@@ -47,7 +47,7 @@ def extract_numeric_prefix(name: str):
     '01 - Tên bài' → (1, 'Tên bài')
     'Tháng 2'      → (None, 'Tháng 2')
     """
-    m = re.match(r"^(\d+)\s*[-–]?\s*(.*)", name)
+    m = re.match(r"^(\d+)\s*[~-–]?\s*(.*)", name)
     if m:
         return int(m.group(1)), m.group(2).strip() or name
     return None, name
@@ -57,7 +57,7 @@ def extract_video_prefix(title: str):
     Lấy phần prefix số từ tên video YouTube.
     '020101 - Tính đơn điệu...' → '020101'
     """
-    m = re.match(r"^(\d{6,10})\s*[-–]", title)
+    m = re.match(r"^(\d{6,10})\s*~", title)
     return m.group(1) if m else None
 
 def parse_prefix_parts(prefix: str):
@@ -387,8 +387,6 @@ def push_to_firestore(data: dict):
     """Push data.json lên Firestore collection 'app_data', doc 'courses'."""
     import google.auth.transport.requests
     creds_info = json.loads(GOOGLE_CREDENTIALS_JSON)
-    print(f"  Service account: {creds_info.get('client_email')}")
-    print(f"  Project: {creds_info.get('project_id')}")
     creds = service_account.Credentials.from_service_account_info(
         creds_info, scopes=FIRESTORE_SCOPES
     )

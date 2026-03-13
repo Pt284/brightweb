@@ -568,7 +568,7 @@ function renderLesson(courseId, lessonId) {
   if (lesson.youtubeId) {
     nv.style.display = 'none';
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}`;
+    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1&iv_load_policy=3`;
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
     iframe.allowFullscreen = true;
     vw.appendChild(iframe);

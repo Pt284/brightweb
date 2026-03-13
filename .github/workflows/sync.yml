@@ -1,0 +1,60 @@
+name: Sync Drive → data.json
+
+on:
+  # Tự động mỗi 6 tiếng
+  schedule:
+    - cron: "0 */1 * * *"
+
+  # Chạy tay từ GitHub UI
+  workflow_dispatch:
+
+  # Trigger từ nút "Sync ngay" trên web (Admin Panel)
+  repository_dispatch:
+    types: [sync-drive]
+
+jobs:
+  sync:
+    name: Sync & Publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # cần để git push data.json
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # 3. Cài dependencies
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 4. Chạy script sync
+      - name: Run sync_drive.py
+        run: python sync_drive.py
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          YOUTUBE_API_KEY:         ${{ secrets.YOUTUBE_API_KEY }}
+          DRIVE_ROOT_FOLDER_ID:    ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
+          COURSE_PLAYLISTS_JSON:   ${{ secrets.COURSE_PLAYLISTS_JSON }}
+          FIRESTORE_PROJECT_ID: ${{ secrets.FIRESTORE_PROJECT_ID }}
+      # 5. Commit data.json nếu có thay đổi
+      - name: Xoá data.json khỏi repo nếu tồn tại
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-files --error-unmatch data.json 2>/dev/null; then
+            git rm data.json
+            git commit -m "chore: remove data.json from repo [skip ci]"
+            git push origin HEAD:main
+            echo "✓ Đã xoá data.json khỏi repo."
+          else
+            echo "✓ data.json không có trong repo, bỏ qua."
+          fi

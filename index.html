@@ -130,16 +130,6 @@ button { cursor: pointer; font-family: inherit; }
 .lesson-main h2 { font-size: 1.15rem; margin-bottom: 16px; }
 .video-wrap { position: relative; padding-bottom: 56.25%; background: #000; border-radius: 10px; overflow: hidden; margin-bottom: 18px; }
 .video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
-/* Che góc trên phải — nút logo/xem trên YouTube */
-.video-wrap::after {
-  content: '';
-  position: absolute;
-  top: 0; right: 0;
-  width: 160px; height: 44px;
-  background: #000;
-  z-index: 2;
-  pointer-events: none;
-}
 .no-video { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: .9rem; }
 .watch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .btn-watch { padding: 8px 20px; border-radius: 8px; border: 1.5px solid var(--green); background: #fff; color: var(--green); font-weight: 500; font-size: .9rem; }
@@ -578,7 +568,7 @@ function renderLesson(courseId, lessonId) {
   if (lesson.youtubeId) {
     nv.style.display = 'none';
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1&disablekb=0&iv_load_policy=3`;
+    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}`;
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
     iframe.allowFullscreen = true;
     vw.appendChild(iframe);

@@ -4,21 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HM-LEAKBASE😈</title>
-
-<!-- ======================================================
-     FIREBASE SDK v9 COMPAT
-====================================================== -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-
 <style>
 /* ── Reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; }
-
 /* ── Variables ── */
 :root {
   --blue: #2563EB;
@@ -28,7 +22,6 @@ button { cursor: pointer; font-family: inherit; }
   --white: #fff;
   --sidebar-w: 280px;
 }
-
 /* ── Header ── */
 #header {
   background: var(--white);
@@ -55,11 +48,9 @@ button { cursor: pointer; font-family: inherit; }
 .btn-sm { padding: 5px 12px; font-size: .82rem; }
 .btn-danger { background: #dc2626; color: #fff; }
 .btn-danger:hover { background: #b91c1c; }
-
 /* ── Pages ── */
 .page { display: none; }
 .page.active { display: block; }
-
 /* ── Landing ── */
 #page-landing {
   display: none;
@@ -73,7 +64,6 @@ button { cursor: pointer; font-family: inherit; }
 #page-landing.active { display: flex; }
 #page-landing h1 { font-size: 2.2rem; color: var(--blue); }
 #page-landing p { color: var(--gray); font-size: 1rem; }
-
 /* ── Home: course grid ── */
 #page-home { padding: 24px 16px; max-width: 900px; margin: 0 auto; }
 #page-home h2 { font-size: 1.2rem; margin-bottom: 16px; }
@@ -91,7 +81,6 @@ button { cursor: pointer; font-family: inherit; }
 .progress-bar { background: #e5e7eb; border-radius: 99px; height: 7px; overflow: hidden; margin-bottom: 6px; }
 .progress-fill { background: var(--green); height: 100%; border-radius: 99px; transition: width .3s; }
 .progress-label { font-size: .8rem; color: var(--gray); }
-
 /* ── Course page ── */
 #page-course { display: none; }
 #page-course.active { display: flex; min-height: calc(100vh - 52px); }
@@ -122,7 +111,6 @@ button { cursor: pointer; font-family: inherit; }
 .tree-children { display: none; }
 .tree-children.open { display: block; }
 .course-main { flex: 1; padding: 24px; overflow-y: auto; }
-
 /* ── Lesson page ── */
 #page-lesson { display: none; }
 #page-lesson.active { display: flex; min-height: calc(100vh - 52px); }
@@ -138,7 +126,6 @@ button { cursor: pointer; font-family: inherit; }
 .doc-list { display: flex; flex-direction: column; gap: 8px; }
 .doc-card { background: var(--white); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
 .doc-card span { font-size: .875rem; }
-
 /* ── Admin panel ── */
 #admin-panel {
   position: fixed;
@@ -155,11 +142,9 @@ button { cursor: pointer; font-family: inherit; }
 #admin-panel.open { display: block; }
 #admin-panel h4 { margin-bottom: 10px; font-size: .95rem; }
 #admin-panel p { font-size: .82rem; color: var(--gray); margin-bottom: 12px; }
-
 /* ── Loading spinner ── */
 #loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.7); align-items: center; justify-content: center; z-index: 999; font-size: 1rem; color: var(--gray); }
 #loading.show { display: flex; }
-
 /* ── Mobile ── */
 @media (max-width: 640px) {
   .sidebar { width: 220px; min-width: 220px; }
@@ -168,11 +153,7 @@ button { cursor: pointer; font-family: inherit; }
 </style>
 </head>
 <body>
-
-<!-- ── Loading overlay ── -->
 <div id="loading">Đang tải...</div>
-
-<!-- ── Header ── -->
 <div id="header" style="display:none">
   <span class="logo" onclick="navigate('home')">🏠 GO TO HOME 😈</span>
   <div class="header-right">
@@ -181,8 +162,6 @@ button { cursor: pointer; font-family: inherit; }
     <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
   </div>
 </div>
-
-<!-- ── Admin panel ── -->
 <div id="admin-panel">
   <h4>⚙ Admin Panel</h4>
   <p id="admin-last-updated">lastUpdated: —</p>
@@ -200,8 +179,6 @@ button { cursor: pointer; font-family: inherit; }
   <div id="security-logs" style="font-size:.78rem;color:#dc2626;max-height:100px;overflow-y:auto"></div>
   <button class="btn btn-sm" style="margin-top:8px;background:#f3f4f6" onclick="loadAdminData()">🔄 Tải lại</button>
 </div>
-
-<!-- ── Page: Landing ── -->
 <div id="page-landing" class="page">
   <h1>BrightWeb</h1>
   <p>Nền tảng học chui trực tuyến</p>
@@ -209,14 +186,10 @@ button { cursor: pointer; font-family: inherit; }
     Đăng nhập bằng Google
   </button>
 </div>
-
-<!-- ── Page: Home ── -->
 <div id="page-home" class="page">
   <h2>Khóa học của bạn</h2>
   <div class="course-grid" id="course-grid"></div>
 </div>
-
-<!-- ── Page: Course ── -->
 <div id="page-course" class="page">
   <div class="sidebar" id="sidebar">
     <div class="sidebar-title" id="sidebar-title">—</div>
@@ -226,8 +199,6 @@ button { cursor: pointer; font-family: inherit; }
     <p style="color:var(--gray);font-size:.9rem">Chọn một bài học từ menu bên trái.</p>
   </div>
 </div>
-
-<!-- ── Page: Lesson ── -->
 <div id="page-lesson" class="page">
   <div class="sidebar" id="sidebar-lesson">
     <div class="sidebar-title" id="sidebar-lesson-title">—</div>
@@ -248,10 +219,6 @@ button { cursor: pointer; font-family: inherit; }
     </div>
   </div>
 </div>
-
-<!-- ========================================================
-     SCRIPT
-======================================================== -->
 <script>
 // ============================================================
 // ⚙ CONFIG — Thay các giá trị này sau khi setup xong
@@ -270,31 +237,26 @@ const ADMIN_EMAIL   = "mcdg5444@gmail.com";
 const SYNC_PROXY_URL = "https://brightweb-sync.mcdg5444.workers.dev"; // ← thay sau khi tạo Worker
 const SYNC_SECRET    = "76V9bynHNy7v6iT7o8uBLIUTco8o6T75xe65iceR7o746Ro6RVO7U6386ClvtILYBUYHKJFEDEY5c3e6UyB3VY938pvyrbY8rpvb983ybr39yrvbPYrbpo38YR3ourkhVHFbljhivl3yrO3BYV8p8b3r83OUP3opWO83U9P8o39yvO389RYo38ov3BIRYOvybrvwhjbkvOBVqouV388Vbo38oESUIOcbu12uOQUIByVQYyqoBQVYBVOi8y8YoyQOYVOb3yVOB83RY938vvRV3V881YVB1I1o1BVORYB1OBRVY18O1b1OY2vvy1RVby11YR21ouR8uovU181vb18v3pVBP19YRV1b9b8v19y1bvoyh1cb1ncx1LKFDTSRDYTguoipUYUTREw4er78U8tytdrfXCVBNjhuyi65REDfgvbhJUOY76r5erdTFUot76RFYJVHcgjdtueR56TIYUgjhGDRYE465r6itytu5767UOJHbgFDRYE6tyiguHVjfyuitUOHJBvnbgJDTU6tugkhVGTue576TIUGKHvjgdTU56tiyfhcGdtYFjggjUThuJGHVjyuR57ruyiuJGBKVHkfyirTDgcjFUY"; // ← đặt chuỗi random bất kỳ, điền giống vào Worker Variable SYNC_SECRET
 // ============================================================
-
 // ── Firebase init ──
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
-
 // ── App state ──
 let appData     = null;  // data.json
 let currentUser = null;
 let progress    = {};    // { lessonId: true/false }
 let currentCourseId = null;
 let currentLessonId = null;
-
 // ── Loading helper ──
 const $ = id => document.getElementById(id);
 const showLoad = () => $('loading').classList.add('show');
 const hideLoad = () => $('loading').classList.remove('show');
-
 // ── Page routing ──
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const p = $('page-' + name);
   if (p) p.classList.add('active');
 }
-
 function navigate(hash, ...args) {
   if (hash === 'home') {
     window.location.hash = '#home';
@@ -310,7 +272,6 @@ function navigate(hash, ...args) {
     renderLesson(courseId, lessonId);
   }
 }
-
 function handleHash() {
   if (!currentUser || !appData) return;
   const h = window.location.hash;
@@ -320,7 +281,6 @@ function handleHash() {
   if (parts[0] === 'lesson' && parts[1] && parts[2]) { renderLesson(parts[1], parts[2]); return; }
   navigate('home');
 }
-
 // ── Auth ──
 function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -329,11 +289,9 @@ function signInGoogle() {
 function signOut() {
   auth.signOut();
 }
-
 auth.onAuthStateChanged(async user => {
   if (user) {
     showLoad();
-
     // ── Kiểm tra whitelist ──
     const allowed = await checkWhitelist(user);
     if (!allowed) {
@@ -343,7 +301,6 @@ auth.onAuthStateChanged(async user => {
       alert(`⛔ Tài khoản ${user.email} không có quyền truy cập.\nLiên hệ quản trị viên để được cấp quyền.`);
       return;
     }
-
     currentUser = user;
     $('header').style.display = 'flex';
     $('user-info').textContent = user.displayName || user.email;
@@ -360,7 +317,6 @@ auth.onAuthStateChanged(async user => {
     showPage('landing');
   }
 });
-
 // ── Kiểm tra email có trong whitelist không ──
 async function checkWhitelist(user) {
   // Admin luôn được vào
@@ -373,7 +329,6 @@ async function checkWhitelist(user) {
     return false; // Mặc định từ chối nếu lỗi
   }
 }
-
 // ── Ghi log truy cập trái phép → admin thấy trong Firestore ──
 async function logUnauthorized(user) {
   try {
@@ -387,7 +342,6 @@ async function logUnauthorized(user) {
     console.warn('Ghi log thất bại:', e.message);
   }
 }
-
 // ── Load data từ Firestore (thay vì data.json) ──
 async function loadData() {
   try {
@@ -405,7 +359,6 @@ async function loadData() {
     appData = getMockData();
   }
 }
-
 // ── Load progress từ Firestore ──
 async function loadProgress() {
   if (!currentUser) return;
@@ -422,7 +375,6 @@ async function loadProgress() {
     console.warn('Firestore không khả dụng:', e.message);
   }
 }
-
 // ── Firestore: save progress ──
 async function saveProgress(lessonId, courseId, watched) {
   if (!currentUser) return;
@@ -438,29 +390,24 @@ async function saveProgress(lessonId, courseId, watched) {
     console.warn('Lưu progress thất bại:', e.message);
   }
 }
-
 // ── Helpers: traverse tree ──
 function findCourse(courseId) {
   return appData.courses.find(c => c.id === courseId);
 }
-
 function getAllLessons(node) {
   if (node.type === 'lesson') return [node];
   if (!node.children) return [];
   return node.children.flatMap(getAllLessons);
 }
-
 function findLesson(course, lessonId) {
   const all = course.tree.flatMap(getAllLessons);
   return all.find(l => l.id === lessonId);
 }
-
 function countProgress(course) {
   const all = course.tree.flatMap(getAllLessons);
   const done = all.filter(l => progress[l.id]).length;
   return { done, total: all.length };
 }
-
 // ── Render: Home ──
 function renderHome() {
   showPage('home');
@@ -480,18 +427,15 @@ function renderHome() {
     grid.appendChild(card);
   });
 }
-
 // ── Render: Sidebar tree ──
 function buildTree(nodes, courseId, indent, activeLessonId) {
   const ul = document.createElement('div');
   nodes.forEach(node => {
     const wrap = document.createElement('div');
     wrap.className = 'tree-node';
-
     const label = document.createElement('div');
     label.className = 'tree-label';
     label.style.paddingLeft = (14 + indent * 14) + 'px';
-
     if (node.type === 'lesson') {
       const checked = progress[node.id] ? '✓' : '';
       label.innerHTML = `<span class="icon">📄</span><span style="flex:1">${node.title}</span><span class="check">${checked}</span>`;
@@ -514,13 +458,11 @@ function buildTree(nodes, courseId, indent, activeLessonId) {
       ul.appendChild(wrap);
       return;
     }
-
     wrap.appendChild(label);
     ul.appendChild(wrap);
   });
   return ul;
 }
-
 // ── Render: Course ──
 function renderCourse(courseId) {
   currentCourseId = courseId;
@@ -531,40 +473,32 @@ function renderCourse(courseId) {
   $('sidebar-tree').innerHTML = '';
   $('sidebar-tree').appendChild(buildTree(course.tree, courseId, 0, null));
 }
-
 // ── Render: Lesson ──
 function renderLesson(courseId, lessonId) {
   currentCourseId = courseId;
   currentLessonId = lessonId;
   showPage('lesson');
-
   const course = findCourse(courseId);
   if (!course) { navigate('home'); return; }
-
   // Sidebar
   $('sidebar-lesson-title').textContent = course.title;
   $('sidebar-lesson-tree').innerHTML = '';
   $('sidebar-lesson-tree').appendChild(buildTree(course.tree, courseId, 0, lessonId));
-
   // Auto-expand active nodes
   document.querySelectorAll('#sidebar-lesson-tree .tree-label.active-lesson').forEach(el => {
     let parent = el.parentElement?.parentElement?.previousElementSibling;
     // expand parents — simple approach: open all tree-children in sidebar
   });
-
   const lesson = findLesson(course, lessonId);
   if (!lesson) return;
-
   // Title
   $('lesson-title').textContent = lesson.title;
-
   // Video
   const vw = $('video-wrap');
   const nv = $('no-video');
   // Remove old iframe if any
   const oldIframe = vw.querySelector('iframe');
   if (oldIframe) oldIframe.remove();
-
   if (lesson.youtubeId) {
     nv.style.display = 'none';
     const iframe = document.createElement('iframe');
@@ -575,10 +509,8 @@ function renderLesson(courseId, lessonId) {
   } else {
     nv.style.display = 'flex';
   }
-
   // Watch button
   updateWatchBtn();
-
   // Documents
   const dl = $('doc-list');
   dl.innerHTML = '';
@@ -593,7 +525,6 @@ function renderLesson(courseId, lessonId) {
     dl.innerHTML = '<p style="font-size:.85rem;color:var(--gray)">Không có tài liệu</p>';
   }
 }
-
 function updateWatchBtn() {
   const btn = $('btn-watch');
   const status = $('watch-status');
@@ -603,7 +534,6 @@ function updateWatchBtn() {
   btn.className = 'btn-watch' + (watched ? ' watched' : '');
   status.textContent = '';
 }
-
 async function toggleWatch() {
   if (!currentLessonId || !currentCourseId) return;
   const newVal = !progress[currentLessonId];
@@ -611,13 +541,11 @@ async function toggleWatch() {
   updateWatchBtn();
   await saveProgress(currentLessonId, currentCourseId, newVal);
 }
-
 // ── Admin ──
 function toggleAdmin() {
   $('admin-panel').classList.toggle('open');
   if ($('admin-panel').classList.contains('open')) loadAdminData();
 }
-
 async function loadAdminData() {
   // Whitelist
   const wl = $('whitelist-list');
@@ -636,7 +564,6 @@ async function loadAdminData() {
       });
     }
   } catch(e) { wl.innerHTML = 'Lỗi: ' + e.message; }
-
   // Security logs
   const sl = $('security-logs');
   sl.innerHTML = 'Đang tải...';
@@ -656,7 +583,6 @@ async function loadAdminData() {
     }
   } catch(e) { sl.innerHTML = 'Lỗi: ' + e.message; }
 }
-
 async function addWhitelist() {
   const input = $('whitelist-input');
   const email = input.value.trim().toLowerCase();
@@ -665,7 +591,6 @@ async function addWhitelist() {
   input.value = '';
   loadAdminData();
 }
-
 async function removeWhitelist(email) {
   if (!confirm(`Xoá quyền của ${email}?`)) return;
   await db.collection('whitelist').doc(email).delete();
@@ -676,7 +601,6 @@ document.addEventListener('click', e => {
     $('admin-panel').classList.remove('open');
   }
 });
-
 async function triggerSync(e) {
   const btn = e.target;
   btn.disabled = true;
@@ -699,10 +623,8 @@ async function triggerSync(e) {
   btn.disabled = false;
   btn.textContent = '🔄 Sync ngay';
 }
-
 // ── Hash navigation ──
 window.addEventListener('hashchange', handleHash);
-
 // ── Mock data (dùng khi chưa có data.json) ──
 function getMockData() {
   return {

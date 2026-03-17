@@ -256,116 +256,19 @@ const SYNC_SECRET    = "76V9bynHNy7v6iT7o8uBLIUTco8o6T75xe65iceR7o746Ro6RVO7U638
 
 // ── Particles config ── PASTE JSON CỦA BẠN VÀO ĐÂY
 const PARTICLES_CONFIG = {
-{
   "particles": {
-    "number": {
-      "value": 50,
-      "density": {
-        "enable": true,
-        "value_area": 300
-      }
-    },
-    "color": {
-      "value": "#37b1f8"
-    },
-    "shape": {
-      "type": "circle",
-      "stroke": {
-        "width": 4,
-        "color": "#1d4470"
-      },
-      "polygon": {
-        "nb_sides": 5
-      },
-      "image": {
-        "src": "img/github.svg",
-        "width": 100,
-        "height": 100
-      }
-    },
-    "opacity": {
-      "value": 1,
-      "random": true,
-      "anim": {
-        "enable": true,
-        "speed": 1,
-        "opacity_min": 0.7,
-        "sync": false
-      }
-    },
-    "size": {
-      "value": 5,
-      "random": true,
-      "anim": {
-        "enable": true,
-        "speed": 5,
-        "size_min": 4,
-        "sync": true
-      }
-    },
-    "line_linked": {
-      "enable": true,
-      "distance": 130,
-      "color": "#ffffff",
-      "opacity": 0.3,
-      "width": 1
-    },
-    "move": {
-      "enable": true,
-      "speed": 4,
-      "direction": "none",
-      "random": true,
-      "straight": false,
-      "out_mode": "out",
-      "bounce": false,
-      "attract": {
-        "enable": false,
-        "rotateX": 2479.0083966413445,
-        "rotateY": 1200
-      }
-    }
+    "number": { "value": 50 },
+    "color": { "value": "#37b1f8" },
+    "line_linked": { "enable": true, "color": "#ffffff", "opacity": 0.3 },
+    "move": { "enable": true, "speed": 4 }
   },
   "interactivity": {
-    "detect_on": "canvas",
     "events": {
-      "onhover": {
-        "enable": true,
-        "mode": "bubble"
-      },
-      "onclick": {
-        "enable": true,
-        "mode": "push"
-      },
-      "resize": true
-    },
-    "modes": {
-      "grab": {
-        "distance": 400,
-        "line_linked": {
-          "opacity": 1
-        }
-      },
-      "bubble": {
-        "distance": 100,
-        "size": 10,
-        "duration": 0.971951110859124,
-        "opacity": 0.9962498886306022,
-        "speed": 3
-      },
-      "repulse": {
-        "distance": 130,
-        "duration": 0.4
-      },
-      "push": {
-        "particles_nb": 4
-      },
-      "remove": {
-        "particles_nb": 2
-      }
+      "onhover": { "enable": true, "mode": "bubble" },
+      "onclick": { "enable": true, "mode": "push" }
     }
   },
   "retina_detect": true
-}
 };
 
 firebase.initializeApp(firebaseConfig);

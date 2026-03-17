@@ -5,6 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HM-LEAKBASE😈</title>
 <link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<script>
+(function() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const link = document.querySelector("link[rel='icon']") || document.createElement('link');
+  link.rel = 'icon'; link.type = 'image/png';
+  document.head.appendChild(link);
+
+  const anim = lottie.loadAnimation({
+    container: document.createElement('div'), // off-screen
+    renderer: 'canvas',
+    loop: true, autoplay: true,
+    path: 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/lottie.json',
+    rendererSettings: { context: ctx, clearCanvas: true,
+      preserveAspectRatio: 'xMidYMid meet' }
+  });
+
+  anim.addEventListener('enterFrame', () => {
+    link.href = canvas.toDataURL('image/png');
+  });
+})();
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>

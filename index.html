@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HM-LEAKBASE💦</title>
-<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-<link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
+<title>HM-LEAKBASE😈</title>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -56,8 +54,6 @@ button { cursor: pointer; font-family: inherit; }
 /* ── Landing ── */
 #page-landing {
   display: none;
-  position: relative;
-  background: #37b1f8;
   align-items: center;
   justify-content: center;
   min-height: calc(100vh - 52px);
@@ -184,14 +180,11 @@ button { cursor: pointer; font-family: inherit; }
   <button class="btn btn-sm" style="margin-top:8px;background:#f3f4f6" onclick="loadAdminData()">🔄 Tải lại</button>
 </div>
 <div id="page-landing" class="page">
-  <div id="particles-js" style="position:absolute;inset:0;z-index:0"></div>
-  <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:20px;text-align:center">
   <h1>BrightWeb</h1>
   <p>Nền tảng học chui trực tuyến</p>
   <button class="btn btn-primary" onclick="signInGoogle()" style="margin-top:8px;padding:10px 28px;font-size:1rem;">
     Đăng nhập bằng Google
   </button>
-</div>
 </div>
 <div id="page-home" class="page">
   <h2>Khóa học của bạn</h2>
@@ -509,7 +502,7 @@ function renderLesson(courseId, lessonId) {
   if (lesson.youtubeId) {
     nv.style.display = 'none';
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1&disablekb=0&iv_load_policy=3`;
+    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1&iv_load_policy=3`;
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
     iframe.allowFullscreen = true;
     vw.appendChild(iframe);
@@ -630,119 +623,6 @@ async function triggerSync(e) {
   btn.disabled = false;
   btn.textContent = '🔄 Sync ngay';
 }
-// ── Particles.js ──
-particlesJS('particles-js', 
-{
-  "particles": {
-    "number": {
-      "value": 50,
-      "density": {
-        "enable": true,
-        "value_area": 300
-      }
-    },
-    "color": {
-      "value": "#37b1f8"
-    },
-    "shape": {
-      "type": "circle",
-      "stroke": {
-        "width": 4,
-        "color": "#1d4470"
-      },
-      "polygon": {
-        "nb_sides": 5
-      },
-      "image": {
-        "src": "img/github.svg",
-        "width": 100,
-        "height": 100
-      }
-    },
-    "opacity": {
-      "value": 1,
-      "random": true,
-      "anim": {
-        "enable": true,
-        "speed": 1,
-        "opacity_min": 0.7,
-        "sync": false
-      }
-    },
-    "size": {
-      "value": 5,
-      "random": true,
-      "anim": {
-        "enable": true,
-        "speed": 5,
-        "size_min": 4,
-        "sync": true
-      }
-    },
-    "line_linked": {
-      "enable": true,
-      "distance": 130,
-      "color": "#ffffff",
-      "opacity": 0.3,
-      "width": 1
-    },
-    "move": {
-      "enable": true,
-      "speed": 4,
-      "direction": "none",
-      "random": true,
-      "straight": false,
-      "out_mode": "out",
-      "bounce": false,
-      "attract": {
-        "enable": false,
-        "rotateX": 2479.0083966413445,
-        "rotateY": 1200
-      }
-    }
-  },
-  "interactivity": {
-    "detect_on": "canvas",
-    "events": {
-      "onhover": {
-        "enable": true,
-        "mode": "bubble"
-      },
-      "onclick": {
-        "enable": true,
-        "mode": "push"
-      },
-      "resize": true
-    },
-    "modes": {
-      "grab": {
-        "distance": 400,
-        "line_linked": {
-          "opacity": 1
-        }
-      },
-      "bubble": {
-        "distance": 100,
-        "size": 10,
-        "duration": 0.971951110859124,
-        "opacity": 0.9962498886306022,
-        "speed": 3
-      },
-      "repulse": {
-        "distance": 130,
-        "duration": 0.4
-      },
-      "push": {
-        "particles_nb": 4
-      },
-      "remove": {
-        "particles_nb": 2
-      }
-    }
-  },
-  "retina_detect": true
-}
-);
 // ── Hash navigation ──
 window.addEventListener('hashchange', handleHash);
 // ── Mock data (dùng khi chưa có data.json) ──

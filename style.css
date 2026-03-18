@@ -444,6 +444,45 @@ button { cursor: pointer; font-family: inherit; }
   margin-top: 8px;
 }
 
+.btn-glass-login {
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+  border-radius: 99px;
+  border: 1px solid rgba(255,255,255,.25);
+  cursor: pointer;
+  letter-spacing: .02em;
+
+  /* Live glass effect — capture được cả WebGL canvas */
+  background: rgba(255,255,255,.08);
+  backdrop-filter: blur(14px) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(180%) brightness(1.1);
+
+  box-shadow:
+    0 8px 32px rgba(0,145,234,.3),
+    0 2px 8px rgba(0,0,0,.4),
+    inset 0 1px 0 rgba(255,255,255,.2),
+    inset 0 -1px 0 rgba(0,0,0,.15);
+
+  transition: transform .15s, box-shadow .15s, background .15s;
+}
+
+.btn-glass-login:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,.13);
+  box-shadow:
+    0 12px 40px rgba(0,145,234,.4),
+    0 4px 12px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.25),
+    inset 0 -1px 0 rgba(0,0,0,.2);
+}
+
+.btn-glass-login:active {
+  transform: translateY(0);
+}
+
 /* Course cards dùng glass — override màu chữ */
 .glass-card-content {
   position: relative;

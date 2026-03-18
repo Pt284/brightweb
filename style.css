@@ -391,6 +391,83 @@ button { cursor: pointer; font-family: inherit; }
 .doc-card span { font-size: .875rem; color: var(--text-dim); }
 
 /* ============================================================
+   LIQUID GLASS OVERRIDES
+   ============================================================ */
+
+/* Glass containers dùng trong BrightWeb */
+.glass-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.glass-container-circle { aspect-ratio: 1/1; flex-shrink: 0; flex-grow: 0; }
+.glass-container-pill   { flex-shrink: 0; flex-grow: 0; }
+
+.glass-button {
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0,145,234,.25), 0 2px 8px rgba(0,0,0,.4);
+  cursor: pointer;
+  pointer-events: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: transform .15s, box-shadow .15s;
+}
+.glass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0,145,234,.35), 0 4px 12px rgba(0,0,0,.5);
+}
+.glass-button-circle { aspect-ratio: 1/1; flex-shrink: 0; flex-grow: 0; }
+
+.glass-button-text {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  font-weight: 600;
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,.4);
+  letter-spacing: .02em;
+}
+
+/* Wrapper cho glass login button trên landing */
+#landing-glass-btn {
+  margin-top: 8px;
+}
+
+/* Course cards dùng glass — override màu chữ */
+.glass-card-content {
+  position: relative;
+  z-index: 1;
+  padding: 18px;
+  width: 100%;
+  pointer-events: none;
+}
+.glass-card-content h3 { font-size: 1rem; margin-bottom: 10px; color: #fff; }
+
+/* Admin panel glass override */
+#admin-panel.glass-admin {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  min-width: auto;
+}
+#admin-panel.glass-admin .admin-inner {
+  padding: 16px;
+  color: var(--text);
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 640px) {

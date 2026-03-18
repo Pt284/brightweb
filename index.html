@@ -6,10 +6,14 @@
 <title>HM-LEAKBASE😈</title>
 <link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="glass.css">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="container.js"></script>
+<script src="button.js"></script>
 </head>
 <body>
 
@@ -47,9 +51,7 @@
   <div id="landing-content">
     <h1>HM-LEAKBASE 😈</h1>
     <p>Nền tảng học chui trực tuyến</p>
-    <button class="btn btn-primary" onclick="signInGoogle()" style="padding:10px 28px;font-size:1rem;">
-      Đăng nhập bằng Google
-    </button>
+    <div id="landing-glass-btn"></div>
   </div>
 </div>
 
@@ -149,8 +151,24 @@ function showPage(name) {
   const p = $('page-' + name);
   if (p) p.classList.add('active');
   if (name === 'landing' && !window._pjsLoaded) {
-    window._pjsLoaded = true;
-    particlesJS('particles-js', PARTICLES_CONFIG);
+    window._pjsLoaded = true
+    particlesJS('particles-js', PARTICLES_CONFIG)
+    // Glass login button — khởi tạo sau khi particles render xong
+    setTimeout(() => {
+      const wrap = $('landing-glass-btn')
+      if (wrap && !wrap._glassInit) {
+        wrap._glassInit = true
+        const btn = new Button({
+          text: 'Đăng nhập bằng Google',
+          size: 18,
+          type: 'pill',
+          tintOpacity: 0.3,
+          warp: false,
+          onClick: () => signInGoogle()
+        })
+        wrap.appendChild(btn.element)
+      }
+    }, 300)
   }
 }
 

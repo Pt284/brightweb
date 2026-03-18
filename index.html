@@ -51,7 +51,11 @@
   <div id="landing-content">
     <h1>HM-LEAKBASE 😈</h1>
     <p>Nền tảng học chui trực tuyến</p>
-    <div id="landing-glass-btn"></div>
+    <div id="landing-glass-btn">
+      <button class="btn-glass-login" onclick="signInGoogle()">
+        Đăng nhập bằng Google
+      </button>
+    </div>
   </div>
 </div>
 
@@ -153,22 +157,6 @@ function showPage(name) {
   if (name === 'landing' && !window._pjsLoaded) {
     window._pjsLoaded = true
     particlesJS('particles-js', PARTICLES_CONFIG)
-    // Glass login button — khởi tạo sau khi particles render xong
-    setTimeout(() => {
-      const wrap = $('landing-glass-btn')
-      if (wrap && !wrap._glassInit) {
-        wrap._glassInit = true
-        const btn = new Button({
-          text: 'Đăng nhập bằng Google',
-          size: 18,
-          type: 'pill',
-          tintOpacity: 0.3,
-          warp: false,
-          onClick: () => signInGoogle()
-        })
-        wrap.appendChild(btn.element)
-      }
-    }, 300)
   }
 }
 

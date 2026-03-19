@@ -19,7 +19,7 @@
 
 <div id="loading">Đang tải...</div>
 
-<div id="header" style="display:none">
+<div id="header" class="glass" style="display:none">
   <span class="logo" onclick="navigate('home')">🏠 GO TO HOME 😈</span>
   <div class="header-right">
     <span id="user-info"></span>
@@ -28,7 +28,7 @@
   </div>
 </div>
 
-<div id="admin-panel">
+<div id="admin-panel" class="glass">
   <h4>⚙ Admin Panel</h4>
   <p id="admin-last-updated">lastUpdated: —</p>
   <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
@@ -67,7 +67,7 @@
 
 <!-- Course -->
 <div id="page-course" class="page">
-  <div class="sidebar" id="sidebar">
+  <div class="sidebar glass" id="sidebar">
     <div class="sidebar-title" id="sidebar-title">—</div>
     <div id="sidebar-tree"></div>
   </div>
@@ -78,7 +78,7 @@
 
 <!-- Lesson -->
 <div id="page-lesson" class="page">
-  <div class="sidebar" id="sidebar-lesson">
+  <div class="sidebar glass" id="sidebar-lesson">
     <div class="sidebar-title" id="sidebar-lesson-title">—</div>
     <div id="sidebar-lesson-tree"></div>
   </div>
@@ -274,19 +274,19 @@ function countProgress(course) {
 
 // ── RENDER: HOME ──
 function renderHome() {
-  showPage('home');
-  const grid = $('course-grid'); grid.innerHTML = '';
+  showPage('home')
+  const grid = $('course-grid'); grid.innerHTML = ''
   appData.courses.forEach(course => {
-    const { done, total } = countProgress(course);
-    const pct = total ? Math.round(done/total*100) : 0;
-    const card = document.createElement('div'); card.className = 'course-card';
+    const { done, total } = countProgress(course)
+    const pct = total ? Math.round(done/total*100) : 0
+    const card = document.createElement('div'); card.className = 'course-card glass'
     card.innerHTML = `
       <h3>${course.title}</h3>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`;
-    card.onclick = () => navigate('course', course.id);
-    grid.appendChild(card);
-  });
+      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`
+    card.onclick = () => navigate('course', course.id)
+    grid.appendChild(card)
+  })
 }
 
 // ── RENDER: TREE ──
@@ -368,8 +368,8 @@ async function toggleWatch() {
 
 // ── ADMIN ──
 function toggleAdmin() {
-  $('admin-panel').classList.toggle('open');
-  if ($('admin-panel').classList.contains('open')) loadAdminData();
+  $('admin-panel').classList.toggle('open')
+  if ($('admin-panel').classList.contains('open')) loadAdminData()
 }
 
 async function loadAdminData() {

@@ -274,19 +274,31 @@ function countProgress(course) {
 
 // ── RENDER: HOME ──
 function renderHome() {
-  showPage('home');
-  const grid = $('course-grid'); grid.innerHTML = '';
+  showPage('home')
+  const grid = $('course-grid'); grid.innerHTML = ''
   appData.courses.forEach(course => {
-    const { done, total } = countProgress(course);
-    const pct = total ? Math.round(done/total*100) : 0;
-    const card = document.createElement('div'); card.className = 'course-card';
-    card.innerHTML = `
+    const { done, total } = countProgress(course)
+    const pct = total ? Math.round(done/total*100) : 0
+
+    // Glass container cho mỗi card
+    const glassCard = new Container({
+      type: 'rounded',
+      borderRadius: 10,
+      tintOpacity: window.glassControls.tintOpacity
+    })
+    glassCard.element.classList.add('course-card')
+    glassCard.element.style.cursor = 'pointer'
+
+    const content = document.createElement('div')
+    content.className = 'glass-card-content'
+    content.innerHTML = `
       <h3>${course.title}</h3>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`;
-    card.onclick = () => navigate('course', course.id);
-    grid.appendChild(card);
-  });
+      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`
+    glassCard.element.appendChild(content)
+    glassCard.element.onclick = () => navigate('course', course.id)
+    grid.appendChild(glassCard.element)
+  })
 }
 
 // ── RENDER: TREE ──
@@ -368,8 +380,39 @@ async function toggleWatch() {
 
 // ── ADMIN ──
 function toggleAdmin() {
-  $('admin-panel').classList.toggle('open');
-  if ($('admin-panel').classList.contains('open')) loadAdminData();
+  $('admin-panel').classList.toggle('open')
+  if ($('admin-panel').classList.contains('open')) {
+    loadAdminData()
+    // Khởi tạo glass cho admin panel nếu chưa có
+    if (!window._adminGlass) {
+      window._adminGlass = true
+      setTimeout(() => {
+        const panel = $('admin-panel')
+        if (!panel._glassWrap) {
+          panel._glassWrap = true
+          const glassWrap = new Container({
+            type: 'rounded',
+            borderRadius: 10,
+            tintOpacity: window.glassControls.tintOpacity
+          })
+          glassWrap.element.style.cssText = `
+            position:fixed;top:60px;right:16px;
+            min-width:260px;z-index:200;
+          `
+          // Di chuyển nội dung admin vào glass container
+          const inner = document.createElement('div')
+          inner.className = 'admin-inner'
+          while (panel.firstChild) inner.appendChild(panel.firstChild)
+          glassWrap.element.appendChild(inner)
+          panel.parentNode.insertBefore(glassWrap.element, panel)
+          panel.remove()
+          // Gán lại id để các hàm khác vẫn tìm được
+          glassWrap.element.id = 'admin-panel'
+          glassWrap.element.classList.add('open')
+        }
+      }, 100)
+    }
+  }
 }
 
 async function loadAdminData() {

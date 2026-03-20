@@ -4,23 +4,176 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HM-LEAKBASE😈</title>
-<link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="glass.css">
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+
+<!-- ======================================================
+     FIREBASE SDK v9 COMPAT
+====================================================== -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="bg.js"></script>
-<script src="container.js"></script>
-<script src="button.js"></script>
+
+<style>
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: inherit; }
+
+/* ── Variables ── */
+:root {
+  --blue: #2563EB;
+  --green: #16A34A;
+  --gray: #6b7280;
+  --border: #e5e7eb;
+  --white: #fff;
+  --sidebar-w: 280px;
+}
+
+/* ── Header ── */
+#header {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+#header .logo { font-weight: 700; font-size: 1.15rem; color: var(--blue); cursor: pointer; }
+#header .header-right { display: flex; align-items: center; gap: 12px; }
+#user-info { font-size: .85rem; color: var(--gray); }
+.btn-icon { background: none; border: none; font-size: 1.2rem; padding: 4px 8px; border-radius: 6px; }
+.btn-icon:hover { background: #f3f4f6; }
+.btn { padding: 8px 18px; border-radius: 8px; border: none; font-size: .9rem; font-weight: 500; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-outline { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+.btn-outline:hover { background: #eff6ff; }
+.btn-sm { padding: 5px 12px; font-size: .82rem; }
+.btn-danger { background: #dc2626; color: #fff; }
+.btn-danger:hover { background: #b91c1c; }
+
+/* ── Pages ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── Landing ── */
+#page-landing {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 52px);
+  flex-direction: column;
+  gap: 20px;
+  text-align: center;
+}
+#page-landing.active { display: flex; }
+#page-landing h1 { font-size: 2.2rem; color: var(--blue); }
+#page-landing p { color: var(--gray); font-size: 1rem; }
+
+/* ── Home: course grid ── */
+#page-home { padding: 24px 16px; max-width: 900px; margin: 0 auto; }
+#page-home h2 { font-size: 1.2rem; margin-bottom: 16px; }
+.course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.course-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  cursor: pointer;
+  transition: box-shadow .15s;
+}
+.course-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.course-card h3 { font-size: 1rem; margin-bottom: 10px; }
+.progress-bar { background: #e5e7eb; border-radius: 99px; height: 7px; overflow: hidden; margin-bottom: 6px; }
+.progress-fill { background: var(--green); height: 100%; border-radius: 99px; transition: width .3s; }
+.progress-label { font-size: .8rem; color: var(--gray); }
+
+/* ── Course page ── */
+#page-course { display: none; }
+#page-course.active { display: flex; min-height: calc(100vh - 52px); }
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px 0;
+}
+.sidebar-title { padding: 4px 14px 10px; font-weight: 600; font-size: .95rem; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.tree-node { }
+.tree-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: .875rem;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0;
+}
+.tree-label:hover { background: #f9fafb; }
+.tree-label.active-lesson { background: #eff6ff; color: var(--blue); font-weight: 500; }
+.tree-label .icon { font-size: .7rem; width: 14px; text-align: center; flex-shrink: 0; color: var(--gray); }
+.tree-label .check { color: var(--green); font-size: .8rem; flex-shrink: 0; }
+.tree-children { display: none; }
+.tree-children.open { display: block; }
+.course-main { flex: 1; padding: 24px; overflow-y: auto; }
+
+/* ── Lesson page ── */
+#page-lesson { display: none; }
+#page-lesson.active { display: flex; min-height: calc(100vh - 52px); }
+.lesson-main { flex: 1; padding: 24px; overflow-y: auto; max-width: 860px; }
+.lesson-main h2 { font-size: 1.15rem; margin-bottom: 16px; }
+.video-wrap { position: relative; padding-bottom: 56.25%; background: #000; border-radius: 10px; overflow: hidden; margin-bottom: 18px; }
+.video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+.no-video { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: .9rem; }
+.watch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.btn-watch { padding: 8px 20px; border-radius: 8px; border: 1.5px solid var(--green); background: #fff; color: var(--green); font-weight: 500; font-size: .9rem; }
+.btn-watch.watched { background: var(--green); color: #fff; }
+.docs-section h3 { font-size: .95rem; margin-bottom: 10px; color: var(--gray); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; font-size: .78rem; }
+.doc-list { display: flex; flex-direction: column; gap: 8px; }
+.doc-card { background: var(--white); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+.doc-card span { font-size: .875rem; }
+
+/* ── Admin panel ── */
+#admin-panel {
+  position: fixed;
+  top: 60px; right: 16px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 260px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.1);
+  z-index: 200;
+  display: none;
+}
+#admin-panel.open { display: block; }
+#admin-panel h4 { margin-bottom: 10px; font-size: .95rem; }
+#admin-panel p { font-size: .82rem; color: var(--gray); margin-bottom: 12px; }
+
+/* ── Loading spinner ── */
+#loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.7); align-items: center; justify-content: center; z-index: 999; font-size: 1rem; color: var(--gray); }
+#loading.show { display: flex; }
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .sidebar { width: 220px; min-width: 220px; }
+  .course-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
 
+<!-- ── Loading overlay ── -->
 <div id="loading">Đang tải...</div>
 
-<div id="header" class="glass" style="display:none">
+<!-- ── Header ── -->
+<div id="header" style="display:none">
   <span class="logo" onclick="navigate('home')">🏠 GO TO HOME 😈</span>
   <div class="header-right">
     <span id="user-info"></span>
@@ -29,57 +182,54 @@
   </div>
 </div>
 
-<div id="admin-panel" class="glass">
+<!-- ── Admin panel ── -->
+<div id="admin-panel">
   <h4>⚙ Admin Panel</h4>
   <p id="admin-last-updated">lastUpdated: —</p>
   <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
-  <hr>
-  <div class="section-label">Whitelist</div>
-  <div class="admin-row">
-    <input id="whitelist-input" type="email" placeholder="email@gmail.com">
+  <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+  <div style="margin-bottom:8px;font-size:.82rem;font-weight:600">Whitelist</div>
+  <div style="display:flex;gap:6px;margin-bottom:8px">
+    <input id="whitelist-input" type="email" placeholder="email@gmail.com"
+      style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem">
     <button class="btn btn-primary btn-sm" onclick="addWhitelist()">Thêm</button>
   </div>
-  <div id="whitelist-list"></div>
-  <hr>
-  <div class="section-label">Truy cập trái phép</div>
-  <div id="security-logs"></div>
-  <button class="btn-reload" onclick="loadAdminData()">🔄 Tải lại</button>
+  <div id="whitelist-list" style="font-size:.8rem;color:var(--gray);max-height:120px;overflow-y:auto"></div>
+  <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+  <div style="margin-bottom:6px;font-size:.82rem;font-weight:600">Truy cập trái phép</div>
+  <div id="security-logs" style="font-size:.78rem;color:#dc2626;max-height:100px;overflow-y:auto"></div>
+  <button class="btn btn-sm" style="margin-top:8px;background:#f3f4f6" onclick="loadAdminData()">🔄 Tải lại</button>
 </div>
 
-<!-- Landing -->
+<!-- ── Page: Landing ── -->
 <div id="page-landing" class="page">
-  <div id="particles-js"></div>
-  <div id="landing-content">
-    <h1>HM-LEAKBASE 😈</h1>
-    <p>Nền tảng học chui trực tuyến</p>
-    <div id="landing-glass-btn">
-      <button class="btn-glass-login" onclick="signInGoogle()">
-        Đăng nhập bằng Google
-      </button>
-    </div>
-  </div>
+  <h1>BrightWeb</h1>
+  <p>Nền tảng học chui trực tuyến</p>
+  <button class="btn btn-primary" onclick="signInGoogle()" style="margin-top:8px;padding:10px 28px;font-size:1rem;">
+    Đăng nhập bằng Google
+  </button>
 </div>
 
-<!-- Home -->
+<!-- ── Page: Home ── -->
 <div id="page-home" class="page">
   <h2>Khóa học của bạn</h2>
   <div class="course-grid" id="course-grid"></div>
 </div>
 
-<!-- Course -->
+<!-- ── Page: Course ── -->
 <div id="page-course" class="page">
-  <div class="sidebar glass" id="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-title" id="sidebar-title">—</div>
     <div id="sidebar-tree"></div>
   </div>
   <div class="course-main">
-    <p>Chọn một bài học từ menu bên trái.</p>
+    <p style="color:var(--gray);font-size:.9rem">Chọn một bài học từ menu bên trái.</p>
   </div>
 </div>
 
-<!-- Lesson -->
+<!-- ── Page: Lesson ── -->
 <div id="page-lesson" class="page">
-  <div class="sidebar glass" id="sidebar-lesson">
+  <div class="sidebar" id="sidebar-lesson">
     <div class="sidebar-title" id="sidebar-lesson-title">—</div>
     <div id="sidebar-lesson-tree"></div>
   </div>
@@ -90,7 +240,7 @@
     </div>
     <div class="watch-bar">
       <button class="btn-watch" id="btn-watch" onclick="toggleWatch()">Đánh dấu đã xem</button>
-      <span id="watch-status"></span>
+      <span id="watch-status" style="font-size:.85rem;color:var(--gray)"></span>
     </div>
     <div class="docs-section">
       <h3>Tài liệu</h3>
@@ -99,8 +249,13 @@
   </div>
 </div>
 
+<!-- ========================================================
+     SCRIPT
+======================================================== -->
 <script>
-// ── CONFIG ──
+// ============================================================
+// ⚙ CONFIG — Thay các giá trị này sau khi setup xong
+// ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyCRLENh_UEBdXzukzpXVHHTltSapqyNWVc",
   authDomain: "brightwebaccbase.firebaseapp.com",
@@ -110,64 +265,49 @@ const firebaseConfig = {
   appId: "1:482143691238:web:67dd3871bc93bf08c03627",
   measurementId: "G-LXMQJM43PN"
 };
-const ADMIN_EMAIL    = "mcdg5444@gmail.com";
-const SYNC_PROXY_URL = "https://brightweb-sync.mcdg5444.workers.dev";
-const SYNC_SECRET    = "76V9bynHNy7v6iT7o8uBLIUTco8o6T75xe65iceR7o746Ro6RVO7U6386ClvtILYBUYHKJFEDEY5c3e6UyB3VY938pvyrbY8rpvb983ybr39yrvbPYrbpo38YR3ourkhVHFbljhivl3yrO3BYV8p8b3r83OUP3opWO83U9P8o39yvO389RYo38ov3BIRYOvybrvwhjbkvOBVqouV388Vbo38oESUIOcbu12uOQUIByVQYyqoBQVYBVOi8y8YoyQOYVOb3yVOB83RY938vvRV3V881YVB1I1o1BVORYB1OBRVY18O1b1OY2vvy1RVby11YR21ouR8uovU181vb18v3pVBP19YRV1b9b8v19y1bvoyh1cb1ncx1LKFDTSRDYTguoipUYUTREw4er78U8tytdrfXCVBNjhuyi65REDfgvbhJUOY76r5erdTFUot76RFYJVHcgjdtueR56TIYUgjhGDRYE465r6itytu5767UOJHbgFDRYE6tyiguHVjfyuitUOHJBvnbgJDTU6tugkhVGTue576TIUGKHvjgdTU56tiyfhcGdtYFjggjUThuJGHVjyuR57ruyiuJGBKVHkfyirTDgcjFUY";
+const ADMIN_EMAIL   = "mcdg5444@gmail.com";
+// Cloudflare Worker proxy URL — token GitHub được giữ server-side, không lộ trong source
+const SYNC_PROXY_URL = "https://brightweb-sync.mcdg5444.workers.dev"; // ← thay sau khi tạo Worker
+const SYNC_SECRET    = "76V9bynHNy7v6iT7o8uBLIUTco8o6T75xe65iceR7o746Ro6RVO7U6386ClvtILYBUYHKJFEDEY5c3e6UyB3VY938pvyrbY8rpvb983ybr39yrvbPYrbpo38YR3ourkhVHFbljhivl3yrO3BYV8p8b3r83OUP3opWO83U9P8o39yvO389RYo38ov3BIRYOvybrvwhjbkvOBVqouV388Vbo38oESUIOcbu12uOQUIByVQYyqoBQVYBVOi8y8YoyQOYVOb3yVOB83RY938vvRV3V881YVB1I1o1BVORYB1OBRVY18O1b1OY2vvy1RVby11YR21ouR8uovU181vb18v3pVBP19YRV1b9b8v19y1bvoyh1cb1ncx1LKFDTSRDYTguoipUYUTREw4er78U8tytdrfXCVBNjhuyi65REDfgvbhJUOY76r5erdTFUot76RFYJVHcgjdtueR56TIYUgjhGDRYE465r6itytu5767UOJHbgFDRYE6tyiguHVjfyuitUOHJBvnbgJDTU6tugkhVGTue576TIUGKHvjgdTU56tiyfhcGdtYFjggjUThuJGHVjyuR57ruyiuJGBKVHkfyirTDgcjFUY"; // ← đặt chuỗi random bất kỳ, điền giống vào Worker Variable SYNC_SECRET
+// ============================================================
 
-// ── PARTICLES CONFIG — paste JSON config của bạn vào đây ──
-const PARTICLES_CONFIG = {
-  "particles": {
-    "number": { "value": 50, "density": { "enable": true, "value_area": 300 } },
-    "color": { "value": "#37b1f8" },
-    "shape": { "type": "circle", "stroke": { "width": 4, "color": "#1d4470" } },
-    "opacity": { "value": 1, "random": true, "anim": { "enable": true, "speed": 1, "opacity_min": 0.7, "sync": false } },
-    "size": { "value": 5, "random": true, "anim": { "enable": true, "speed": 5, "size_min": 4, "sync": true } },
-    "line_linked": { "enable": true, "distance": 130, "color": "#ffffff", "opacity": 0.3, "width": 1 },
-    "move": { "enable": true, "speed": 4, "direction": "none", "random": true, "straight": false, "out_mode": "out", "bounce": false }
-  },
-  "interactivity": {
-    "detect_on": "canvas",
-    "events": { "onhover": { "enable": true, "mode": "bubble" }, "onclick": { "enable": true, "mode": "push" }, "resize": true },
-    "modes": {
-      "bubble": { "distance": 100, "size": 10, "duration": 0.97, "opacity": 0.99, "speed": 3 },
-      "push": { "particles_nb": 4 }, "remove": { "particles_nb": 2 }
-    }
-  },
-  "retina_detect": true
-};
-
-// ── FIREBASE ──
+// ── Firebase init ──
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// ── STATE ──
-let appData = null, currentUser = null, progress = {};
-let currentCourseId = null, currentLessonId = null;
+// ── App state ──
+let appData     = null;  // data.json
+let currentUser = null;
+let progress    = {};    // { lessonId: true/false }
+let currentCourseId = null;
+let currentLessonId = null;
 
-// ── HELPERS ──
+// ── Loading helper ──
 const $ = id => document.getElementById(id);
 const showLoad = () => $('loading').classList.add('show');
 const hideLoad = () => $('loading').classList.remove('show');
 
-// ── ROUTING ──
+// ── Page routing ──
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const p = $('page-' + name);
   if (p) p.classList.add('active');
-  if (name === 'landing' && !window._pjsLoaded) {
-    window._pjsLoaded = true
-    particlesJS('particles-js', PARTICLES_CONFIG)
-  }
 }
 
 function navigate(hash, ...args) {
   if (hash === 'home') {
-    window.location.hash = '#home'; renderHome(); showPage('home');
+    window.location.hash = '#home';
+    renderHome();
+    showPage('home');
   } else if (hash === 'course') {
-    window.location.hash = `#course/${args[0]}`; renderCourse(args[0]);
+    const [courseId] = args;
+    window.location.hash = `#course/${courseId}`;
+    renderCourse(courseId);
   } else if (hash === 'lesson') {
-    window.location.hash = `#lesson/${args[0]}/${args[1]}`; renderLesson(args[0], args[1]);
+    const [courseId, lessonId] = args;
+    window.location.hash = `#lesson/${courseId}/${lessonId}`;
+    renderLesson(courseId, lessonId);
   }
 }
 
@@ -175,22 +315,26 @@ function handleHash() {
   if (!currentUser || !appData) return;
   const h = window.location.hash;
   if (!h || h === '#home') { navigate('home'); return; }
-  const p = h.replace('#','').split('/');
-  if (p[0] === 'course' && p[1]) { renderCourse(p[1]); return; }
-  if (p[0] === 'lesson' && p[1] && p[2]) { renderLesson(p[1], p[2]); return; }
+  const parts = h.replace('#','').split('/');
+  if (parts[0] === 'course' && parts[1]) { renderCourse(parts[1]); return; }
+  if (parts[0] === 'lesson' && parts[1] && parts[2]) { renderLesson(parts[1], parts[2]); return; }
   navigate('home');
 }
 
-// ── AUTH ──
+// ── Auth ──
 function signInGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(e => alert('Lỗi đăng nhập: ' + e.message));
 }
-function signOut() { auth.signOut(); }
+function signOut() {
+  auth.signOut();
+}
 
 auth.onAuthStateChanged(async user => {
   if (user) {
     showLoad();
+
+    // ── Kiểm tra whitelist ──
     const allowed = await checkWhitelist(user);
     if (!allowed) {
       await logUnauthorized(user);
@@ -199,6 +343,7 @@ auth.onAuthStateChanged(async user => {
       alert(`⛔ Tài khoản ${user.email} không có quyền truy cập.\nLiên hệ quản trị viên để được cấp quyền.`);
       return;
     }
+
     currentUser = user;
     $('header').style.display = 'flex';
     $('user-info').textContent = user.displayName || user.email;
@@ -208,196 +353,303 @@ auth.onAuthStateChanged(async user => {
     hideLoad();
     handleHash();
   } else {
-    currentUser = null; appData = null; progress = {};
+    currentUser = null;
+    appData = null;
+    progress = {};
     $('header').style.display = 'none';
     showPage('landing');
   }
 });
 
+// ── Kiểm tra email có trong whitelist không ──
 async function checkWhitelist(user) {
+  // Admin luôn được vào
   if (user.email === ADMIN_EMAIL) return true;
-  try { const d = await db.collection('whitelist').doc(user.email).get(); return d.exists; }
-  catch(e) { console.warn(e); return false; }
+  try {
+    const doc = await db.collection('whitelist').doc(user.email).get();
+    return doc.exists;
+  } catch(e) {
+    console.warn('Không đọc được whitelist:', e.message);
+    return false; // Mặc định từ chối nếu lỗi
+  }
 }
 
+// ── Ghi log truy cập trái phép → admin thấy trong Firestore ──
 async function logUnauthorized(user) {
   try {
     await db.collection('security_logs').add({
-      email: user.email, name: user.displayName || '',
+      email: user.email,
+      name: user.displayName || '',
       time: firebase.firestore.FieldValue.serverTimestamp(),
       ua: navigator.userAgent
     });
-  } catch(e) { console.warn(e); }
+  } catch(e) {
+    console.warn('Ghi log thất bại:', e.message);
+  }
 }
 
-// ── DATA ──
+// ── Load data từ Firestore (thay vì data.json) ──
 async function loadData() {
   try {
     const doc = await db.collection('app_data').doc('courses').get();
-    appData = doc.exists ? JSON.parse(doc.data().json) : getMockData();
-    if ($('admin-last-updated'))
+    if (doc.exists) {
+      appData = JSON.parse(doc.data().json);
+    } else {
+      appData = getMockData();
+    }
+    if ($('admin-last-updated')) {
       $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
-  } catch(e) { console.warn(e); appData = getMockData(); }
+    }
+  } catch(e) {
+    console.warn('Không đọc được Firestore, dùng mock:', e.message);
+    appData = getMockData();
+  }
 }
 
+// ── Load progress từ Firestore ──
 async function loadProgress() {
   if (!currentUser) return;
   try {
-    const snap = await db.collection('progress').where('userId','==',currentUser.uid).get();
+    const snap = await db.collection('progress')
+      .where('userId', '==', currentUser.uid)
+      .get();
     progress = {};
-    snap.forEach(doc => { const d = doc.data(); if (d.watched) progress[d.lessonId] = true; });
-  } catch(e) { console.warn(e); }
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (d.watched) progress[d.lessonId] = true;
+    });
+  } catch(e) {
+    console.warn('Firestore không khả dụng:', e.message);
+  }
 }
 
+// ── Firestore: save progress ──
 async function saveProgress(lessonId, courseId, watched) {
   if (!currentUser) return;
+  const docId = `${currentUser.uid}_${lessonId}`;
   try {
-    await db.collection('progress').doc(`${currentUser.uid}_${lessonId}`).set({
-      userId: currentUser.uid, lessonId, courseId, watched,
+    await db.collection('progress').doc(docId).set({
+      userId: currentUser.uid,
+      lessonId, courseId,
+      watched,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-  } catch(e) { console.warn(e); }
+  } catch(e) {
+    console.warn('Lưu progress thất bại:', e.message);
+  }
 }
 
-// ── TREE HELPERS ──
-const findCourse = id => appData.courses.find(c => c.id === id);
+// ── Helpers: traverse tree ──
+function findCourse(courseId) {
+  return appData.courses.find(c => c.id === courseId);
+}
+
 function getAllLessons(node) {
   if (node.type === 'lesson') return [node];
-  return (node.children || []).flatMap(getAllLessons);
-}
-function findLesson(course, lid) {
-  return course.tree.flatMap(getAllLessons).find(l => l.id === lid);
-}
-function countProgress(course) {
-  const all = course.tree.flatMap(getAllLessons);
-  return { done: all.filter(l => progress[l.id]).length, total: all.length };
+  if (!node.children) return [];
+  return node.children.flatMap(getAllLessons);
 }
 
-// ── RENDER: HOME ──
+function findLesson(course, lessonId) {
+  const all = course.tree.flatMap(getAllLessons);
+  return all.find(l => l.id === lessonId);
+}
+
+function countProgress(course) {
+  const all = course.tree.flatMap(getAllLessons);
+  const done = all.filter(l => progress[l.id]).length;
+  return { done, total: all.length };
+}
+
+// ── Render: Home ──
 function renderHome() {
-  showPage('home')
-  const grid = $('course-grid'); grid.innerHTML = ''
+  showPage('home');
+  const grid = $('course-grid');
+  grid.innerHTML = '';
   appData.courses.forEach(course => {
-    const { done, total } = countProgress(course)
-    const pct = total ? Math.round(done/total*100) : 0
-    const card = document.createElement('div'); card.className = 'course-card glass'
+    const { done, total } = countProgress(course);
+    const pct = total ? Math.round(done / total * 100) : 0;
+    const card = document.createElement('div');
+    card.className = 'course-card';
     card.innerHTML = `
       <h3>${course.title}</h3>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`
-    card.onclick = () => navigate('course', course.id)
-    grid.appendChild(card)
-  })
+      <div class="progress-label">${done}/${total} bài · ${pct}%</div>
+    `;
+    card.onclick = () => navigate('course', course.id);
+    grid.appendChild(card);
+  });
 }
 
-// ── RENDER: TREE ──
-function buildTree(nodes, courseId, indent, activeId) {
+// ── Render: Sidebar tree ──
+function buildTree(nodes, courseId, indent, activeLessonId) {
   const ul = document.createElement('div');
   nodes.forEach(node => {
-    const wrap = document.createElement('div'); wrap.className = 'tree-node';
-    const label = document.createElement('div'); label.className = 'tree-label';
-    label.style.paddingLeft = (14 + indent*14) + 'px';
+    const wrap = document.createElement('div');
+    wrap.className = 'tree-node';
+
+    const label = document.createElement('div');
+    label.className = 'tree-label';
+    label.style.paddingLeft = (14 + indent * 14) + 'px';
+
     if (node.type === 'lesson') {
-      label.innerHTML = `<span class="icon">📄</span><span style="flex:1">${node.title}</span><span class="check">${progress[node.id]?'✓':''}</span>`;
-      if (node.id === activeId) label.classList.add('active-lesson');
+      const checked = progress[node.id] ? '✓' : '';
+      label.innerHTML = `<span class="icon">📄</span><span style="flex:1">${node.title}</span><span class="check">${checked}</span>`;
+      if (node.id === activeLessonId) label.classList.add('active-lesson');
       label.onclick = () => navigate('lesson', courseId, node.id);
     } else {
-      const ch = document.createElement('div'); ch.className = 'tree-children';
+      // chapter/folder
+      const children = document.createElement('div');
+      children.className = 'tree-children';
       label.innerHTML = `<span class="icon toggle-icon">▶</span><span>${node.title}</span>`;
       label.onclick = () => {
-        const o = ch.classList.toggle('open');
-        label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
+        const open = children.classList.toggle('open');
+        label.querySelector('.toggle-icon').textContent = open ? '▼' : '▶';
       };
-      if (node.children) ch.appendChild(buildTree(node.children, courseId, indent+1, activeId));
-      wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;
+      if (node.children) {
+        children.appendChild(buildTree(node.children, courseId, indent + 1, activeLessonId));
+      }
+      wrap.appendChild(label);
+      wrap.appendChild(children);
+      ul.appendChild(wrap);
+      return;
     }
-    wrap.appendChild(label); ul.appendChild(wrap);
+
+    wrap.appendChild(label);
+    ul.appendChild(wrap);
   });
   return ul;
 }
 
-// ── RENDER: COURSE ──
+// ── Render: Course ──
 function renderCourse(courseId) {
-  currentCourseId = courseId; showPage('course');
-  const course = findCourse(courseId); if (!course) { navigate('home'); return; }
+  currentCourseId = courseId;
+  showPage('course');
+  const course = findCourse(courseId);
+  if (!course) { navigate('home'); return; }
   $('sidebar-title').textContent = course.title;
   $('sidebar-tree').innerHTML = '';
   $('sidebar-tree').appendChild(buildTree(course.tree, courseId, 0, null));
 }
 
-// ── RENDER: LESSON ──
+// ── Render: Lesson ──
 function renderLesson(courseId, lessonId) {
-  currentCourseId = courseId; currentLessonId = lessonId; showPage('lesson');
-  const course = findCourse(courseId); if (!course) { navigate('home'); return; }
+  currentCourseId = courseId;
+  currentLessonId = lessonId;
+  showPage('lesson');
+
+  const course = findCourse(courseId);
+  if (!course) { navigate('home'); return; }
+
+  // Sidebar
   $('sidebar-lesson-title').textContent = course.title;
   $('sidebar-lesson-tree').innerHTML = '';
   $('sidebar-lesson-tree').appendChild(buildTree(course.tree, courseId, 0, lessonId));
-  const lesson = findLesson(course, lessonId); if (!lesson) return;
+
+  // Auto-expand active nodes
+  document.querySelectorAll('#sidebar-lesson-tree .tree-label.active-lesson').forEach(el => {
+    let parent = el.parentElement?.parentElement?.previousElementSibling;
+    // expand parents — simple approach: open all tree-children in sidebar
+  });
+
+  const lesson = findLesson(course, lessonId);
+  if (!lesson) return;
+
+  // Title
   $('lesson-title').textContent = lesson.title;
-  const vw = $('video-wrap'), nv = $('no-video');
-  const old = vw.querySelector('iframe'); if (old) old.remove();
+
+  // Video
+  const vw = $('video-wrap');
+  const nv = $('no-video');
+  // Remove old iframe if any
+  const oldIframe = vw.querySelector('iframe');
+  if (oldIframe) oldIframe.remove();
+
   if (lesson.youtubeId) {
     nv.style.display = 'none';
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1&iv_load_policy=3&color=white`;
+    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}`;
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
     iframe.allowFullscreen = true;
     vw.appendChild(iframe);
-  } else { nv.style.display = 'flex'; }
+  } else {
+    nv.style.display = 'flex';
+  }
+
+  // Watch button
   updateWatchBtn();
-  const dl = $('doc-list'); dl.innerHTML = '';
-  if (lesson.documents?.length) {
+
+  // Documents
+  const dl = $('doc-list');
+  dl.innerHTML = '';
+  if (lesson.documents && lesson.documents.length) {
     lesson.documents.forEach(doc => {
-      const card = document.createElement('div'); card.className = 'doc-card';
+      const card = document.createElement('div');
+      card.className = 'doc-card';
       card.innerHTML = `<span>📎 ${doc.title}</span><a href="${doc.url}" target="_blank" class="btn btn-outline btn-sm">Mở</a>`;
       dl.appendChild(card);
     });
-  } else { dl.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted)">Không có tài liệu</p>'; }
+  } else {
+    dl.innerHTML = '<p style="font-size:.85rem;color:var(--gray)">Không có tài liệu</p>';
+  }
 }
 
 function updateWatchBtn() {
-  const btn = $('btn-watch'); if (!btn) return;
-  const w = !!progress[currentLessonId];
-  btn.textContent = w ? '✓ Đã xem' : 'Đánh dấu đã xem';
-  btn.className = 'btn-watch' + (w ? ' watched' : '');
-}
-async function toggleWatch() {
-  if (!currentLessonId || !currentCourseId) return;
-  const v = !progress[currentLessonId]; progress[currentLessonId] = v;
-  updateWatchBtn(); await saveProgress(currentLessonId, currentCourseId, v);
+  const btn = $('btn-watch');
+  const status = $('watch-status');
+  if (!btn) return;
+  const watched = !!progress[currentLessonId];
+  btn.textContent = watched ? '✓ Đã xem' : 'Đánh dấu đã xem';
+  btn.className = 'btn-watch' + (watched ? ' watched' : '');
+  status.textContent = '';
 }
 
-// ── ADMIN ──
+async function toggleWatch() {
+  if (!currentLessonId || !currentCourseId) return;
+  const newVal = !progress[currentLessonId];
+  progress[currentLessonId] = newVal;
+  updateWatchBtn();
+  await saveProgress(currentLessonId, currentCourseId, newVal);
+}
+
+// ── Admin ──
 function toggleAdmin() {
-  $('admin-panel').classList.toggle('open')
-  if ($('admin-panel').classList.contains('open')) loadAdminData()
+  $('admin-panel').classList.toggle('open');
+  if ($('admin-panel').classList.contains('open')) loadAdminData();
 }
 
 async function loadAdminData() {
-  const wl = $('whitelist-list'); wl.innerHTML = 'Đang tải...';
+  // Whitelist
+  const wl = $('whitelist-list');
+  wl.innerHTML = 'Đang tải...';
   try {
     const snap = await db.collection('whitelist').get();
     if (snap.empty) { wl.innerHTML = '<i>Chưa có ai</i>'; }
     else {
       wl.innerHTML = '';
       snap.forEach(doc => {
-        const row = document.createElement('div'); row.className = 'whitelist-item';
-        row.innerHTML = `<span>${doc.id}</span>
-          <button class="whitelist-remove" onclick="removeWhitelist('${doc.id}')">✕</button>`;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:2px 0';
+        row.innerHTML = `<span>${doc.id}</span><button onclick="removeWhitelist('${doc.id}')"
+          style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.8rem">✕</button>`;
         wl.appendChild(row);
       });
     }
   } catch(e) { wl.innerHTML = 'Lỗi: ' + e.message; }
 
-  const sl = $('security-logs'); sl.innerHTML = 'Đang tải...';
+  // Security logs
+  const sl = $('security-logs');
+  sl.innerHTML = 'Đang tải...';
   try {
     const snap = await db.collection('security_logs').orderBy('time','desc').limit(10).get();
     if (snap.empty) { sl.innerHTML = '<span style="color:var(--green)">Không có truy cập trái phép</span>'; }
     else {
       sl.innerHTML = '';
       snap.forEach(doc => {
-        const d = doc.data(), t = d.time?.toDate?.()?.toLocaleString('vi-VN') || '—';
-        const div = document.createElement('div'); div.className = 'log-item';
+        const d = doc.data();
+        const t = d.time?.toDate?.()?.toLocaleString('vi-VN') || '—';
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:2px 0;border-bottom:1px solid #fee2e2';
         div.textContent = `⚠ ${d.email} — ${t}`;
         sl.appendChild(div);
       });
@@ -406,43 +658,91 @@ async function loadAdminData() {
 }
 
 async function addWhitelist() {
-  const input = $('whitelist-input'), email = input.value.trim().toLowerCase();
+  const input = $('whitelist-input');
+  const email = input.value.trim().toLowerCase();
   if (!email || !email.includes('@')) { alert('Email không hợp lệ'); return; }
   await db.collection('whitelist').doc(email).set({ addedAt: firebase.firestore.FieldValue.serverTimestamp() });
-  input.value = ''; loadAdminData();
-}
-async function removeWhitelist(email) {
-  if (!confirm(`Xoá quyền của ${email}?`)) return;
-  await db.collection('whitelist').doc(email).delete(); loadAdminData();
+  input.value = '';
+  loadAdminData();
 }
 
+async function removeWhitelist(email) {
+  if (!confirm(`Xoá quyền của ${email}?`)) return;
+  await db.collection('whitelist').doc(email).delete();
+  loadAdminData();
+}
 document.addEventListener('click', e => {
-  if (!$('admin-panel').contains(e.target) && e.target !== $('btn-admin'))
+  if (!$('admin-panel').contains(e.target) && e.target !== $('btn-admin')) {
     $('admin-panel').classList.remove('open');
+  }
 });
 
 async function triggerSync(e) {
-  const btn = e.target; btn.disabled = true; btn.textContent = 'Đang sync...';
+  const btn = e.target;
+  btn.disabled = true;
+  btn.textContent = 'Đang sync...';
   try {
-    const r = await fetch(SYNC_PROXY_URL, { method: 'POST', headers: { 'x-secret': SYNC_SECRET } });
-    if (r.status === 204) alert('✓ Đã trigger sync! GitHub Actions sẽ chạy trong vài giây.');
-    else if (r.status === 429) alert('⏳ Vừa sync xong, chờ 1 phút trước khi sync lại.');
-    else alert('Lỗi: ' + r.status + '. Kiểm tra Cloudflare Worker.');
-  } catch(e) { alert('Lỗi kết nối: ' + e.message); }
-  btn.disabled = false; btn.textContent = '🔄 Sync ngay';
+    const r = await fetch(SYNC_PROXY_URL, {
+      method: 'POST',
+      headers: { 'x-secret': SYNC_SECRET }
+    });
+    if (r.status === 204) {
+      alert('✓ Đã trigger sync! GitHub Actions sẽ chạy trong vài giây.');
+    } else if (r.status === 429) {
+      alert('⏳ Vừa sync xong, chờ 1 phút trước khi sync lại.');
+    } else {
+      alert('Lỗi: ' + r.status + '. Kiểm tra Cloudflare Worker.');
+    }
+  } catch(e) {
+    alert('Lỗi kết nối: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = '🔄 Sync ngay';
 }
 
+// ── Hash navigation ──
 window.addEventListener('hashchange', handleHash);
 
-// ── MOCK DATA ──
+// ── Mock data (dùng khi chưa có data.json) ──
 function getMockData() {
-  return { lastUpdated: new Date().toISOString(), courses: [
-    { id:"01-mock", title:"Khóa mẫu", order:1, tree:[
-      { id:"01-01", title:"Chương 1", order:1, type:"chapter", children:[
-        { id:"01-01-01", title:"Bài 1", order:1, type:"lesson", youtubeId:"", documents:[] }
-      ]}
-    ]}
-  ]};
+  return {
+    lastUpdated: new Date().toISOString(),
+    courses: [
+      {
+        id: "01-100-ngay-pha-ken",
+        title: "100 ngày phá kén - Toán",
+        order: 1,
+        tree: [
+          {
+            id: "01-01-thang-2", title: "Tháng 2", order: 1, type: "chapter",
+            children: [
+              { id: "01-01-01", title: "Các dạng toán P1", order: 1, type: "lesson", youtubeId: "", documents: [] },
+              { id: "01-01-02", title: "Các dạng toán P2", order: 2, type: "lesson", youtubeId: "", documents: [] }
+            ]
+          }
+        ]
+      },
+      {
+        id: "02-nen-tang-12",
+        title: "NỀN TẢNG 12",
+        order: 2,
+        tree: [
+          {
+            id: "02-01-toan", title: "Môn Toán", order: 1, type: "chapter",
+            children: [
+              {
+                id: "02-01-01-dao-ham", title: "Ứng dụng đạo hàm", order: 1, type: "chapter",
+                children: [
+                  { id: "02-01-01-01", title: "Tính đơn điệu P1", order: 1, type: "lesson", youtubeId: "", documents: [] },
+                  { id: "02-01-01-02", title: "Tính đơn điệu P2", order: 2, type: "lesson", youtubeId: "", documents: [] }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
 }
 </script>
 </body>

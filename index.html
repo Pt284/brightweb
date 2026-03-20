@@ -53,13 +53,9 @@
     <h1>HM-LEAKBASE 😈</h1>
     <p>Nền tảng học chui trực tuyến</p>
     <div id="landing-glass-btn">
-      <div class="login-btn-wrap" id="login-wrap">
-        <div class="border-glow"><div class="grad" id="login-grad1"></div></div>
-        <div class="border-hard"><div class="grad" id="login-grad2"></div></div>
-        <button class="btn-glass-login" onclick="signInGoogle()">
-          Đăng nhập bằng Google
-        </button>
-      </div>
+      <button class="btn-glass-login" onclick="signInGoogle()">
+        Đăng nhập bằng Google
+      </button>
     </div>
   </div>
 </div>
@@ -442,28 +438,6 @@ async function triggerSync(e) {
 }
 
 window.addEventListener('hashchange', handleHash);
-
-// ── BORDER SPIN ANIMATION ──
-(function () {
-  const g1 = document.getElementById('login-grad1');
-  const g2 = document.getElementById('login-grad2');
-  if (!g1 || !g2) return;
-
-  const V0 = 13, VN = 3, DUR = 3000;
-  let angle = 0, startTime = null, rafId;
-
-  function tick(ts) {
-    if (!startTime) startTime = ts;
-    const progress = Math.min((ts - startTime) / DUR, 1);
-    const velocity = V0 + (VN - V0) * progress;
-    angle += velocity;
-    const t = `rotate(${angle}deg)`;
-    g1.style.transform = t;
-    g2.style.transform = t;
-    rafId = requestAnimationFrame(tick);
-  }
-  rafId = requestAnimationFrame(tick);
-})();
 
 // ── MOCK DATA ──
 function getMockData() {

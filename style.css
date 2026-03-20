@@ -37,9 +37,10 @@
    RESET & BASE
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: #020810; } /* fallback màu tối khi canvas chưa load */
 body {
   font-family: system-ui, sans-serif;
-  background: transparent; /* bg.js canvas lo phần này */
+  background: transparent;
   color: var(--text);
   min-height: 100vh;
 }

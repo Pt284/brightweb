@@ -64,8 +64,12 @@
   <div id="landing-content">
     <h1>HM-LEAKBASE 😈</h1>
     <p>Nền tảng học chui trực tuyến</p>
-    <!-- FIX 2: div trống, Button WebGL sẽ được inject bằng JS bên dưới -->
-    <div id="landing-glass-btn"></div>
+    <!-- Dùng CSS glass cho landing vì nền là canvas động, WebGL không capture được -->
+    <div id="landing-glass-btn">
+      <button class="btn-glass-login" onclick="signInGoogle()">
+        Đăng nhập bằng Google
+      </button>
+    </div>
   </div>
 </div>
 <div id="page-home" class="page">
@@ -153,31 +157,13 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const p = $('page-' + name);
   if (p) p.classList.add('active');
-  if (name === 'landing') {
-    if (!window._pjsLoaded) {
-      window._pjsLoaded = true
-      particlesJS('particles-js', PARTICLES_CONFIG)
-      requestAnimationFrame(() => {
-        const pCanvas = document.querySelector('#particles-js canvas')
-        if (pCanvas) pCanvas.style.background = 'transparent'
-      })
-    }
-    // FIX 3: tạo Button SAU KHI page đã display:flex → getBoundingClientRect mới có giá trị đúng
-    if (!window._loginBtnCreated) {
-      window._loginBtnCreated = true
-      requestAnimationFrame(() => {
-        const loginBtn = new Button({
-          text: 'Đăng nhập bằng Google',
-          size: 18,
-          type: 'pill',
-          tintOpacity: 0.2,
-          onClick: () => signInGoogle()
-        })
-        const container = $('landing-glass-btn')
-        container.style.cssText = 'display:flex;justify-content:center;margin-top:8px;'
-        container.appendChild(loginBtn.element)
-      })
-    }
+  if (name === 'landing' && !window._pjsLoaded) {
+    window._pjsLoaded = true
+    particlesJS('particles-js', PARTICLES_CONFIG)
+    requestAnimationFrame(() => {
+      const pCanvas = document.querySelector('#particles-js canvas')
+      if (pCanvas) pCanvas.style.background = 'transparent'
+    })
   }
 }
 function navigate(hash, ...args) {

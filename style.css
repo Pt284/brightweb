@@ -492,59 +492,44 @@ button { cursor: pointer; font-family: inherit; }
   margin-top: 8px;
 }
 
-/* Wrapper cho hiệu ứng viền xoay */
-.login-btn-wrap {
-  position: relative;
-  border-radius: 99px;
-  display: inline-block;
-}
-.login-btn-wrap .border-glow {
-  position: absolute;
-  inset: -3px;
-  border-radius: 99px;
-  overflow: hidden;
-  z-index: 0;
-  opacity: 0.85;
-  filter: blur(7px);
-}
-.login-btn-wrap .border-hard {
-  position: absolute;
-  inset: -1.5px;
-  border-radius: 99px;
-  overflow: hidden;
-  z-index: 1;
-}
-.login-btn-wrap .grad {
-  position: absolute;
-  width: 200%; height: 200%;
-  top: -50%; left: -50%;
-  background: conic-gradient(#4285f4, #34a853, #fbbc04, #ea4335, #4285f4);
-  transform-origin: center;
-}
 .btn-glass-login {
-  position: relative;
-  z-index: 2;
   padding: 12px 32px;
   font-size: 1rem;
   font-weight: 600;
   font-family: system-ui, sans-serif;
   color: #fff;
   border-radius: 99px;
-  border: none;
+  border: 1px solid rgba(255,255,255,.25);
   cursor: pointer;
   letter-spacing: .02em;
-  display: block;
-  background: rgba(10,16,40,.75);
+
+  /* Live glass effect — capture được cả WebGL canvas */
+  background: rgba(255,255,255,.08);
   backdrop-filter: blur(14px) saturate(180%) brightness(1.1);
   -webkit-backdrop-filter: blur(14px) saturate(180%) brightness(1.1);
-  box-shadow: 0 8px 32px rgba(0,145,234,.2), inset 0 1px 0 rgba(255,255,255,.1);
-  transition: transform .15s, background .15s;
+
+  box-shadow:
+    0 8px 32px rgba(0,145,234,.3),
+    0 2px 8px rgba(0,0,0,.4),
+    inset 0 1px 0 rgba(255,255,255,.2),
+    inset 0 -1px 0 rgba(0,0,0,.15);
+
+  transition: transform .15s, box-shadow .15s, background .15s;
 }
+
 .btn-glass-login:hover {
   transform: translateY(-2px);
-  background: rgba(20,30,60,.8);
+  background: rgba(255,255,255,.13);
+  box-shadow:
+    0 12px 40px rgba(0,145,234,.4),
+    0 4px 12px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.25),
+    inset 0 -1px 0 rgba(0,0,0,.2);
 }
-.btn-glass-login:active { transform: translateY(0); }
+
+.btn-glass-login:active {
+  transform: translateY(0);
+}
 
 /* Course cards dùng glass — override màu chữ */
 .glass-card-content {

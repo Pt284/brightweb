@@ -1,6 +1,7 @@
 // bg.js — Animated blob background, dùng chung toàn web
 // Chỉ cần include file này là có nền động ở mọi trang
 
+document.addEventListener('DOMContentLoaded', function () {
 (function () {
   const canvas = document.createElement('canvas');
   canvas.id = 'bg-canvas';
@@ -138,3 +139,4 @@
 
   draw();
 })();
+}); // DOMContentLoaded

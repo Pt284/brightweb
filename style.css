@@ -39,7 +39,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: system-ui, sans-serif;
-  background: var(--bg);
+  background: #020810; /* fallback khi canvas chưa load */
   color: var(--text);
   min-height: 100vh;
 }
@@ -106,7 +106,10 @@ button { cursor: pointer; font-family: inherit; }
    HEADER
    ============================================================ */
 #header {
-  background: var(--surface);
+  background: rgba(2,8,16,.55);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   padding: 0 16px;
   height: 52px;
@@ -219,7 +222,7 @@ button { cursor: pointer; font-family: inherit; }
   flex-direction: column;
   gap: 20px;
   text-align: center;
-  background: var(--bg);
+  background: transparent; /* canvas bg nhìn xuyên qua */
 }
 #page-landing.active { display: flex; }
 #particles-js { position: absolute; inset: 0; z-index: 0; }
@@ -248,12 +251,14 @@ button { cursor: pointer; font-family: inherit; }
   gap: 16px;
 }
 .course-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
   border-radius: var(--radius);
   padding: 18px;
   cursor: pointer;
-  transition: box-shadow .15s, border-color .15s;
+  transition: box-shadow .15s, border-color .15s, background .15s;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .course-card:hover {
   box-shadow: var(--shadow-sm);
@@ -283,10 +288,12 @@ button { cursor: pointer; font-family: inherit; }
 .sidebar {
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
-  background: var(--surface3);
+  background: rgba(2,8,16,.45);
   border-right: 1px solid var(--border);
   overflow-y: auto;
   padding: 12px 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .sidebar-title {
   padding: 4px 14px 10px;
@@ -380,15 +387,38 @@ button { cursor: pointer; font-family: inherit; }
 }
 .doc-list { display: flex; flex-direction: column; gap: 8px; }
 .doc-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
   border-radius: var(--radius);
   padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .doc-card span { font-size: .875rem; color: var(--text-dim); }
+
+/* ============================================================
+   CSS GLASS — dùng backdrop-filter, hoạt động trên mọi element
+   Chỉ cần thêm class "glass" vào bất kỳ element nào
+   ============================================================ */
+.glass {
+  background: rgba(255,255,255,.06) !important;
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  border: 1px solid rgba(255,255,255,.12) !important;
+  box-shadow:
+    0 8px 32px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 -1px 0 rgba(0,0,0,.1) !important;
+}
+.glass:hover {
+  background: rgba(255,255,255,.1) !important;
+  border-color: rgba(255,255,255,.2) !important;
+  box-shadow:
+    0 12px 40px rgba(0,145,234,.2),
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.12) !important;
+}
 
 /* ============================================================
    LIQUID GLASS OVERRIDES

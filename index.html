@@ -158,6 +158,11 @@ function showPage(name) {
   if (name === 'landing' && !window._pjsLoaded) {
     window._pjsLoaded = true
     particlesJS('particles-js', PARTICLES_CONFIG)
+    // Làm transparent canvas của particles để blob bg nhìn xuyên qua
+    requestAnimationFrame(() => {
+      const pCanvas = document.querySelector('#particles-js canvas')
+      if (pCanvas) pCanvas.style.background = 'transparent'
+    })
   }
 }
 

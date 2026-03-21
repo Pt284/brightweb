@@ -168,32 +168,72 @@ def read_drive(service):
 # BƯỚC 2: ĐỌC YOUTUBE
 # ============================================================
 
+def build_youtube_service():
+    """
+    Dùng OAuth2 nếu có YOUTUBE_OAUTH_JSON (để đọc Unlisted).
+    Fallback về API key nếu không có OAuth.
+    """
+    if YOUTUBE_OAUTH_JSON:
+        from google.oauth2.credentials import Credentials
+        info = json.loads(YOUTUBE_OAUTH_JSON)
+        creds = Credentials(
+            token         = info["token"],
+            refresh_token = info["refresh_token"],
+            token_uri     = info["token_uri"],
+            client_id     = info["client_id"],
+            client_secret = info["client_secret"],
+            scopes        = ["https://www.googleapis.com/auth/youtube.readonly"]
+        )
+        print("  ✓ Dùng OAuth2 (đọc được Unlisted + Private)")
+        return build("youtube", "v3", credentials=creds)
+    print("  ℹ Dùng API Key (chỉ đọc Public)")
+    return None  # fallback về requests + API key
+
 def fetch_playlist_items(playlist_id: str) -> list:
-    """Lấy tất cả video trong 1 playlist. Trả về list {videoId, title, prefix}."""
-    if not YOUTUBE_API_KEY:
-        raise ValueError("❌ Thiếu YOUTUBE_API_KEY.")
+    """Lấy tất cả video trong 1 playlist. Ưu tiên OAuth2, fallback API key."""
+    if not YOUTUBE_API_KEY and not YOUTUBE_OAUTH_JSON:
+        raise ValueError("❌ Thiếu YOUTUBE_API_KEY hoặc YOUTUBE_OAUTH_JSON.")
+
+    yt_service = build_youtube_service()
     videos, page_token = [], None
+
     while True:
-        params = {
-            "part": "snippet", "playlistId": playlist_id,
-            "maxResults": 50, "key": YOUTUBE_API_KEY,
-        }
-        if page_token:
-            params["pageToken"] = page_token
-        r = retry(lambda: requests.get(
-            "https://www.googleapis.com/youtube/v3/playlistItems",
-            params=params, timeout=15
-        ))
-        if r.status_code == 404:
-            print(f"  ⚠ Playlist {playlist_id} không tồn tại, bỏ qua.")
-            return []
-        if r.status_code != 200:
-            print(f"  ⚠ Lỗi {r.status_code}: {r.text[:200]}")
-            return []
-        data = r.json()
+        if yt_service:
+            # OAuth2 path
+            def call():
+                return yt_service.playlistItems().list(
+                    part="snippet", playlistId=playlist_id,
+                    maxResults=50, pageToken=page_token or ""
+                ).execute()
+            try:
+                data = retry(call)
+            except Exception as e:
+                print(f"  ⚠ OAuth2 lỗi: {e}")
+                return []
+        else:
+            # API key path
+            params = {
+                "part": "snippet", "playlistId": playlist_id,
+                "maxResults": 50, "key": YOUTUBE_API_KEY,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            r = retry(lambda: requests.get(
+                "https://www.googleapis.com/youtube/v3/playlistItems",
+                params=params, timeout=15
+            ))
+            if r.status_code == 404:
+                print(f"  ⚠ Playlist {playlist_id} không tồn tại, bỏ qua.")
+                return []
+            if r.status_code != 200:
+                print(f"  ⚠ Lỗi {r.status_code}: {r.text[:200]}")
+                return []
+            data = r.json()
+
         total = data.get("pageInfo", {}).get("totalResults", "?")
-        if not videos:  # chỉ in lần đầu
+        if not videos:
             print(f"    totalResults={total}")
+
         for item in data.get("items", []):
             sn = item["snippet"]
             title    = sn.get("title", "")
@@ -201,10 +241,10 @@ def fetch_playlist_items(playlist_id: str) -> list:
             prefix   = extract_video_prefix(title)
             if video_id and prefix:
                 videos.append({"videoId": video_id, "title": title, "prefix": prefix})
-            elif video_id and not prefix:
-                # in vài tên không match để debug
-                if len(videos) == 0 and title not in ["Deleted video", "Private video"]:
+            elif video_id and title not in ["Deleted video", "Private video"]:
+                if len(videos) == 0:
                     print(f"    ⚠ Không match prefix: [{title[:50]}]")
+
         page_token = data.get("nextPageToken")
         if not page_token:
             break

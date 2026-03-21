@@ -40,11 +40,11 @@ jobs:
       - name: Run sync_drive.py
         run: python sync_drive.py
         env:
+          YOUTUBE_OAUTH_JSON: ${{ secrets.YOUTUBE_OAUTH_JSON }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           YOUTUBE_API_KEY:         ${{ secrets.YOUTUBE_API_KEY }}
           DRIVE_ROOT_FOLDER_ID:    ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
           COURSE_PLAYLISTS_JSON:   ${{ secrets.COURSE_PLAYLISTS_JSON }}
-          YOUTUBE_CHANNEL_ID:      ${{ secrets.YOUTUBE_CHANNEL_ID }}
           FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
 
       # 5. Commit data.json nếu có thay đổi

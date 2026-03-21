@@ -14,8 +14,9 @@ import requests
 # ============================================================
 DRIVE_ROOT_FOLDER_ID    = os.environ.get("DRIVE_ROOT_FOLDER_ID", "")
 YOUTUBE_API_KEY         = os.environ.get("YOUTUBE_API_KEY", "")
-GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
+YOUTUBE_OAUTH_JSON      = os.environ.get("YOUTUBE_OAUTH_JSON", "")
 YOUTUBE_CHANNEL_ID      = os.environ.get("YOUTUBE_CHANNEL_ID", "")
+GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
 
 # Playlist fallback (tuỳ chọn — để trống nếu không dùng)
 COURSE_PLAYLISTS = {

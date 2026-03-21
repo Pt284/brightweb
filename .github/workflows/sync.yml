@@ -45,6 +45,7 @@ jobs:
           DRIVE_ROOT_FOLDER_ID:    ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
           COURSE_PLAYLISTS_JSON:   ${{ secrets.COURSE_PLAYLISTS_JSON }}
           YOUTUBE_CHANNEL_ID:      ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          YOUTUBE_OAUTH_JSON:      ${{ secrets.YOUTUBE_OAUTH_JSON }}
           FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
 
       # 5. Commit data.json nếu có thay đổi

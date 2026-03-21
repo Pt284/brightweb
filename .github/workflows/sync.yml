@@ -3,7 +3,7 @@ name: Sync Drive → data.json
 on:
   # Tự động mỗi 6 tiếng
   schedule:
-    - cron: "0 */1 * * *"
+    - cron: "0 */6 * * *"
 
   # Chạy tay từ GitHub UI
   workflow_dispatch:
@@ -44,7 +44,9 @@ jobs:
           YOUTUBE_API_KEY:         ${{ secrets.YOUTUBE_API_KEY }}
           DRIVE_ROOT_FOLDER_ID:    ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
           COURSE_PLAYLISTS_JSON:   ${{ secrets.COURSE_PLAYLISTS_JSON }}
-          FIRESTORE_PROJECT_ID: ${{ secrets.FIRESTORE_PROJECT_ID }}
+          YOUTUBE_CHANNEL_ID:      ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
+
       # 5. Commit data.json nếu có thay đổi
       - name: Xoá data.json khỏi repo nếu tồn tại
         run: |

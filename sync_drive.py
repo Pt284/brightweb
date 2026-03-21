@@ -48,8 +48,13 @@ def extract_numeric_prefix(name: str):
     return None, name
 
 def extract_video_prefix(title: str):
-    """'020101 ~ Tên video' → '020101'"""
-    m = re.match(r"^(\d{6,10})\s*~", title)
+    """
+    Nhận diện prefix số ở đầu tên video, hỗ trợ cả ~ và -
+    '020101 ~ Tên video' → '020101'
+    '020101 - Tên video' → '020101'
+    '020101-Tên video'   → '020101'
+    """
+    m = re.match(r"^(\d{6,10})\s*[~\-–]", title)
     return m.group(1) if m else None
 
 def sort_key(name: str):
@@ -225,11 +230,17 @@ def read_youtube(course_orders: list) -> dict:
     # ── Nguồn 1: Toàn bộ channel ──
     uploads_id = get_uploads_playlist_id()
     if uploads_id:
-        print(f"  Đọc tất cả video từ channel (uploads: {uploads_id})...")
+        print(f"  Đọc tất cả video từ channel...")
         channel_videos = fetch_playlist_items(uploads_id)
-        for v in channel_videos:
+        # Debug: in 5 tên đầu để kiểm tra format
+        if channel_videos:
+            print(f"  Ví dụ tên video đầu tiên:")
+            for v in channel_videos[:5]:
+                print(f"    [{v.get('title','?')[:60]}]")
+        matched = [v for v in channel_videos if v.get("prefix")]
+        for v in matched:
             merged[v["prefix"]] = v["videoId"]
-        print(f"  → {len(channel_videos)} video có prefix hợp lệ từ channel")
+        print(f"  → {len(matched)}/{len(channel_videos)} video có prefix hợp lệ")
     else:
         print("  ℹ Không có YOUTUBE_CHANNEL_ID — bỏ qua đọc channel")
 

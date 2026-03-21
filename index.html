@@ -12,7 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="bg.js"></script>
+<script src="bg.js" defer></script>
 <script src="container.js"></script>
 <script src="button.js"></script>
 </head>
@@ -158,6 +158,11 @@ function showPage(name) {
   if (name === 'landing' && !window._pjsLoaded) {
     window._pjsLoaded = true
     particlesJS('particles-js', PARTICLES_CONFIG)
+    // Làm transparent canvas của particles để blob bg nhìn xuyên qua
+    requestAnimationFrame(() => {
+      const pCanvas = document.querySelector('#particles-js canvas')
+      if (pCanvas) pCanvas.style.background = 'transparent'
+    })
   }
 }
 

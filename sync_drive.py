@@ -187,8 +187,13 @@ def fetch_playlist_items(playlist_id: str) -> list:
         if r.status_code == 404:
             print(f"  ⚠ Playlist {playlist_id} không tồn tại, bỏ qua.")
             return []
-        r.raise_for_status()
+        if r.status_code != 200:
+            print(f"  ⚠ Lỗi {r.status_code}: {r.text[:200]}")
+            return []
         data = r.json()
+        total = data.get("pageInfo", {}).get("totalResults", "?")
+        if not videos:  # chỉ in lần đầu
+            print(f"    totalResults={total}")
         for item in data.get("items", []):
             sn = item["snippet"]
             title    = sn.get("title", "")
@@ -196,6 +201,10 @@ def fetch_playlist_items(playlist_id: str) -> list:
             prefix   = extract_video_prefix(title)
             if video_id and prefix:
                 videos.append({"videoId": video_id, "title": title, "prefix": prefix})
+            elif video_id and not prefix:
+                # in vài tên không match để debug
+                if len(videos) == 0 and title not in ["Deleted video", "Private video"]:
+                    print(f"    ⚠ Không match prefix: [{title[:50]}]")
         page_token = data.get("nextPageToken")
         if not page_token:
             break

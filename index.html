@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HM-LEAKBASE😈</title>
+<link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="glass.css">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="bg.js" defer></script>
+<script src="container.js"></script>
+<script src="button.js"></script>
+</head>
+<body>
+
+<div id="loading">Đang tải...</div>
+
+<div id="header" class="glass" style="display:none">
+  <span class="logo" onclick="navigate('home')">🏠 GO TO HOME 😈</span>
+  <div class="header-right">
+    <span id="user-info"></span>
+    <button id="btn-admin" class="btn-icon" title="Admin" style="display:none" onclick="toggleAdmin()">⚙</button>
+    <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
+  </div>
+</div>
+
+<div id="admin-panel" class="glass">
+  <h4>⚙ Admin Panel</h4>
+  <p id="admin-last-updated">lastUpdated: —</p>
+  <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
+  <hr>
+  <div class="section-label">Whitelist</div>
+  <div class="admin-row">
+    <input id="whitelist-input" type="email" placeholder="email@gmail.com">
+    <button class="btn btn-primary btn-sm" onclick="addWhitelist()">Thêm</button>
+  </div>
+  <div id="whitelist-list"></div>
+  <hr>
+  <div class="section-label">Truy cập trái phép</div>
+  <div id="security-logs"></div>
+  <button class="btn-reload" onclick="loadAdminData()">🔄 Tải lại</button>
+</div>
+
+<!-- Landing -->
+<div id="page-landing" class="page">
+  <div id="particles-js"></div>
+  <div id="landing-content">
+    <h1>HM-LEAKBASE 😈</h1>
+    <p>Nền tảng học chui trực tuyến</p>
+    <div id="landing-glass-btn">
+      <button class="btn-glass-login" onclick="signInGoogle()">
+        Đăng nhập bằng Google
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Home -->
+<div id="page-home" class="page">
+  <h2>Khóa học của bạn</h2>
+  <div class="course-grid" id="course-grid"></div>
+</div>
+
+<!-- Course -->
+<div id="page-course" class="page">
+  <div class="sidebar glass" id="sidebar">
+    <div class="sidebar-title" id="sidebar-title">—</div>
+    <div id="sidebar-tree"></div>
+  </div>
+  <div class="course-main">
+    <p>Chọn một bài học từ menu bên trái.</p>
+  </div>
+</div>
+
+<!-- Lesson -->
+<div id="page-lesson" class="page">
+  <div class="sidebar glass" id="sidebar-lesson">
+    <div class="sidebar-title" id="sidebar-lesson-title">—</div>
+    <div id="sidebar-lesson-tree"></div>
+  </div>
+  <div class="lesson-main">
+    <h2 id="lesson-title">—</h2>
+    <div class="video-wrap" id="video-wrap">
+      <div class="no-video" id="no-video">Chưa có video</div>
+    </div>
+    <div class="watch-bar">
+      <button class="btn-watch" id="btn-watch" onclick="toggleWatch()">Đánh dấu đã xem</button>
+      <span id="watch-status"></span>
+    </div>
+    <div class="docs-section">
+      <h3>Tài liệu</h3>
+      <div class="doc-list" id="doc-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const firebaseConfig = {
+  apiKey: "AIzaSyCRLENh_UEBdXzukzpXVHHTltSapqyNWVc",
+  authDomain: "brightwebaccbase.firebaseapp.com",
+  projectId: "brightwebaccbase",
+  storageBucket: "brightwebaccbase.firebasestorage.app",
+  messagingSenderId: "482143691238",
+  appId: "1:482143691238:web:67dd3871bc93bf08c03627",
+  measurementId: "G-LXMQJM43PN"
+};
+const ADMIN_EMAIL    = "mcdg5444@gmail.com";
+const SYNC_PROXY_URL = "https://brightweb-sync.mcdg5444.workers.dev";
+const SYNC_SECRET    = "76V9bynHNy7v6iT7o8uBLIUTco8o6T75xe65iceR7o746Ro6RVO7U6386ClvtILYBUYHKJFEDEY5c3e6UyB3VY938pvyrbY8rpvb983ybr39yrvbPYrbpo38YR3ourkhVHFbljhivl3yrO3BYV8p8b3r83OUP3opWO83U9P8o39yvO389RYo38ov3BIRYOvybrvwhjbkvOBVqouV388Vbo38oESUIOcbu12uOQUIByVQYyqoBQVYBVOi8y8YoyQOYVOb3yVOB83RY938vvRV3V881YVB1I1o1BVORYB1OBRVY18O1b1OY2vvy1RVby11YR21ouR8uovU181vb18v3pVBP19YRV1b9b8v19y1bvoyh1cb1ncx1LKFDTSRDYTguoipUYUTREw4er78U8tytdrfXCVBNjhuyi65REDfgvbhJUOY76r5erdTFUot76RFYJVHcgjdtueR56TIYUgjhGDRYE465r6itytu5767UOJHbgFDRYE6tyiguHVjfyuitUOHJBvnbgJDTU6tugkhVGTue576TIUGKHvjgdTU56tiyfhcGdtYFjggjUThuJGHVjyuR57ruyiuJGBKVHkfyirTDgcjFUY";
+
+// ── PARTICLES CONFIG — paste JSON config của bạn vào đây ──
+const PARTICLES_CONFIG = {
+  "particles": {
+    "number": { "value": 50, "density": { "enable": true, "value_area": 300 } },
+    "color": { "value": "#37b1f8" },
+    "shape": { "type": "circle", "stroke": { "width": 4, "color": "#1d4470" } },
+    "opacity": { "value": 1, "random": true, "anim": { "enable": true, "speed": 1, "opacity_min": 0.7, "sync": false } },
+    "size": { "value": 5, "random": true, "anim": { "enable": true, "speed": 5, "size_min": 4, "sync": true } },
+    "line_linked": { "enable": true, "distance": 130, "color": "#ffffff", "opacity": 0.3, "width": 1 },
+    "move": { "enable": true, "speed": 4, "direction": "none", "random": true, "straight": false, "out_mode": "out", "bounce": false }
+  },
+  "interactivity": {
+    "detect_on": "canvas",
+    "events": { "onhover": { "enable": true, "mode": "bubble" }, "onclick": { "enable": true, "mode": "push" }, "resize": true },
+    "modes": {
+      "bubble": { "distance": 100, "size": 10, "duration": 0.97, "opacity": 0.99, "speed": 3 },
+      "push": { "particles_nb": 4 }, "remove": { "particles_nb": 2 }
+    }
+  },
+  "retina_detect": true
+};
+
+// ── FIREBASE ──
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// ── STATE ──
+let appData = null, currentUser = null, progress = {};
+let currentCourseId = null, currentLessonId = null;
+
+// ── HELPERS ──
+const $ = id => document.getElementById(id);
+const showLoad = () => $('loading').classList.add('show');
+const hideLoad = () => $('loading').classList.remove('show');
+
+// ── ROUTING ──
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const p = $('page-' + name);
+  if (p) p.classList.add('active');
+  if (name === 'landing' && !window._pjsLoaded) {
+    window._pjsLoaded = true
+    particlesJS('particles-js', PARTICLES_CONFIG)
+    // Làm transparent canvas của particles để blob bg nhìn xuyên qua
+    requestAnimationFrame(() => {
+      const pCanvas = document.querySelector('#particles-js canvas')
+      if (pCanvas) pCanvas.style.background = 'transparent'
+    })
+  }
+}
+
+function navigate(hash, ...args) {
+  if (hash === 'home') {
+    window.location.hash = '#home'; renderHome(); showPage('home');
+  } else if (hash === 'course') {
+    window.location.hash = `#course/${args[0]}`; renderCourse(args[0]);
+  } else if (hash === 'lesson') {
+    window.location.hash = `#lesson/${args[0]}/${args[1]}`; renderLesson(args[0], args[1]);
+  }
+}
+
+function handleHash() {
+  if (!currentUser || !appData) return;
+  const h = window.location.hash;
+  if (!h || h === '#home') { navigate('home'); return; }
+  const p = h.replace('#','').split('/');
+  if (p[0] === 'course' && p[1]) { renderCourse(p[1]); return; }
+  if (p[0] === 'lesson' && p[1] && p[2]) { renderLesson(p[1], p[2]); return; }
+  navigate('home');
+}
+
+// ── AUTH ──
+function signInGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => alert('Lỗi đăng nhập: ' + e.message));
+}
+function signOut() { auth.signOut(); }
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    showLoad();
+    const allowed = await checkWhitelist(user);
+    if (!allowed) {
+      await logUnauthorized(user);
+      await auth.signOut();
+      hideLoad();
+      alert(`⛔ Tài khoản ${user.email} không có quyền truy cập.\nLiên hệ quản trị viên để được cấp quyền.`);
+      return;
+    }
+    currentUser = user;
+    $('header').style.display = 'flex';
+    $('user-info').textContent = user.displayName || user.email;
+    if (user.email === ADMIN_EMAIL) $('btn-admin').style.display = '';
+    await loadData();
+    await loadProgress();
+    hideLoad();
+    handleHash();
+  } else {
+    currentUser = null; appData = null; progress = {};
+    $('header').style.display = 'none';
+    showPage('landing');
+  }
+});
+
+async function checkWhitelist(user) {
+  if (user.email === ADMIN_EMAIL) return true;
+  try { const d = await db.collection('whitelist').doc(user.email).get(); return d.exists; }
+  catch(e) { console.warn(e); return false; }
+}
+
+async function logUnauthorized(user) {
+  try {
+    await db.collection('security_logs').add({
+      email: user.email, name: user.displayName || '',
+      time: firebase.firestore.FieldValue.serverTimestamp(),
+      ua: navigator.userAgent
+    });
+  } catch(e) { console.warn(e); }
+}
+
+// ── DATA ──
+async function loadData() {
+  try {
+    const doc = await db.collection('app_data').doc('courses').get();
+    appData = doc.exists ? JSON.parse(doc.data().json) : getMockData();
+    if ($('admin-last-updated'))
+      $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
+  } catch(e) { console.warn(e); appData = getMockData(); }
+}
+
+async function loadProgress() {
+  if (!currentUser) return;
+  try {
+    const snap = await db.collection('progress').where('userId','==',currentUser.uid).get();
+    progress = {};
+    snap.forEach(doc => { const d = doc.data(); if (d.watched) progress[d.lessonId] = true; });
+  } catch(e) { console.warn(e); }
+}
+
+async function saveProgress(lessonId, courseId, watched) {
+  if (!currentUser) return;
+  try {
+    await db.collection('progress').doc(`${currentUser.uid}_${lessonId}`).set({
+      userId: currentUser.uid, lessonId, courseId, watched,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch(e) { console.warn(e); }
+}
+
+// ── TREE HELPERS ──
+const findCourse = id => appData.courses.find(c => c.id === id);
+function getAllLessons(node) {
+  if (node.type === 'lesson') return [node];
+  return (node.children || []).flatMap(getAllLessons);
+}
+function findLesson(course, lid) {
+  return course.tree.flatMap(getAllLessons).find(l => l.id === lid);
+}
+function countProgress(course) {
+  const all = course.tree.flatMap(getAllLessons);
+  return { done: all.filter(l => progress[l.id]).length, total: all.length };
+}
+
+// ── RENDER: HOME ──
+function renderHome() {
+  showPage('home')
+  const grid = $('course-grid'); grid.innerHTML = ''
+  appData.courses.forEach(course => {
+    const { done, total } = countProgress(course)
+    const pct = total ? Math.round(done/total*100) : 0
+    const card = document.createElement('div'); card.className = 'course-card glass'
+    card.innerHTML = `
+      <h3>${course.title}</h3>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`
+    card.onclick = () => navigate('course', course.id)
+    grid.appendChild(card)
+  })
+}
+
+// ── RENDER: TREE ──
+function buildTree(nodes, courseId, indent, activeId) {
+  const ul = document.createElement('div');
+  nodes.forEach(node => {
+    const wrap = document.createElement('div'); wrap.className = 'tree-node';
+    const label = document.createElement('div'); label.className = 'tree-label';
+    label.style.paddingLeft = (14 + indent*14) + 'px';
+    if (node.type === 'lesson') {
+      label.innerHTML = `<span class="icon">📄</span><span style="flex:1">${node.title}</span><span class="check">${progress[node.id]?'✓':''}</span>`;
+      if (node.id === activeId) label.classList.add('active-lesson');
+      label.onclick = () => navigate('lesson', courseId, node.id);
+    } else {
+      const ch = document.createElement('div'); ch.className = 'tree-children';
+      label.innerHTML = `<span class="icon toggle-icon">▶</span><span>${node.title}</span>`;
+      label.onclick = () => {
+        const o = ch.classList.toggle('open');
+        label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
+      };
+      if (node.children) ch.appendChild(buildTree(node.children, courseId, indent+1, activeId));
+      wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;
+    }
+    wrap.appendChild(label); ul.appendChild(wrap);
+  });
+  return ul;
+}
+
+// ── RENDER: COURSE ──
+function renderCourse(courseId) {
+  currentCourseId = courseId; showPage('course');
+  const course = findCourse(courseId); if (!course) { navigate('home'); return; }
+  $('sidebar-title').textContent = course.title;
+  $('sidebar-tree').innerHTML = '';
+  $('sidebar-tree').appendChild(buildTree(course.tree, courseId, 0, null));
+}
+
+// ── RENDER: LESSON ──
+function renderLesson(courseId, lessonId) {
+  currentCourseId = courseId; currentLessonId = lessonId; showPage('lesson');
+  const course = findCourse(courseId); if (!course) { navigate('home'); return; }
+  $('sidebar-lesson-title').textContent = course.title;
+  $('sidebar-lesson-tree').innerHTML = '';
+  $('sidebar-lesson-tree').appendChild(buildTree(course.tree, courseId, 0, lessonId));
+  const lesson = findLesson(course, lessonId); if (!lesson) return;
+  $('lesson-title').textContent = lesson.title;
+  const vw = $('video-wrap'), nv = $('no-video');
+  const old = vw.querySelector('iframe'); if (old) old.remove();
+  if (lesson.youtubeId) {
+    nv.style.display = 'none';
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1&iv_load_policy=3&color=white`;
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    vw.appendChild(iframe);
+  } else { nv.style.display = 'flex'; }
+  updateWatchBtn();
+  const dl = $('doc-list'); dl.innerHTML = '';
+  if (lesson.documents?.length) {
+    lesson.documents.forEach(doc => {
+      const card = document.createElement('div'); card.className = 'doc-card';
+      card.innerHTML = `<span>📎 ${doc.title}</span><a href="${doc.url}" target="_blank" class="btn btn-outline btn-sm">Mở</a>`;
+      dl.appendChild(card);
+    });
+  } else { dl.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted)">Không có tài liệu</p>'; }
+}
+
+function updateWatchBtn() {
+  const btn = $('btn-watch'); if (!btn) return;
+  const w = !!progress[currentLessonId];
+  btn.textContent = w ? '✓ Đã xem' : 'Đánh dấu đã xem';
+  btn.className = 'btn-watch' + (w ? ' watched' : '');
+}
+async function toggleWatch() {
+  if (!currentLessonId || !currentCourseId) return;
+  const v = !progress[currentLessonId]; progress[currentLessonId] = v;
+  updateWatchBtn(); await saveProgress(currentLessonId, currentCourseId, v);
+}
+
+// ── ADMIN ──
+function toggleAdmin() {
+  $('admin-panel').classList.toggle('open')
+  if ($('admin-panel').classList.contains('open')) loadAdminData()
+}
+
+async function loadAdminData() {
+  const wl = $('whitelist-list'); wl.innerHTML = 'Đang tải...';
+  try {
+    const snap = await db.collection('whitelist').get();
+    if (snap.empty) { wl.innerHTML = '<i>Chưa có ai</i>'; }
+    else {
+      wl.innerHTML = '';
+      snap.forEach(doc => {
+        const row = document.createElement('div'); row.className = 'whitelist-item';
+        row.innerHTML = `<span>${doc.id}</span>
+          <button class="whitelist-remove" onclick="removeWhitelist('${doc.id}')">✕</button>`;
+        wl.appendChild(row);
+      });
+    }
+  } catch(e) { wl.innerHTML = 'Lỗi: ' + e.message; }
+
+  const sl = $('security-logs'); sl.innerHTML = 'Đang tải...';
+  try {
+    const snap = await db.collection('security_logs').orderBy('time','desc').limit(10).get();
+    if (snap.empty) { sl.innerHTML = '<span style="color:var(--green)">Không có truy cập trái phép</span>'; }
+    else {
+      sl.innerHTML = '';
+      snap.forEach(doc => {
+        const d = doc.data(), t = d.time?.toDate?.()?.toLocaleString('vi-VN') || '—';
+        const div = document.createElement('div'); div.className = 'log-item';
+        div.textContent = `⚠ ${d.email} — ${t}`;
+        sl.appendChild(div);
+      });
+    }
+  } catch(e) { sl.innerHTML = 'Lỗi: ' + e.message; }
+}
+
+async function addWhitelist() {
+  const input = $('whitelist-input'), email = input.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) { alert('Email không hợp lệ'); return; }
+  await db.collection('whitelist').doc(email).set({ addedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  input.value = ''; loadAdminData();
+}
+async function removeWhitelist(email) {
+  if (!confirm(`Xoá quyền của ${email}?`)) return;
+  await db.collection('whitelist').doc(email).delete(); loadAdminData();
+}
+
+document.addEventListener('click', e => {
+  if (!$('admin-panel').contains(e.target) && e.target !== $('btn-admin'))
+    $('admin-panel').classList.remove('open');
+});
+
+async function triggerSync(e) {
+  const btn = e.target; btn.disabled = true; btn.textContent = 'Đang sync...';
+  try {
+    const r = await fetch(SYNC_PROXY_URL, { method: 'POST', headers: { 'x-secret': SYNC_SECRET } });
+    if (r.status === 204) alert('✓ Đã trigger sync! GitHub Actions sẽ chạy trong vài giây.');
+    else if (r.status === 429) alert('⏳ Vừa sync xong, chờ 1 phút trước khi sync lại.');
+    else alert('Lỗi: ' + r.status + '. Kiểm tra Cloudflare Worker.');
+  } catch(e) { alert('Lỗi kết nối: ' + e.message); }
+  btn.disabled = false; btn.textContent = '🔄 Sync ngay';
+}
+
+window.addEventListener('hashchange', handleHash);
+
+// ── MOCK DATA ──
+function getMockData() {
+  return { lastUpdated: new Date().toISOString(), courses: [
+    { id:"01-mock", title:"Khóa mẫu", order:1, tree:[
+      { id:"01-01", title:"Chương 1", order:1, type:"chapter", children:[
+        { id:"01-01-01", title:"Bài 1", order:1, type:"lesson", youtubeId:"", documents:[] }
+      ]}
+    ]}
+  ]};
+}
+</script>
+</body>
+</html>

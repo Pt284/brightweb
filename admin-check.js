@@ -121,11 +121,12 @@ function traverseTree(nodes) {
 
 // ── UTILS ──
 function normalizeId(text) {
-  const match = text.trim().match(/^([a-zA-Z0-9_-]+)/);
+  // Tìm chuỗi SỐ ở đầu dòng, bắt buộc theo sau là " ~" (dấu cách và dấu ~) HOẶC chuỗi chỉ chứa số (dữ liệu script xuất ra)
+  const match = text.trim().match(/^(\d+)(?: ~|$)/);
   if (match) {
-    return match[1].replace(/-/g, ''); // replace hyphens to match 010101 format
+    return match[1]; 
   }
-  return text.trim();
+  return null;
 }
 
 function extractIds(inputStr) {

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - Check Videos</title>
+<link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="glass.css">
+<link rel="stylesheet" href="admin-check.css">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="bg.js" defer></script>
+</head>
+<body>
+
+<div id="loading">Đang tải...</div>
+
+<div id="header" class="glass" style="display:none">
+  <span class="logo" onclick="window.location.href='index.html'">🏠 QUAY LẠI TRANG CHỦ</span>
+  <div class="header-right">
+    <span id="user-info"></span>
+    <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
+  </div>
+</div>
+
+<div id="particles-js" style="position: fixed; inset: 0; z-index: -1;"></div>
+
+<div id="page-admin" class="page" style="display:none">
+  <div class="admin-container glass">
+    <div class="admin-header">
+      <h2>🛠️ Admin Check Video</h2>
+      <p>Công cụ đối chiếu dữ liệu giữa 3 nguồn: Local (Download), YouTube (Upload), và GitHub Pages (Display).</p>
+    </div>
+
+    <div class="input-grid">
+      <div class="input-box glass">
+        <h3>1. Đã Download (Local)</h3>
+        <p>Paste text, JSON, hoặc danh sách file name/ID (mỗi dòng 1 video).</p>
+        <textarea id="input-downloaded" placeholder="VD:&#10;010101~Bai_1.mp4&#10;010102~Bai_2.mp4"></textarea>
+      </div>
+
+      <div class="input-box glass">
+        <h3>2. Đã Upload (YouTube)</h3>
+        <p>Paste text, JSON, hoặc danh sách ID do script xuất ra.</p>
+        <textarea id="input-uploaded" placeholder="VD:&#10;010101&#10;010102"></textarea>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-primary btn-check" onclick="runCheck()">🔍 Bắt đầu kiểm tra</button>
+    </div>
+
+    <div id="report-section" style="display:none;">
+      <div class="summary-cards">
+        <div class="card glass">
+          <h4>📥 Downloaded</h4>
+          <div class="big-num" id="count-dl">0</div>
+        </div>
+        <div class="card glass">
+          <h4>☁️ Uploaded YT</h4>
+          <div class="big-num" id="count-yt">0</div>
+        </div>
+        <div class="card glass">
+          <h4>🌐 GitHub Pages</h4>
+          <div class="big-num" id="count-gh">0</div>
+        </div>
+      </div>
+
+      <div class="report-filters glass">
+        <button class="btn filter-btn active" data-filter="all">Tất cả vấn đề</button>
+        <button class="btn filter-btn" data-filter="missing-gh">Thiếu trên Web</button>
+        <button class="btn filter-btn" data-filter="missing-yt">Chưa Upload</button>
+        <button class="btn filter-btn" data-filter="ghost-gh">Web có - Nguồn không</button>
+      </div>
+
+      <div class="table-container glass">
+        <table id="result-table">
+          <thead>
+            <tr>
+              <th>ID Video</th>
+              <th>Tên bài (Nếu có)</th>
+              <th>Trạng thái</th>
+              <th>Chi tiết</th>
+            </tr>
+          </thead>
+          <tbody id="result-body">
+            <!-- Dữ liệu render bằng JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="unauthorized-msg" style="display:none; text-align: center; margin-top: 100px; color: var(--red);">
+  <h2>⛔ TRUY CẬP BỊ TỪ CHỐI</h2>
+  <p>Bạn không có quyền truy cập trang này. Vui lòng đăng nhập bằng tài khoản Admin.</p>
+  <button class="btn btn-primary" onclick="window.location.href='index.html'" style="margin-top: 20px;">Về trang chủ</button>
+</div>
+
+<script src="admin-check.js"></script>
+</body>
+</html>

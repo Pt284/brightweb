@@ -334,6 +334,7 @@ def assign_videos(nodes, playlist_map, course_order, index_path=None):
         if node["type"] == "lesson":
             parts  = [course_order] + current_path
             prefix = "".join(f"{p:02d}" for p in parts)
+            node["_prefix"] = prefix  # Lưu lại prefix gốc để web lấy
             video_id = videos.get(prefix)
             if video_id:
                 node["youtubeId"] = video_id
@@ -361,6 +362,7 @@ def node_to_schema(node, course_id, id_prefix):
         return {
             "id": node_slug, "title": title, "order": order,
             "type": "lesson",
+            "prefix": node.get("_prefix", ""),
             "youtubeId": node.get("youtubeId") or "",
             "documents": node.get("documents", [])
         }
@@ -401,8 +403,14 @@ def build_output(courses, playlist_map):
     if missing:
         print(f"✗ {len(missing)} bài chưa có video (prefix): {', '.join(missing)}")
 
+    # Gộp toàn bộ list YouTube ID đã upload
+    all_yt_prefixes = []
+    for c_order, p_map in playlist_map.items():
+        all_yt_prefixes.extend(list(p_map.keys()))
+
     return {
         "lastUpdated": datetime.now(timezone.utc).isoformat(),
+        "youtubeIds": all_yt_prefixes,
         "courses": output_courses
     }
 

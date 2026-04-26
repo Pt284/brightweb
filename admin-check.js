@@ -153,26 +153,30 @@ function extractIds(inputStr) {
 // ── CHECKING LOGIC ──
 function runCheck() {
   const dlInput = $('input-downloaded').value;
-  const dlSet = extractIds(dlInput);
+  const ytInput = $('input-uploaded').value;
   
-  // Note: ytSet is now populated directly from loadGhPagesData!
+  const dlSet = extractIds(dlInput);
+  const manualYtSet = extractIds(ytInput);
+  
+  // Kết hợp danh sách YouTube: Tự động (từ Firestore) + Thủ công (từ ô nhập)
+  const combinedYtSet = new Set([...ytSet, ...manualYtSet]);
   
   // GH Pages set is keys of ghPagesMap
   const ghSet = new Set(ghPagesMap.keys());
   
   $('count-dl').textContent = dlSet.size;
-  $('count-yt').textContent = ytSet.size;
+  $('count-yt').textContent = combinedYtSet.size;
   $('count-gh').textContent = ghSet.size;
   
   // Build report
   allResults = [];
   
   // Combine all known IDs
-  let allKnownIds = new Set([...dlSet, ...ytSet, ...ghSet]);
+  let allKnownIds = new Set([...dlSet, ...combinedYtSet, ...ghSet]);
   
   for (let id of allKnownIds) {
     let inDl = dlSet.has(id);
-    let inYt = ytSet.has(id);
+    let inYt = combinedYtSet.has(id);
     let inGh = ghSet.has(id);
     
     let title = ghPagesMap.get(id) || "—";
@@ -223,8 +227,6 @@ function runCheck() {
         details = `Thiếu ở: ${missingFrom.join(', ')}`;
         filterCat = "other";
       }
-    }
-    
     }
     
     allResults.push({ id, title, statusClass, statusText, details, filterCat, safeToDelete: false });

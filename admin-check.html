@@ -36,11 +36,17 @@
       <p>Công cụ đối chiếu dữ liệu giữa 3 nguồn: Local (Download), YouTube (Upload), và GitHub Pages (Display).</p>
     </div>
 
-    <div class="input-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto;">
+    <div class="input-grid">
       <div class="input-box glass">
-        <h3>📥 Danh sách đã Download (progress.json)</h3>
-        <p>Paste nội dung do script <code>xuat_id_video.py</code> sinh ra. Hệ thống sẽ tự động đối chiếu với dữ liệu YouTube và GitHub Pages hiện hành từ Firestore.</p>
-        <textarea id="input-downloaded" placeholder="VD:&#10;010101&#10;010102" style="height: 300px;"></textarea>
+        <h3>1. Đã Download (Local)</h3>
+        <p>Paste nội dung (ID) từ script <code>xuat_id_video.py</code>.</p>
+        <textarea id="input-downloaded" placeholder="VD:&#10;010101&#10;010102"></textarea>
+      </div>
+
+      <div class="input-box glass">
+        <h3>2. Đã Upload (YouTube)</h3>
+        <p>Paste nội dung (ID) từ script <code>xuat_id_video.py</code> (phần YouTube).</p>
+        <textarea id="input-uploaded" placeholder="VD:&#10;010101&#10;010102"></textarea>
       </div>
     </div>
 

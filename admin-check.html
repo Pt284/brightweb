@@ -36,17 +36,11 @@
       <p>Công cụ đối chiếu dữ liệu giữa 3 nguồn: Local (Download), YouTube (Upload), và GitHub Pages (Display).</p>
     </div>
 
-    <div class="input-grid">
+    <div class="input-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto;">
       <div class="input-box glass">
-        <h3>1. Đã Download (Local)</h3>
-        <p>Paste text, JSON, hoặc danh sách file name/ID (mỗi dòng 1 video).</p>
-        <textarea id="input-downloaded" placeholder="VD:&#10;010101~Bai_1.mp4&#10;010102~Bai_2.mp4"></textarea>
-      </div>
-
-      <div class="input-box glass">
-        <h3>2. Đã Upload (YouTube)</h3>
-        <p>Paste text, JSON, hoặc danh sách ID do script xuất ra.</p>
-        <textarea id="input-uploaded" placeholder="VD:&#10;010101&#10;010102"></textarea>
+        <h3>📥 Danh sách đã Download (progress.json)</h3>
+        <p>Paste nội dung do script <code>xuat_id_video.py</code> sinh ra. Hệ thống sẽ tự động đối chiếu với dữ liệu YouTube và GitHub Pages hiện hành từ Firestore.</p>
+        <textarea id="input-downloaded" placeholder="VD:&#10;010101&#10;010102" style="height: 300px;"></textarea>
       </div>
     </div>
 
@@ -75,6 +69,11 @@
         <button class="btn filter-btn" data-filter="missing-gh">Thiếu trên Web</button>
         <button class="btn filter-btn" data-filter="missing-yt">Chưa Upload</button>
         <button class="btn filter-btn" data-filter="ghost-gh">Web có - Nguồn không</button>
+        <button class="btn filter-btn" data-filter="safe-to-delete" style="background-color: var(--green); color: white; border-color: var(--green);">✅ Có thể xóa (Local)</button>
+      </div>
+
+      <div style="text-align: right; margin-bottom: 15px; display: none;" id="delete-cmd-container">
+        <button class="btn btn-outline" onclick="copyDeleteCmd()">📋 Copy lệnh xóa (PowerShell)</button>
       </div>
 
       <div class="table-container glass">

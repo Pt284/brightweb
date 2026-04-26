@@ -40,6 +40,7 @@ const db = firebase.firestore();
 const $ = id => document.getElementById(id);
 let appData = null;
 let ghPagesMap = new Map(); // id -> title
+let ytSet = new Set(); // ID already uploaded to YouTube
 let allResults = []; // Store results for filtering
 
 // Particles Init
@@ -85,8 +86,11 @@ async function loadGhPagesData() {
       appData = JSON.parse(doc.data().json);
       ghPagesMap.clear();
       
+      // Load YouTube uploaded IDs directly from Firestore
+      ytSet = new Set(appData.youtubeIds || []);
+      
       appData.courses.forEach(course => {
-        traverseTree(course.tree, [course.order]);
+        traverseTree(course.tree);
       });
       console.log(`Loaded ${ghPagesMap.size} videos from GitHub Pages data.`);
     } else {
@@ -98,18 +102,15 @@ async function loadGhPagesData() {
   }
 }
 
-function traverseTree(nodes, currentPath) {
+function traverseTree(nodes) {
   nodes.forEach(node => {
-    const path = [...currentPath, node.order];
     if (node.type === 'lesson') {
-      if (node.youtubeId) {
-        // Tái tạo ID 6 chữ số bằng cách ghép order của Khoá + Chương + Bài học
-        // VD: [1, 1, 1] => "010101"
-        const prefixId = path.map(p => p.toString().padStart(2, '0')).join('');
-        ghPagesMap.set(prefixId, node.title);
+      if (node.youtubeId && node.prefix) {
+        // Sử dụng luôn mã prefix 6 số đã được sync_drive.py tạo ra sẵn
+        ghPagesMap.set(node.prefix, node.title);
       }
     } else if (node.children) {
-      traverseTree(node.children, path);
+      traverseTree(node.children);
     }
   });
 }
@@ -152,10 +153,9 @@ function extractIds(inputStr) {
 // ── CHECKING LOGIC ──
 function runCheck() {
   const dlInput = $('input-downloaded').value;
-  const ytInput = $('input-uploaded').value;
-  
   const dlSet = extractIds(dlInput);
-  const ytSet = extractIds(ytInput);
+  
+  // Note: ytSet is now populated directly from loadGhPagesData!
   
   // GH Pages set is keys of ghPagesMap
   const ghSet = new Set(ghPagesMap.keys());
@@ -181,11 +181,21 @@ function runCheck() {
     let details = "";
     let filterCat = "all";
     
-    if (inDl && inYt && inGh) {
-      statusClass = "success";
-      statusText = "HOÀN THẢO";
-      details = "Có mặt đầy đủ trên cả 3 nguồn";
-      filterCat = "ok";
+    if (inDl && inYt) {
+      if (inGh) {
+        statusClass = "success";
+        statusText = "HOÀN HẢO";
+        details = "Có mặt đầy đủ trên cả 3 nguồn. An toàn để xóa trên máy.";
+        filterCat = "ok";
+      } else {
+        statusClass = "error";
+        statusText = "THIẾU TRÊN WEB";
+        details = "Đã upload YouTube nhưng chưa gắn link lên web. An toàn để xóa trên máy.";
+        filterCat = "missing-gh";
+      }
+      // Bất cứ video nào inDl && inYt đều an toàn để xóa
+      allResults.push({ id, title, statusClass, statusText, details, filterCat, safeToDelete: true });
+      continue;
     } else {
       let missingFrom = [];
       if (!inDl) missingFrom.push("Download");
@@ -215,7 +225,9 @@ function runCheck() {
       }
     }
     
-    allResults.push({ id, title, statusClass, statusText, details, filterCat });
+    }
+    
+    allResults.push({ id, title, statusClass, statusText, details, filterCat, safeToDelete: false });
   }
   
   // Sort: errors first, then warnings, then successes
@@ -228,13 +240,27 @@ function runCheck() {
   renderTable("all");
 }
 
-// ── RENDERING ──
+// Events for filters
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    
+    const filter = e.target.dataset.filter;
+    $('delete-cmd-container').style.display = (filter === 'safe-to-delete') ? 'block' : 'none';
+    
+    renderTable(filter);
+  });
+});
+
 function renderTable(filter) {
   const tbody = $('result-body');
   tbody.innerHTML = '';
   
   let toShow = allResults;
-  if (filter !== "all") {
+  if (filter === "safe-to-delete") {
+    toShow = allResults.filter(r => r.safeToDelete);
+  } else if (filter !== "all") {
     toShow = allResults.filter(r => r.filterCat === filter);
   }
   
@@ -255,11 +281,20 @@ function renderTable(filter) {
   });
 }
 
-// Events for filters
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    renderTable(e.target.dataset.filter);
+function copyDeleteCmd() {
+  const safeIds = allResults.filter(r => r.safeToDelete).map(r => `"${r.id}"`);
+  if (safeIds.length === 0) {
+    alert("Không có video nào cần xóa!");
+    return;
+  }
+  
+  // Tạo lệnh PowerShell
+  const idsStr = safeIds.join(",");
+  const cmd = `$ids = @(${idsStr})\nforeach ($id in $ids) { Get-ChildItem "D:\\VIDDOWNLOAD\\*\\*\\$id*.mp4" -ErrorAction SilentlyContinue | Remove-Item -Force }\nWrite-Host "Da xoa thanh cong cac video da upload tren YouTube!"`;
+  
+  navigator.clipboard.writeText(cmd).then(() => {
+    alert("Đã copy lệnh PowerShell vào Clipboard! Hãy mở PowerShell, dán lệnh này vào và nhấn Enter để xóa.");
+  }).catch(err => {
+    alert("Không thể copy: " + err);
   });
-});
+}

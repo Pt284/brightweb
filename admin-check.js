@@ -8,7 +8,7 @@ const firebaseConfig = {
   appId: "1:482143691238:web:67dd3871bc93bf08c03627",
   measurementId: "G-LXMQJM43PN"
 };
-const ADMIN_EMAIL = "mcdg5444@gmail.com";
+// ADMIN_EMAIL đã được xóa khỏi client — admin check giờ qua Firestore collection 'admins'
 
 // ── PARTICLES CONFIG ──
 const PARTICLES_CONFIG = {
@@ -55,7 +55,16 @@ function signOut() {
 // ── AUTH CHECK ──
 auth.onAuthStateChanged(async user => {
   if (user) {
-    if (user.email !== ADMIN_EMAIL) {
+    // Kiểm tra Firestore admins collection thay vì hardcode email
+    let isAdmin = false;
+    try {
+      const adminDoc = await db.collection('admins').doc(user.email).get();
+      isAdmin = adminDoc.exists;
+    } catch(e) {
+      console.warn('Admin check error:', e);
+    }
+
+    if (!isAdmin) {
       // Not admin
       $('unauthorized-msg').style.display = 'block';
       $('page-admin').style.display = 'none';
@@ -250,18 +259,40 @@ function renderTable(filter) {
   }
   
   if (toShow.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Không có dữ liệu phù hợp</td></tr>`;
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4;
+    td.style.cssText = 'text-align: center; color: var(--text-muted);';
+    td.textContent = 'Không có dữ liệu phù hợp';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
     return;
   }
   
   toShow.forEach(r => {
+    // Dùng DOM API thay innerHTML để tránh XSS từ dữ liệu Firestore
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><strong>${r.id}</strong></td>
-      <td>${r.title}</td>
-      <td><span class="status ${r.statusClass}">${r.statusText}</span></td>
-      <td>${r.details}</td>
-    `;
+    const tdId = document.createElement('td');
+    const strong = document.createElement('strong');
+    strong.textContent = r.id;
+    tdId.appendChild(strong);
+
+    const tdTitle = document.createElement('td');
+    tdTitle.textContent = r.title;
+
+    const tdStatus = document.createElement('td');
+    const span = document.createElement('span');
+    span.className = 'status ' + r.statusClass;
+    span.textContent = r.statusText;
+    tdStatus.appendChild(span);
+
+    const tdDetails = document.createElement('td');
+    tdDetails.textContent = r.details;
+
+    tr.appendChild(tdId);
+    tr.appendChild(tdTitle);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdDetails);
     tbody.appendChild(tr);
   });
 }

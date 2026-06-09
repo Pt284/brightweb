@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Content Security Policy: giới hạn script/style chỉ từ domain tin cậy — giảm nhẹ XSS -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' https://fonts.gstatic.com data:;
+  connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://brightweb-sync.mcdg5444.workers.dev;
+  frame-src https://www.youtube.com;
+  object-src 'none';
+">
 <title>HM-LEAKBASE😈</title>
 <link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
 <link rel="stylesheet" href="style.css">
@@ -111,9 +122,10 @@ const firebaseConfig = {
   appId: "1:482143691238:web:67dd3871bc93bf08c03627",
   measurementId: "G-LXMQJM43PN"
 };
-const ADMIN_EMAIL    = "mcdg5444@gmail.com";
+// SYNC_SECRET và ADMIN_EMAIL đã được xóa khỏi client (bảo mật)
+// Admin check giờ dùng Firestore collection 'admins'
+// Sync giờ dùng Firebase ID token thay secret
 const SYNC_PROXY_URL = "https://brightweb-sync.mcdg5444.workers.dev";
-const SYNC_SECRET    = "76V9bynHNy7v6iT7o8uBLIUTco8o6T75xe65iceR7o746Ro6RVO7U6386ClvtILYBUYHKJFEDEY5c3e6UyB3VY938pvyrbY8rpvb983ybr39yrvbPYrbpo38YR3ourkhVHFbljhivl3yrO3BYV8p8b3r83OUP3opWO83U9P8o39yvO389RYo38ov3BIRYOvybrvwhjbkvOBVqouV388Vbo38oESUIOcbu12uOQUIByVQYyqoBQVYBVOi8y8YoyQOYVOb3yVOB83RY938vvRV3V881YVB1I1o1BVORYB1OBRVY18O1b1OY2vvy1RVby11YR21ouR8uovU181vb18v3pVBP19YRV1b9b8v19y1bvoyh1cb1ncx1LKFDTSRDYTguoipUYUTREw4er78U8tytdrfXCVBNjhuyi65REDfgvbhJUOY76r5erdTFUot76RFYJVHcgjdtueR56TIYUgjhGDRYE465r6itytu5767UOJHbgFDRYE6tyiguHVjfyuitUOHJBvnbgJDTU6tugkhVGTue576TIUGKHvjgdTU56tiyfhcGdtYFjggjUThuJGHVjyuR57ruyiuJGBKVHkfyirTDgcjFUY";
 
 // ── PARTICLES CONFIG — paste JSON config của bạn vào đây ──
 const PARTICLES_CONFIG = {
@@ -145,11 +157,36 @@ const db   = firebase.firestore();
 // ── STATE ──
 let appData = null, currentUser = null, progress = {};
 let currentCourseId = null, currentLessonId = null;
+let _isAdmin = false; // Cache admin status từ Firestore, không expose email
 
 // ── HELPERS ──
 const $ = id => document.getElementById(id);
 const showLoad = () => $('loading').classList.add('show');
 const hideLoad = () => $('loading').classList.remove('show');
+
+// ── SAFE DOM HELPERS (chống XSS) ──
+function safeUrl(url) {
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? url : '#';
+  } catch { return '#'; }
+}
+
+function el(tag, props = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'className') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k === 'textContent') e.textContent = v;
+    else if (k === 'onclick') e.addEventListener('click', v);
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else if (c) e.appendChild(c);
+  }
+  return e;
+}
 
 // ── ROUTING ──
 function showPage(name) {
@@ -197,7 +234,7 @@ function signOut() { auth.signOut(); }
 auth.onAuthStateChanged(async user => {
   if (user) {
     showLoad();
-    const allowed = await checkWhitelist(user);
+    const allowed = await checkAccess(user);
     if (!allowed) {
       await logUnauthorized(user);
       await auth.signOut();
@@ -208,22 +245,29 @@ auth.onAuthStateChanged(async user => {
     currentUser = user;
     $('header').style.display = 'flex';
     $('user-info').textContent = user.displayName || user.email;
-    if (user.email === ADMIN_EMAIL) $('btn-admin').style.display = '';
+    if (_isAdmin) $('btn-admin').style.display = ''; // Dùng _isAdmin từ Firestore, không hardcode email
     await loadData();
     await loadProgress();
     hideLoad();
     handleHash();
   } else {
+    _isAdmin = false;
     currentUser = null; appData = null; progress = {};
     $('header').style.display = 'none';
     showPage('landing');
   }
 });
 
-async function checkWhitelist(user) {
-  if (user.email === ADMIN_EMAIL) return true;
-  try { const d = await db.collection('whitelist').doc(user.email).get(); return d.exists; }
-  catch(e) { console.warn(e); return false; }
+// Kiểm tra quyền truy cập qua Firestore thay vì hardcode email
+async function checkAccess(user) {
+  try {
+    const [wlDoc, adminDoc] = await Promise.all([
+      db.collection('whitelist').doc(user.email).get(),
+      db.collection('admins').doc(user.email).get()
+    ]);
+    _isAdmin = adminDoc.exists;
+    return wlDoc.exists || _isAdmin;
+  } catch(e) { console.warn(e); return false; }
 }
 
 async function logUnauthorized(user) {
@@ -281,19 +325,24 @@ function countProgress(course) {
 
 // ── RENDER: HOME ──
 function renderHome() {
-  showPage('home')
-  const grid = $('course-grid'); grid.innerHTML = ''
+  showPage('home');
+  const grid = $('course-grid'); grid.innerHTML = '';
   appData.courses.forEach(course => {
-    const { done, total } = countProgress(course)
-    const pct = total ? Math.round(done/total*100) : 0
-    const card = document.createElement('div'); card.className = 'course-card glass'
-    card.innerHTML = `
-      <h3>${course.title}</h3>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-label">${done}/${total} bài · ${pct}%</div>`
-    card.onclick = () => navigate('course', course.id)
-    grid.appendChild(card)
-  })
+    const { done, total } = countProgress(course);
+    const pct = total ? Math.round(done / total * 100) : 0;
+    // Dùng DOM API thay innerHTML để tránh XSS
+    const fill = el('div', { className: 'progress-fill', style: `width:${pct}%` });
+    const bar  = el('div', { className: 'progress-bar' }, fill);
+    const card = el('div', {
+      className: 'course-card glass',
+      onclick: () => navigate('course', course.id)
+    },
+      el('h3', { textContent: course.title }),
+      bar,
+      el('div', { className: 'progress-label', textContent: `${done}/${total} bài · ${pct}%` })
+    );
+    grid.appendChild(card);
+  });
 }
 
 // ── RENDER: TREE ──
@@ -304,16 +353,23 @@ function buildTree(nodes, courseId, indent, activeId) {
     const label = document.createElement('div'); label.className = 'tree-label';
     label.style.paddingLeft = (14 + indent*14) + 'px';
     if (node.type === 'lesson') {
-      label.innerHTML = `<span class="icon">📄</span><span style="flex:1">${node.title}</span><span class="check">${progress[node.id]?'✓':''}</span>`;
+      // Dùng DOM API thay innerHTML để tránh XSS từ dữ liệu Firestore
+      const icon  = el('span', { className: 'icon', textContent: '📄' });
+      const title = el('span', { style: 'flex:1', textContent: node.title });
+      const check = el('span', { className: 'check', textContent: progress[node.id] ? '✓' : '' });
+      label.appendChild(icon); label.appendChild(title); label.appendChild(check);
       if (node.id === activeId) label.classList.add('active-lesson');
-      label.onclick = () => navigate('lesson', courseId, node.id);
+      label.addEventListener('click', () => navigate('lesson', courseId, node.id));
     } else {
       const ch = document.createElement('div'); ch.className = 'tree-children';
-      label.innerHTML = `<span class="icon toggle-icon">▶</span><span>${node.title}</span>`;
-      label.onclick = () => {
+      // Dùng DOM API thay innerHTML để tránh XSS
+      const icon  = el('span', { className: 'icon toggle-icon', textContent: '▶' });
+      const title = el('span', { textContent: node.title });
+      label.appendChild(icon); label.appendChild(title);
+      label.addEventListener('click', () => {
         const o = ch.classList.toggle('open');
         label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
-      };
+      });
       if (node.children) ch.appendChild(buildTree(node.children, courseId, indent+1, activeId));
       wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;
     }
@@ -354,8 +410,16 @@ function renderLesson(courseId, lessonId) {
   const dl = $('doc-list'); dl.innerHTML = '';
   if (lesson.documents?.length) {
     lesson.documents.forEach(doc => {
-      const card = document.createElement('div'); card.className = 'doc-card';
-      card.innerHTML = `<span>📎 ${doc.title}</span><a href="${doc.url}" target="_blank" class="btn btn-outline btn-sm">Mở</a>`;
+      // Validate URL để tránh javascript: injection, dùng DOM API thay innerHTML
+      const link = el('a', {
+        href: safeUrl(doc.url),
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        className: 'btn btn-outline btn-sm',
+        textContent: 'Mở'
+      });
+      const icon = el('span', { textContent: '📎 ' + doc.title });
+      const card = el('div', { className: 'doc-card' }, icon, link);
       dl.appendChild(card);
     });
   } else { dl.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted)">Không có tài liệu</p>'; }
@@ -387,9 +451,14 @@ async function loadAdminData() {
     else {
       wl.innerHTML = '';
       snap.forEach(doc => {
-        const row = document.createElement('div'); row.className = 'whitelist-item';
-        row.innerHTML = `<span>${doc.id}</span>
-          <button class="whitelist-remove" onclick="removeWhitelist('${doc.id}')">✕</button>`;
+        // Dùng DOM API + closure thay vì onclick string → tránh XSS qua email độc
+        const emailText = el('span', { textContent: doc.id });
+        const removeBtn = el('button', {
+          className: 'whitelist-remove',
+          textContent: '✕',
+          onclick: () => removeWhitelist(doc.id)
+        });
+        const row = el('div', { className: 'whitelist-item' }, emailText, removeBtn);
         wl.appendChild(row);
       });
     }
@@ -430,12 +499,20 @@ document.addEventListener('click', e => {
 async function triggerSync(e) {
   const btn = e.target; btn.disabled = true; btn.textContent = 'Đang sync...';
   try {
-    const r = await fetch(SYNC_PROXY_URL, { method: 'POST', headers: { 'x-secret': SYNC_SECRET } });
+    // Dùng Firebase ID token thay SYNC_SECRET — secret chỉ tồn tại trong Cloudflare Worker
+    if (!currentUser) { alert('Bạn chưa đăng nhập.'); return; }
+    const idToken = await currentUser.getIdToken(); // Firebase tự refresh nếu hết hạn
+    const r = await fetch(SYNC_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + idToken }
+      // Không còn 'x-secret' nào trong client
+    });
     if (r.status === 204) alert('✓ Đã trigger sync! GitHub Actions sẽ chạy trong vài giây.');
+    else if (r.status === 403) alert('⛔ Bạn không có quyền trigger sync.');
     else if (r.status === 429) alert('⏳ Vừa sync xong, chờ 1 phút trước khi sync lại.');
     else alert('Lỗi: ' + r.status + '. Kiểm tra Cloudflare Worker.');
   } catch(e) { alert('Lỗi kết nối: ' + e.message); }
-  btn.disabled = false; btn.textContent = '🔄 Sync ngay';
+  finally { btn.disabled = false; btn.textContent = '🔄 Sync ngay'; }
 }
 
 window.addEventListener('hashchange', handleHash);

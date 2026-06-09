@@ -9,30 +9,15 @@
 <link rel="stylesheet" href="glass.css">
 <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
 <style>
-.video-container { position: relative; aspect-ratio: 16/9; width: 100%; }
-#plyr-wrap { position: absolute; inset: 0; width: 100%; height: 100%; }
-#plyr-wrap iframe { pointer-events: none; }
+.video-container { position: relative; width: 100%; background: #000; }
 
 #custom-poster {
   position: absolute; inset: 0; z-index: 10;
   transition: opacity 0.3s; cursor: pointer;
+  background: black;
 }
 #custom-poster img {
   width: 100%; height: 100%; object-fit: cover; display: block;
-}
-
-.video-title-bar {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 11;
-  padding: 12px 16px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
-  color: white;
-}
-#video-yt-title {
-  display: block; font-size: 14px; font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-#video-yt-channel {
-  display: block; font-size: 12px; opacity: 0.7; margin-top: 2px;
 }
 
 #poster-play-btn {
@@ -414,28 +399,13 @@ function renderLesson(courseId, lessonId) {
     const container = document.createElement('div');
     container.className = 'video-container';
     
-    const plyrWrap = document.createElement('div');
-    plyrWrap.id = 'plyr-wrap';
-    
     const plyrPlayer = document.createElement('div');
-    plyrPlayer.className = 'plyr__video-embed';
     plyrPlayer.id = 'plyr-player';
-    
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube-nocookie.com/embed/${lesson.youtubeId}?origin=${window.location.origin}&iv_load_policy=3&modestbranding=1&rel=0&showinfo=0&controls=0&disablekb=1&playsinline=1&enablejsapi=1&noCookie=true`;
-    iframe.style.pointerEvents = 'none';
-    iframe.allowFullscreen = true;
-    iframe.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope';
-    
-    plyrPlayer.appendChild(iframe);
-    plyrWrap.appendChild(plyrPlayer);
+    plyrPlayer.setAttribute('data-plyr-provider', 'youtube');
+    plyrPlayer.setAttribute('data-plyr-embed-id', lesson.youtubeId);
     
     const poster = document.createElement('div');
     poster.id = 'custom-poster';
-    
-    const titleBar = document.createElement('div');
-    titleBar.className = 'video-title-bar';
-    titleBar.innerHTML = `<span id="video-yt-title">Đang tải...</span><span id="video-yt-channel"></span>`;
     
     const img = document.createElement('img');
     img.src = `https://i.ytimg.com/vi/${lesson.youtubeId}/maxresdefault.jpg`;
@@ -444,11 +414,10 @@ function renderLesson(courseId, lessonId) {
     const playBtn = document.createElement('button');
     playBtn.id = 'poster-play-btn';
     
-    poster.appendChild(titleBar);
     poster.appendChild(img);
     poster.appendChild(playBtn);
     
-    container.appendChild(plyrWrap);
+    container.appendChild(plyrPlayer);
     container.appendChild(poster);
     vw.appendChild(container);
 
@@ -459,7 +428,15 @@ function renderLesson(courseId, lessonId) {
       settings: ['speed'],
       speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] },
       keyboard: { focused: false, global: false },
-      youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 },
+      youtube: { 
+        noCookie: true, 
+        rel: 0, 
+        showinfo: 0, 
+        iv_load_policy: 3, 
+        modestbranding: 1,
+        playsinline: 1,
+        disablekb: 1
+      },
       i18n: {
         play: 'Phát', pause: 'Tạm dừng', restart: 'Phát lại từ đầu',
         rewind: 'Quay lại 10 giây', fastForward: 'Tua nhanh 10 giây',
@@ -469,19 +446,6 @@ function renderLesson(courseId, lessonId) {
         duration: 'Thời lượng'
       }
     });
-
-    fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${lesson.youtubeId}&format=json`)
-      .then(r => r.json())
-      .then(data => {
-        const t = document.getElementById('video-yt-title');
-        const c = document.getElementById('video-yt-channel');
-        if (t) t.textContent = data.title;
-        if (c) c.textContent = data.author_name;
-      })
-      .catch(() => {
-        const t = document.getElementById('video-yt-title');
-        if (t) t.textContent = lesson.title;
-      });
 
     playBtn.addEventListener('click', () => plyrInstance.play());
     

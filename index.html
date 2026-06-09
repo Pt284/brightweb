@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="glass.css">
 <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
 <style>
-.video-container { position: relative; width: 100%; background: #000; }
+.video-container { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
 
 #custom-poster {
   position: absolute; inset: 0; z-index: 10;
@@ -211,6 +211,24 @@ function showPage(name) {
 }
 
 function navigate(hash, ...args) {
+  // Quản lý particles
+  if (hash === 'lesson' || hash === 'course') {
+    if (window.pJSDom && window.pJSDom.length > 0) {
+      window.pJSDom[0].pJS.fn.vendors.destroypJS();
+      window.pJSDom = [];
+    }
+    const pjs = document.getElementById('particles-js');
+    if (pjs) pjs.style.display = 'none';
+  } else if (hash === 'home' || hash === 'landing') {
+    const pjs = document.getElementById('particles-js');
+    if (pjs) pjs.style.display = 'block';
+    if (!window.pJSDom || window.pJSDom.length === 0) {
+      if (window.particlesJS && typeof PARTICLES_CONFIG !== 'undefined') {
+        particlesJS('particles-js', PARTICLES_CONFIG);
+      }
+    }
+  }
+
   if (hash === 'home') {
     window.location.hash = '#home'; renderHome(); showPage('home');
   } else if (hash === 'course') {
@@ -339,6 +357,8 @@ function renderHome() {
   })
 }
 
+const openNodes = new Set();
+
 // ── RENDER: TREE ──
 function buildTree(nodes, courseId, indent, activeId) {
   const ul = document.createElement('div');
@@ -352,10 +372,15 @@ function buildTree(nodes, courseId, indent, activeId) {
       label.onclick = () => navigate('lesson', courseId, node.id);
     } else {
       const ch = document.createElement('div'); ch.className = 'tree-children';
-      label.innerHTML = `<span class="icon toggle-icon">▶</span><span>${node.title}</span>`;
+      const isOpen = openNodes.has(node.id);
+      if (isOpen) ch.classList.add('open');
+      
+      label.innerHTML = `<span class="icon toggle-icon">${isOpen ? '▼' : '▶'}</span><span>${node.title}</span>`;
       label.onclick = () => {
         const o = ch.classList.toggle('open');
         label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
+        if (o) openNodes.add(node.id);
+        else openNodes.delete(node.id);
       };
       if (node.children) ch.appendChild(buildTree(node.children, courseId, indent+1, activeId));
       wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;

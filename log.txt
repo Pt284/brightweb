@@ -1,0 +1,2144 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "WebInspector",
+      "version": "537.36"
+    },
+    "pages": [
+      {
+        "startedDateTime": "2026-06-10T03:11:18.523Z",
+        "id": "page_1",
+        "title": "https://pt284.github.io/brightweb/",
+        "pageTimings": {
+          "onContentLoad": 339.8299999998926,
+          "onLoad": 576.8840000000637
+        }
+      }
+    ],
+    "entries": [
+      {
+        "_initiator": {
+          "type": "other"
+        },
+        "_priority": "VeryHigh",
+        "_resourceType": "document",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://pt284.github.io/brightweb/",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": ":authority",
+              "value": "pt284.github.io"
+            },
+            {
+              "name": ":method",
+              "value": "GET"
+            },
+            {
+              "name": ":path",
+              "value": "/brightweb/"
+            },
+            {
+              "name": ":scheme",
+              "value": "https"
+            },
+            {
+              "name": "accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+            },
+            {
+              "name": "accept-encoding",
+              "value": "gzip, deflate, br, zstd"
+            },
+            {
+              "name": "accept-language",
+              "value": "en-US,en;q=0.9,vi;q=0.8"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=0"
+            },
+            {
+              "name": "if-modified-since",
+              "value": "Wed, 10 Jun 2026 02:57:36 GMT"
+            },
+            {
+              "name": "if-none-match",
+              "value": "W/\"6a28d2a0-52ac\""
+            },
+            {
+              "name": "priority",
+              "value": "u=0, i"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            },
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "sec-fetch-dest",
+              "value": "document"
+            },
+            {
+              "name": "sec-fetch-mode",
+              "value": "navigate"
+            },
+            {
+              "name": "sec-fetch-site",
+              "value": "none"
+            },
+            {
+              "name": "sec-fetch-user",
+              "value": "?1"
+            },
+            {
+              "name": "upgrade-insecure-requests",
+              "value": "1"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 304,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "age",
+              "value": "9"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=600"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 10 Jun 2026 03:11:20 GMT"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"6a28d2a0-52ac\""
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 03:21:11 GMT"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "via",
+              "value": "1.1 varnish"
+            },
+            {
+              "name": "x-cache",
+              "value": "HIT"
+            },
+            {
+              "name": "x-cache-hits",
+              "value": "1"
+            },
+            {
+              "name": "x-fastly-request-id",
+              "value": "db081345034d22facefe08639c896b8e9cf5a499"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-sin-wsap440032-SIN"
+            },
+            {
+              "name": "x-timer",
+              "value": "S1781061081.612956,VS0,VE2"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 21164,
+            "mimeType": "text/html"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 150,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:50c0:8000::153]",
+        "startedDateTime": "2026-06-10T03:11:18.513Z",
+        "time": 74.49099999985265,
+        "timings": {
+          "blocked": 16.37499999972357,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0.2629999999999999,
+          "wait": 51.0549999997846,
+          "receive": 6.798000000344473,
+          "_blocked_queueing": 10.285999999723572,
+          "_workerStart": -1,
+          "_workerReady": -1,
+          "_workerFetchStart": -1,
+          "_workerRespondWithSettled": -1
+        },
+        "_connectionId": "64447",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 18
+        },
+        "_priority": "VeryHigh",
+        "_resourceType": "stylesheet",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://pt284.github.io/brightweb/style.css",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/brightweb/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "x-fastly-request-id",
+              "value": "2cb881c60e2bd556f31a276741fd7bfc04d987c5"
+            },
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"6a28d2a0-3a50\""
+            },
+            {
+              "name": "age",
+              "value": "0"
+            },
+            {
+              "name": "x-github-request-id",
+              "value": "1B20:1E4600:23AF763:2407A03:6A28D5CF"
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 03:21:12 GMT"
+            },
+            {
+              "name": "x-proxy-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "x-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 10 Jun 2026 03:11:12 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "text/css; charset=utf-8"
+            },
+            {
+              "name": "last-modified",
+              "value": "Wed, 10 Jun 2026 02:57:36 GMT"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-sin-wsap440032-SIN"
+            },
+            {
+              "name": "x-cache-hits",
+              "value": "0"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=31556952"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=600"
+            },
+            {
+              "name": "x-timer",
+              "value": "S1781061072.994956,VS0,VE261"
+            },
+            {
+              "name": "via",
+              "value": "1.1 varnish"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "3691"
+            },
+            {
+              "name": "server",
+              "value": "GitHub.com"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 14928,
+            "mimeType": "text/css"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:50c0:8000::153]",
+        "startedDateTime": "2026-06-10T03:11:18.686Z",
+        "time": 0.18599999975776882,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.16499999992447556,
+          "receive": 0.02099999983329326,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "_connectionId": "64447",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 19
+        },
+        "_priority": "VeryHigh",
+        "_resourceType": "stylesheet",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://pt284.github.io/brightweb/glass.css",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/brightweb/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "x-fastly-request-id",
+              "value": "c93d7299b206b5caabbc9435acef1c1b4ab55afa"
+            },
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"6a28d2a0-431\""
+            },
+            {
+              "name": "age",
+              "value": "0"
+            },
+            {
+              "name": "x-github-request-id",
+              "value": "0836:1E8B70:233E501:23964CD:6A28D5CF"
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 03:21:12 GMT"
+            },
+            {
+              "name": "x-proxy-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "x-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 10 Jun 2026 03:11:12 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "text/css; charset=utf-8"
+            },
+            {
+              "name": "last-modified",
+              "value": "Wed, 10 Jun 2026 02:57:36 GMT"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-sin-wsap440032-SIN"
+            },
+            {
+              "name": "x-cache-hits",
+              "value": "0"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=31556952"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=600"
+            },
+            {
+              "name": "x-timer",
+              "value": "S1781061072.994863,VS0,VE257"
+            },
+            {
+              "name": "via",
+              "value": "1.1 varnish"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "462"
+            },
+            {
+              "name": "x-origin-cache",
+              "value": "HIT"
+            },
+            {
+              "name": "server",
+              "value": "GitHub.com"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 1073,
+            "mimeType": "text/css"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:50c0:8000::153]",
+        "startedDateTime": "2026-06-10T03:11:18.686Z",
+        "time": 0.13100000023769098,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.09799999997994746,
+          "receive": 0.03300000025774352,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "_connectionId": "64447",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 20
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "access-control-expose-headers",
+              "value": "*"
+            },
+            {
+              "name": "content-encoding",
+              "value": "br"
+            },
+            {
+              "name": "cf-cache-status",
+              "value": "HIT"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"30821-uYfcDMbPzcLjRJk3X1BUcMWtuJE\""
+            },
+            {
+              "name": "age",
+              "value": "4508564"
+            },
+            {
+              "name": "report-to",
+              "value": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=HHmiKN53rYJ9QeB421dYyAh%2BMjgW0dDx6974SG%2BYk6oaPMWEGHNeXRmQh%2FhppU4lnTBpPAjZH7bn0brrY50J09lpy9k5g5BY9GSEilDQMAf8mgmLpjdjWdxVu7mpjV6ugWNYYFjSi1QFZf1LESk%3D\"}]}"
+            },
+            {
+              "name": "x-content-type-options",
+              "value": "nosniff"
+            },
+            {
+              "name": "x-jsd-version-type",
+              "value": "version"
+            },
+            {
+              "name": "alt-svc",
+              "value": "h3=\":443\"; ma=86400"
+            },
+            {
+              "name": "x-cache",
+              "value": "HIT, HIT"
+            },
+            {
+              "name": "date",
+              "value": "Tue, 09 Jun 2026 01:27:49 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "application/javascript; charset=utf-8"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-fra-eddf8230103-FRA, cache-hkg17929-HKG"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "cache-control",
+              "value": "public, max-age=31536000, s-maxage=31536000, immutable"
+            },
+            {
+              "name": "timing-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "nel",
+              "value": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.01,\"max_age\":604800}"
+            },
+            {
+              "name": "cross-origin-resource-policy",
+              "value": "cross-origin"
+            },
+            {
+              "name": "cf-ray",
+              "value": "a08c5b266bb5d007-HKG"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "46076"
+            },
+            {
+              "name": "server",
+              "value": "cloudflare"
+            },
+            {
+              "name": "x-jsd-version",
+              "value": "1.4.1"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 198689,
+            "mimeType": "application/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:4700::6811:cf05]",
+        "startedDateTime": "2026-06-10T03:11:18.686Z",
+        "time": 0.16900000036912388,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.14099999998506973,
+          "receive": 0.028000000384054147,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 21
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "access-control-expose-headers",
+              "value": "*"
+            },
+            {
+              "name": "content-encoding",
+              "value": "br"
+            },
+            {
+              "name": "cf-cache-status",
+              "value": "HIT"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"59e8-UZOhrgIV5VxI3l3rU0rLB4Gjv70\""
+            },
+            {
+              "name": "age",
+              "value": "4320156"
+            },
+            {
+              "name": "report-to",
+              "value": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=e%2FrkaKqB3WOaGKojxVviQGfsbxL65D362cM99NA8jxGH0eqGWpZLMReakn0fV5WYLnMKx1IUleb54dnOrDxd1rB2imwg78AUQmZAa2rSn%2FmLJmzdCRgCkpDllUfRXyrmf2oVmdnkB6kgOTPa32Y%3D\"}]}"
+            },
+            {
+              "name": "x-content-type-options",
+              "value": "nosniff"
+            },
+            {
+              "name": "x-jsd-version-type",
+              "value": "version"
+            },
+            {
+              "name": "alt-svc",
+              "value": "h3=\":443\"; ma=86400"
+            },
+            {
+              "name": "x-cache",
+              "value": "HIT, HIT"
+            },
+            {
+              "name": "date",
+              "value": "Tue, 09 Jun 2026 01:27:49 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "application/javascript; charset=utf-8"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-fra-eddf8230027-FRA, cache-hkg17923-HKG"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "cache-control",
+              "value": "public, max-age=31536000, s-maxage=31536000, immutable"
+            },
+            {
+              "name": "timing-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "nel",
+              "value": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.01,\"max_age\":604800}"
+            },
+            {
+              "name": "cross-origin-resource-policy",
+              "value": "cross-origin"
+            },
+            {
+              "name": "cf-ray",
+              "value": "a08c5b266bb2d007-HKG"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "6168"
+            },
+            {
+              "name": "server",
+              "value": "cloudflare"
+            },
+            {
+              "name": "x-jsd-version",
+              "value": "2.0.0"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 23016,
+            "mimeType": "application/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:4700::6811:cf05]",
+        "startedDateTime": "2026-06-10T03:11:18.711Z",
+        "time": 0.161999999818363,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.1330000000052678,
+          "receive": 0.0289999998130952,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 22
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "age",
+              "value": "471456"
+            },
+            {
+              "name": "report-to",
+              "value": "{\"group\":\"firebase-js\",\"max_age\":2592000,\"endpoints\":[{\"url\":\"https://csp.withgoogle.com/csp/report-to/firebase-js\"}]}"
+            },
+            {
+              "name": "x-content-type-options",
+              "value": "nosniff"
+            },
+            {
+              "name": "expires",
+              "value": "Thu, 03 Jun 2027 14:30:13 GMT"
+            },
+            {
+              "name": "alt-svc",
+              "value": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 03 Jun 2026 14:30:13 GMT"
+            },
+            {
+              "name": "last-modified",
+              "value": "Thu, 08 Jun 2023 18:54:36 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "text/javascript; charset=UTF-8"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "cache-control",
+              "value": "public, max-age=31536000"
+            },
+            {
+              "name": "cross-origin-opener-policy",
+              "value": "same-origin-allow-popups; report-to=\"firebase-js\""
+            },
+            {
+              "name": "cross-origin-resource-policy",
+              "value": "cross-origin"
+            },
+            {
+              "name": "content-security-policy-report-only",
+              "value": "require-trusted-types-for 'script'; report-uri https://csp.withgoogle.com/csp/firebase-js"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "9307"
+            },
+            {
+              "name": "x-xss-protection",
+              "value": "0"
+            },
+            {
+              "name": "server",
+              "value": "sffe"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 28949,
+            "mimeType": "text/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2404:6800:4005:81f::2003]",
+        "startedDateTime": "2026-06-10T03:11:18.716Z",
+        "time": 0.1930000003085297,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.14800000008108327,
+          "receive": 0.045000000227446435,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 23
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "age",
+              "value": "470245"
+            },
+            {
+              "name": "report-to",
+              "value": "{\"group\":\"firebase-js\",\"max_age\":2592000,\"endpoints\":[{\"url\":\"https://csp.withgoogle.com/csp/report-to/firebase-js\"}]}"
+            },
+            {
+              "name": "x-content-type-options",
+              "value": "nosniff"
+            },
+            {
+              "name": "expires",
+              "value": "Thu, 03 Jun 2027 14:50:24 GMT"
+            },
+            {
+              "name": "alt-svc",
+              "value": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 03 Jun 2026 14:50:24 GMT"
+            },
+            {
+              "name": "last-modified",
+              "value": "Thu, 08 Jun 2023 18:54:49 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "text/javascript; charset=UTF-8"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "cache-control",
+              "value": "public, max-age=31536000"
+            },
+            {
+              "name": "cross-origin-opener-policy",
+              "value": "same-origin-allow-popups; report-to=\"firebase-js\""
+            },
+            {
+              "name": "cross-origin-resource-policy",
+              "value": "cross-origin"
+            },
+            {
+              "name": "content-security-policy-report-only",
+              "value": "require-trusted-types-for 'script'; report-uri https://csp.withgoogle.com/csp/firebase-js"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "38084"
+            },
+            {
+              "name": "x-xss-protection",
+              "value": "0"
+            },
+            {
+              "name": "server",
+              "value": "sffe"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 132195,
+            "mimeType": "text/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2404:6800:4005:81f::2003]",
+        "startedDateTime": "2026-06-10T03:11:18.729Z",
+        "time": 0.13500000022759195,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.10900000006586197,
+          "receive": 0.026000000161729986,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 24
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "age",
+              "value": "471386"
+            },
+            {
+              "name": "report-to",
+              "value": "{\"group\":\"firebase-js\",\"max_age\":2592000,\"endpoints\":[{\"url\":\"https://csp.withgoogle.com/csp/report-to/firebase-js\"}]}"
+            },
+            {
+              "name": "x-content-type-options",
+              "value": "nosniff"
+            },
+            {
+              "name": "expires",
+              "value": "Thu, 03 Jun 2027 14:31:23 GMT"
+            },
+            {
+              "name": "alt-svc",
+              "value": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 03 Jun 2026 14:31:23 GMT"
+            },
+            {
+              "name": "last-modified",
+              "value": "Thu, 08 Jun 2023 18:54:54 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "text/javascript; charset=UTF-8"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "cache-control",
+              "value": "public, max-age=31536000"
+            },
+            {
+              "name": "cross-origin-opener-policy",
+              "value": "same-origin-allow-popups; report-to=\"firebase-js\""
+            },
+            {
+              "name": "cross-origin-resource-policy",
+              "value": "cross-origin"
+            },
+            {
+              "name": "content-security-policy-report-only",
+              "value": "require-trusted-types-for 'script'; report-uri https://csp.withgoogle.com/csp/firebase-js"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "100788"
+            },
+            {
+              "name": "x-xss-protection",
+              "value": "0"
+            },
+            {
+              "name": "server",
+              "value": "sffe"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 339222,
+            "mimeType": "text/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2404:6800:4005:81f::2003]",
+        "startedDateTime": "2026-06-10T03:11:18.766Z",
+        "time": 0.16000000005078618,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.12599999990925426,
+          "receive": 0.03400000014153193,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 25
+        },
+        "_priority": "Low",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://pt284.github.io/brightweb/bg.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/brightweb/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "x-fastly-request-id",
+              "value": "a06d1889db2c51b7e696f6455c0e976be910f061"
+            },
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"6a28d2a0-1139\""
+            },
+            {
+              "name": "age",
+              "value": "0"
+            },
+            {
+              "name": "x-github-request-id",
+              "value": "62AA:14F3:CE76FC:D0A710:6A28D5D0"
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 03:21:12 GMT"
+            },
+            {
+              "name": "x-proxy-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "x-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 10 Jun 2026 03:11:12 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "application/javascript; charset=utf-8"
+            },
+            {
+              "name": "last-modified",
+              "value": "Wed, 10 Jun 2026 02:57:36 GMT"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-sin-wsap440032-SIN"
+            },
+            {
+              "name": "x-cache-hits",
+              "value": "0"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=31556952"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=600"
+            },
+            {
+              "name": "x-timer",
+              "value": "S1781061072.367355,VS0,VE262"
+            },
+            {
+              "name": "via",
+              "value": "1.1 varnish"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "1716"
+            },
+            {
+              "name": "server",
+              "value": "GitHub.com"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 4409,
+            "mimeType": "application/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:50c0:8000::153]",
+        "startedDateTime": "2026-06-10T03:11:18.830Z",
+        "time": 0.16400000004068715,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.14099999998506973,
+          "receive": 0.02300000005561742,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "_connectionId": "64447",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 26
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://pt284.github.io/brightweb/container.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/brightweb/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "x-fastly-request-id",
+              "value": "80d20de671967b01c67b11c603dacde22327adcd"
+            },
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"6a28d2a0-4908\""
+            },
+            {
+              "name": "age",
+              "value": "0"
+            },
+            {
+              "name": "x-github-request-id",
+              "value": "693C:8BE48:418419:44CC50:6A28D5D0"
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 03:21:12 GMT"
+            },
+            {
+              "name": "x-proxy-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "x-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 10 Jun 2026 03:11:12 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "application/javascript; charset=utf-8"
+            },
+            {
+              "name": "last-modified",
+              "value": "Wed, 10 Jun 2026 02:57:36 GMT"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-sin-wsap440032-SIN"
+            },
+            {
+              "name": "x-cache-hits",
+              "value": "0"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=31556952"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=600"
+            },
+            {
+              "name": "x-timer",
+              "value": "S1781061072.371683,VS0,VE249"
+            },
+            {
+              "name": "via",
+              "value": "1.1 varnish"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "4810"
+            },
+            {
+              "name": "server",
+              "value": "GitHub.com"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 18696,
+            "mimeType": "application/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:50c0:8000::153]",
+        "startedDateTime": "2026-06-10T03:11:18.830Z",
+        "time": 0.11199999971722718,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.08699999989403295,
+          "receive": 0.02499999982319423,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "_connectionId": "64447",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "parser",
+          "url": "https://pt284.github.io/brightweb/",
+          "lineNumber": 27
+        },
+        "_priority": "High",
+        "_resourceType": "script",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://pt284.github.io/brightweb/button.js",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/brightweb/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "http/2.0",
+          "headers": [
+            {
+              "name": "x-fastly-request-id",
+              "value": "58b13231855cf262aead83a7bb6ad97e3ae2d07b"
+            },
+            {
+              "name": "content-encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "etag",
+              "value": "W/\"6a28d2a0-403c\""
+            },
+            {
+              "name": "age",
+              "value": "0"
+            },
+            {
+              "name": "x-github-request-id",
+              "value": "2F2A:F6F94:418B17:44E418:6A28D5D0"
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 03:21:12 GMT"
+            },
+            {
+              "name": "x-proxy-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "x-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "date",
+              "value": "Wed, 10 Jun 2026 03:11:12 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "application/javascript; charset=utf-8"
+            },
+            {
+              "name": "last-modified",
+              "value": "Wed, 10 Jun 2026 02:57:36 GMT"
+            },
+            {
+              "name": "x-served-by",
+              "value": "cache-sin-wsap440032-SIN"
+            },
+            {
+              "name": "x-cache-hits",
+              "value": "0"
+            },
+            {
+              "name": "vary",
+              "value": "Accept-Encoding"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=31556952"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=600"
+            },
+            {
+              "name": "x-timer",
+              "value": "S1781061073.677689,VS0,VE242"
+            },
+            {
+              "name": "via",
+              "value": "1.1 varnish"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "4053"
+            },
+            {
+              "name": "server",
+              "value": "GitHub.com"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 16444,
+            "mimeType": "application/javascript"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2606:50c0:8000::153]",
+        "startedDateTime": "2026-06-10T03:11:18.832Z",
+        "time": 0.18499999987398041,
+        "timings": {
+          "blocked": -1,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0.1509999997324485,
+          "receive": 0.03400000014153193,
+          "_blocked_queueing": -1
+        },
+        "_fromCache": "memory",
+        "_connectionId": "64447",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "other"
+        },
+        "_priority": "High",
+        "_resourceType": "other",
+        "cache": {},
+        "connection": "443",
+        "request": {
+          "method": "GET",
+          "url": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif",
+          "httpVersion": "h3",
+          "headers": [
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Windows\""
+            },
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            }
+          ],
+          "queryString": [],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "h3",
+          "headers": [
+            {
+              "name": "age",
+              "value": "116002"
+            },
+            {
+              "name": "report-to",
+              "value": "{\"group\":\"apps-themes\",\"max_age\":2592000,\"endpoints\":[{\"url\":\"https://csp.withgoogle.com/csp/report-to/apps-themes\"}]}"
+            },
+            {
+              "name": "x-content-type-options",
+              "value": "nosniff"
+            },
+            {
+              "name": "expires",
+              "value": "Wed, 10 Jun 2026 07:38:31 GMT"
+            },
+            {
+              "name": "alt-svc",
+              "value": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+            },
+            {
+              "name": "date",
+              "value": "Mon, 08 Jun 2026 07:38:31 GMT"
+            },
+            {
+              "name": "last-modified",
+              "value": "Mon, 16 Mar 2026 15:50:39 GMT"
+            },
+            {
+              "name": "content-type",
+              "value": "image/gif"
+            },
+            {
+              "name": "cache-control",
+              "value": "public, max-age=172800, stale-while-revalidate=604800"
+            },
+            {
+              "name": "cross-origin-opener-policy",
+              "value": "same-origin; report-to=\"apps-themes\""
+            },
+            {
+              "name": "cross-origin-resource-policy",
+              "value": "cross-origin"
+            },
+            {
+              "name": "content-security-policy-report-only",
+              "value": "require-trusted-types-for 'script'; report-uri https://csp.withgoogle.com/csp/apps-themes"
+            },
+            {
+              "name": "accept-ranges",
+              "value": "bytes"
+            },
+            {
+              "name": "access-control-allow-origin",
+              "value": "*"
+            },
+            {
+              "name": "content-length",
+              "value": "1996707"
+            },
+            {
+              "name": "x-xss-protection",
+              "value": "0"
+            },
+            {
+              "name": "server",
+              "value": "sffe"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "size": 1996707,
+            "mimeType": "image/gif"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": 0,
+          "_transferSize": 0,
+          "_error": null,
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "[2404:6800:4005:826::2003]",
+        "startedDateTime": "2026-06-10T03:11:19.147Z",
+        "time": 285.4139999999461,
+        "timings": {
+          "blocked": 14.789999999678752,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 129.48899999996337,
+          "receive": 141.135000000304,
+          "_blocked_queueing": 13.815999999678752,
+          "_workerStart": -1,
+          "_workerReady": -1,
+          "_workerFetchStart": -1,
+          "_workerRespondWithSettled": -1
+        },
+        "_fromCache": "disk",
+        "pageref": "page_1"
+      },
+      {
+        "_initiator": {
+          "type": "script",
+          "stack": {
+            "callFrames": [
+              {
+                "functionName": "",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 42557
+              },
+              {
+                "functionName": "je",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 42240
+              },
+              {
+                "functionName": "",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 102184
+              },
+              {
+                "functionName": "pr",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 101747
+              },
+              {
+                "functionName": "yr",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 102662
+              },
+              {
+                "functionName": "initAndGetManager",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 106282
+              },
+              {
+                "functionName": "_initialize",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 106133
+              },
+              {
+                "functionName": "_initialize",
+                "scriptId": "38",
+                "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                "lineNumber": 0,
+                "columnNumber": 118046
+              }
+            ],
+            "parent": {
+              "description": "await",
+              "callFrames": [
+                {
+                  "functionName": "",
+                  "scriptId": "38",
+                  "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                  "lineNumber": 0,
+                  "columnNumber": 94531
+                },
+                {
+                  "functionName": "execute",
+                  "scriptId": "38",
+                  "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                  "lineNumber": 0,
+                  "columnNumber": 94423
+                },
+                {
+                  "functionName": "executeNotNull",
+                  "scriptId": "38",
+                  "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                  "lineNumber": 0,
+                  "columnNumber": 95850
+                },
+                {
+                  "functionName": "",
+                  "scriptId": "38",
+                  "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                  "lineNumber": 0,
+                  "columnNumber": 129862
+                },
+                {
+                  "functionName": "signInWithPopup",
+                  "scriptId": "38",
+                  "url": "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js",
+                  "lineNumber": 0,
+                  "columnNumber": 129879
+                },
+                {
+                  "functionName": "signInGoogle",
+                  "scriptId": "42",
+                  "url": "https://pt284.github.io/brightweb/",
+                  "lineNumber": 229,
+                  "columnNumber": 7
+                },
+                {
+                  "functionName": "onclick",
+                  "scriptId": "50",
+                  "url": "https://pt284.github.io/brightweb/",
+                  "lineNumber": 67,
+                  "columnNumber": 63
+                }
+              ]
+            }
+          }
+        },
+        "_priority": "Low",
+        "_resourceType": "script",
+        "cache": {},
+        "request": {
+          "method": "GET",
+          "url": "https://apis.google.com/js/api.js?onload=__iframefcb833757",
+          "httpVersion": "",
+          "headers": [
+            {
+              "name": "Referer",
+              "value": "https://pt284.github.io/"
+            }
+          ],
+          "queryString": [
+            {
+              "name": "onload",
+              "value": "__iframefcb833757"
+            }
+          ],
+          "cookies": [],
+          "headersSize": -1,
+          "bodySize": 0
+        },
+        "response": {
+          "status": 0,
+          "statusText": "",
+          "httpVersion": "",
+          "headers": [],
+          "cookies": [],
+          "content": {
+            "size": 0,
+            "mimeType": "x-unknown"
+          },
+          "redirectURL": "",
+          "headersSize": -1,
+          "bodySize": -1,
+          "_transferSize": 0,
+          "_error": "",
+          "_fetchedViaServiceWorker": false
+        },
+        "serverIPAddress": "",
+        "startedDateTime": "2026-06-10T03:11:21.159Z",
+        "time": 0.16000000005078618,
+        "timings": {
+          "blocked": 0.16000000005078618,
+          "dns": -1,
+          "ssl": -1,
+          "connect": -1,
+          "send": 0,
+          "wait": 0,
+          "receive": 0,
+          "_blocked_queueing": -1
+        },
+        "pageref": "page_1"
+      }
+    ]
+  }
+}

@@ -357,13 +357,44 @@ button { cursor: pointer; font-family: inherit; }
 
 .video-wrap {
   position: relative;
-  aspect-ratio: 16 / 9;
   background: #000;
   border-radius: var(--radius);
   overflow: hidden;
   margin-bottom: 18px;
+  /* Plyr tự handle aspect-ratio bên trong */
 }
-.video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+/* Iframe thô fallback (không dùng nữa nhưng giữ lại) */
+.video-wrap > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+
+/* ── Plyr theme — khớp với màu web ── */
+.plyr {
+  --plyr-color-main: #0091EA;
+  --plyr-video-background: #000;
+  --plyr-range-fill-background: #0091EA;
+  --plyr-video-controls-background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.85));
+  --plyr-control-radius: 6px;
+  --plyr-font-family: system-ui, sans-serif;
+  border-radius: 10px;
+  overflow: hidden;
+}
+/* Wrapper plyr-player.js tạo */
+#plyr-wrapper {
+  border-radius: 10px;
+  overflow: hidden;
+}
+#plyr-wrapper .plyr {
+  border-radius: 0; /* wrapper đã có radius */
+}
+/* Speed popup không bị che bởi overflow:hidden của video-wrap */
+#speed-popup {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+/* Speed indicator */
+#speed-indicator {
+  font-family: system-ui, sans-serif;
+}
+
 
 /* Tắt backdrop-filter trên trang lesson để bớt lag */
 #page-lesson .sidebar {

@@ -39,14 +39,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyTheme(newHue) {
     const deltaHue = newHue - BASE_HUE;
     
+    // Tính màu nền canvas (--color-bg) sau shift để sync với BlobController.setBgColor
+    let canvasBgHsl = null;
+
     for (const [token, data] of Object.entries(BASE_TOKENS)) {
       const finalHue = Math.round(((data.h + deltaHue) % 360 + 360) % 360);
       
       if (data.type === 'color') {
-        document.documentElement.style.setProperty(
-          token, 
-          `hsla(${finalHue}, ${data.s}%, ${data.l}%, ${data.a})`
-        );
+        const val = `hsla(${finalHue}, ${data.s}%, ${data.l}%, ${data.a})`;
+        document.documentElement.style.setProperty(token, val);
+        if (token === '--color-bg') canvasBgHsl = val;
       } else if (data.type === 'shadow') {
         const shadowString = data.format
           .replace('{h}', finalHue)
@@ -57,8 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (window.BlobController && window.BlobController.setPalette) {
+    if (window.BlobController) {
       window.BlobController.setPalette(newHue);
+      // Sync màu nền canvas với hue mới
+      if (canvasBgHsl) window.BlobController.setBgColor(canvasBgHsl);
     }
   }
 
@@ -192,12 +196,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const grid = document.getElementById('cs-token-grid');
     for (const token of Object.keys(BASE_TOKENS)) {
-      grid.innerHTML += \`
-        <div class="cs-token-item">
-          <div class="cs-token-color" style="background: var(\${token});"></div>
-          \${token.replace('--color-', '').replace('--', '')}
-        </div>
-      \`;
+      const item = document.createElement('div');
+      item.className = 'cs-token-item';
+      const swatch = document.createElement('div');
+      swatch.className = 'cs-token-color';
+      swatch.style.background = `var(${token})`;
+      const label = document.createElement('span');
+      label.textContent = token.replace('--color-', '').replace('--', '');
+      item.appendChild(swatch);
+      item.appendChild(label);
+      grid.appendChild(item);
     }
 
     document.querySelector('.cs-close-btn').addEventListener('click', () => {
@@ -234,22 +242,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Inject UI trước khi gắn button (popup phải tồn tại để onclick hoạt động)
+  injectUI();
+
   const headerRight = document.querySelector('.header-right');
   if (headerRight) {
     const btn = document.createElement('button');
     btn.className = 'btn-icon';
-    btn.innerHTML = '🎨';
+    btn.textContent = '🎨';
     btn.title = 'Cài đặt giao diện';
+    btn.setAttribute('id', 'btn-color-settings');
     btn.onclick = () => {
       document.getElementById('color-settings-backdrop').classList.add('open');
     };
-    headerRight.prepend(btn);
+    // Đặt trước nút Admin (⚙) — giữa user-info và nút đăng xuất
+    const adminBtn = document.getElementById('btn-admin');
+    if (adminBtn) {
+      headerRight.insertBefore(btn, adminBtn);
+    } else {
+      headerRight.prepend(btn);
+    }
   }
-
-  injectUI();
   
-  // Wait a small tick so bg.js logic attaches window.BlobController if it's late
-  setTimeout(loadSavedSettings, 50);
+  // BlobController có thể chưa tồn tại do bg.js dùng defer — dùng timeout để đợi
+  setTimeout(loadSavedSettings, 100);
 
   window.openColorSettings = () => {
     document.getElementById('color-settings-backdrop').classList.add('open');

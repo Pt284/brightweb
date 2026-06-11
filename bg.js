@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let speedMultiplier = 1;
   let isBlobActive = true;
   let currentBgColor = '#020810';
+  let rafId = null;
 
   window.BlobController = {
     setPalette: function(hue) {
@@ -102,7 +103,13 @@ document.addEventListener('DOMContentLoaded', function () {
       speedMultiplier = mul;
     },
     toggle: function(active) {
+      const wasInactive = !isBlobActive;
       isBlobActive = active;
+      // Nếu bật lại thì khởi động lại loop
+      if (wasInactive && active) {
+        if (rafId) cancelAnimationFrame(rafId);
+        draw();
+      }
     },
     setBgColor: function(color) {
       currentBgColor = color;
@@ -130,7 +137,8 @@ document.addEventListener('DOMContentLoaded', function () {
     b.noiseT += b.noiseSpd * speedMultiplier;
     const nx = sn(b.noiseT, b.x * 10 + 1.0) * 0.000025;
     const ny = sn(b.noiseT, b.y * 10 + 4.5) * 0.000025;
-    b.vx += nx * speedMultiplier; b.vy += ny * speedMultiplier;
+    // Chỉ scale noise force, KHÔNG scale maxSpd theo multiplier để tránh double-scaling
+    b.vx += nx; b.vy += ny;
     const maxSpd = 0.00113 * Math.max(0.1, speedMultiplier);
     const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
     if (spd > maxSpd) { b.vx = b.vx / spd * maxSpd; b.vy = b.vy / spd * maxSpd; }
@@ -152,7 +160,8 @@ document.addEventListener('DOMContentLoaded', function () {
     ctx.fillRect(0, 0, W, H);
     
     if (!isBlobActive) {
-      requestAnimationFrame(draw);
+      // Dừng loop khi tắt animation — không tốn CPU
+      rafId = null;
       return;
     }
 
@@ -175,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     ctx.globalCompositeOperation = 'source-over';
-    requestAnimationFrame(draw);
+    rafId = requestAnimationFrame(draw);
   }
 
   draw();

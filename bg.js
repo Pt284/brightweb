@@ -40,6 +40,14 @@ document.addEventListener('DOMContentLoaded', function () {
     [21, 82, 148],
   ];
 
+  function hslToRgb(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
+  }
+
   function makeBlob(forceEdge) {
     let x, y;
     if (forceEdge || Math.random() < 0.45) {
@@ -74,6 +82,33 @@ document.addEventListener('DOMContentLoaded', function () {
     };
   }
 
+  let speedMultiplier = 1;
+  let isBlobActive = true;
+  let currentBgColor = '#020810';
+
+  window.BlobController = {
+    setPalette: function(hue) {
+      const lightnessStops = [6, 8, 10, 15, 19, 24, 29, 33];
+      const satMul         = [1, 1, 1, 1, 1, 0.98, 0.96, 0.93];
+      const hueShift       = [0, 0, 0, -1, -2, -4, -7, -10];
+      for (let i = 0; i < 8; i++) {
+        const h = (hue + hueShift[i] + 360) % 360;
+        const s = 80 * satMul[i];
+        const l = lightnessStops[i];
+        COLORS[i] = hslToRgb(h, s, l);
+      }
+    },
+    setSpeed: function(mul) {
+      speedMultiplier = mul;
+    },
+    toggle: function(active) {
+      isBlobActive = active;
+    },
+    setBgColor: function(color) {
+      currentBgColor = color;
+    }
+  };
+
   const blobs = Array.from({ length: 11 }, () => makeBlob(false));
   blobs.forEach((b, i) => {
     if (i < 6) {
@@ -92,11 +127,11 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function updateBlob(b) {
-    b.noiseT += b.noiseSpd;
+    b.noiseT += b.noiseSpd * speedMultiplier;
     const nx = sn(b.noiseT, b.x * 10 + 1.0) * 0.000025;
     const ny = sn(b.noiseT, b.y * 10 + 4.5) * 0.000025;
-    b.vx += nx; b.vy += ny;
-    const maxSpd = 0.00113;
+    b.vx += nx * speedMultiplier; b.vy += ny * speedMultiplier;
+    const maxSpd = 0.00113 * Math.max(0.1, speedMultiplier);
     const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
     if (spd > maxSpd) { b.vx = b.vx / spd * maxSpd; b.vy = b.vy / spd * maxSpd; }
     b.x += b.vx; b.y += b.vy;
@@ -113,8 +148,14 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function draw() {
-    ctx.fillStyle = '#020810';
+    ctx.fillStyle = currentBgColor;
     ctx.fillRect(0, 0, W, H);
+    
+    if (!isBlobActive) {
+      requestAnimationFrame(draw);
+      return;
+    }
+
     ctx.globalCompositeOperation = 'screen';
 
     for (const b of blobs) {

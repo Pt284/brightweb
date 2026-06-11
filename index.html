@@ -23,27 +23,27 @@
   <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
   <style>
     .video-container {
-      position: absolute; inset: 0; width: 100%; height: 100%; background: #000;
+      position: absolute; inset: 0; width: 100%; height: 100%; background: var(--color-bg);
     }
     #custom-poster {
       position: absolute; inset: 0; z-index: 10; transition: opacity 0.3s;
-      cursor: pointer; background: black;
+      cursor: pointer; background: var(--color-bg);
     }
     #custom-poster img {
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
     #poster-play-btn {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 68px; height: 68px; border-radius: 50%; background: rgba(220, 0, 0, 0.9);
-      border: none; color: white; font-size: 28px; cursor: pointer;
+      width: 68px; height: 68px; border-radius: 50%; background: var(--color-red-alpha);
+      border: none; color: var(--color-text-inverse); font-size: 28px; cursor: pointer;
       transition: transform 0.15s, background 0.15s; display: flex; align-items: center; justify-content: center;
     }
     #poster-play-btn::before { content: '▶'; margin-left: 5px; }
-    #poster-play-btn:hover { background: rgb(220, 0, 0); transform: translate(-50%, -50%) scale(1.1); }
+    #poster-play-btn:hover { background: var(--color-red); transform: translate(-50%, -50%) scale(1.1); }
 
     #player-toast {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.85);
-      background: rgba(0, 0, 0, 0.72); color: white; padding: 10px 20px;
+      background: var(--color-surface-modal); color: var(--color-text-inverse); padding: 10px 20px;
       border-radius: 8px; font-size: 17px; opacity: 0; pointer-events: none; z-index: 20;
       transition: opacity 0.15s, transform 0.15s;
     }
@@ -51,8 +51,8 @@
 
     #custom-video-title {
       position: absolute; top: 16px; left: 16px; right: 16px; z-index: 15;
-      color: #fff; font-size: 1.15rem; font-weight: 600;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.8); pointer-events: none;
+      color: var(--color-text-inverse); font-size: 1.15rem; font-weight: 600;
+      text-shadow: 0 1px 4px var(--color-surface-input); pointer-events: none;
     }
     
     /* Chặn click vào iframe youtube để không bị mất focus của phím tắt */
@@ -74,6 +74,7 @@
   <script src="bg.js" defer></script>
   <script src="container.js"></script>
   <script src="button.js"></script>
+  <link rel="stylesheet" href="color-settings.css">
 </head>
 
 <body>
@@ -540,14 +541,14 @@
           
           // Giao diện Mini Arc cho thư mục
           const pct = getChapterProgressPct(node);
-          const color = pct === 100 ? '#639922' : pct >= 50 ? '#378ADD' : '#EF9F27';
+          const color = pct === 100 ? 'var(--progress-done)' : pct >= 50 ? 'var(--progress-fill)' : 'var(--progress-low)';
           const dash = (pct * 87.96) / 100;
           
           // Tạo SVG Arc dùng innerHTML (an toàn vì chỉ là số và chuỗi hằng)
           const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
           arcWrap.innerHTML = `
             <svg width="24" height="24" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-track)" stroke-width="4"/>
               <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4" 
                 stroke-dasharray="${dash} 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"/>
             </svg>
@@ -1040,6 +1041,7 @@
       };
     }
   </script>
+  <script src="color-settings.js"></script>
 </body>
 
 </html>

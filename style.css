@@ -2,46 +2,87 @@
    DESIGN TOKENS — đổi ở đây để thay toàn bộ giao diện
    ============================================================ */
 :root {
-  /* Màu nền */
-  --bg:          #17274D;
-  --surface:     #1e3160;
-  --surface2:    #243872;
-  --surface3:    #1a2d55;
-
-  /* Màu chính */
-  --accent:      #0091EA;
-  --accent-hover:#0077c2;
-  --green:       #00c853;
-  --red:         #f87171;
-
-  /* Màu chữ */
-  --text:        #e2e8f0;
-  --text-muted:  #94a3b8;
-  --text-dim:    #cbd5e1;
-
-  /* Viền & khoảng cách */
-  --border:      #2a3f6f;
-  --radius:      10px;
-  --radius-sm:   6px;
-  --radius-lg:   16px;
-
-  /* Sidebar */
-  --sidebar-w:   280px;
-
-  /* Shadow */
-  --shadow:      0 4px 24px rgba(0,0,0,.5);
-  --shadow-sm:   0 2px 16px rgba(0,145,234,.2);
+  /* System Backgrounds */
+  --color-bg: hsl(213, 78%, 4%);
+  --color-bg-alt: hsl(222, 54%, 20%);
+  
+  /* System Surfaces */
+  --color-surface: hsl(223, 52%, 25%);
+  --color-surface2: hsl(225, 52%, 29%);
+  --color-surface3: hsl(221, 53%, 22%);
+  --color-surface-glass: hsla(215, 0%, 100%, 0.06);
+  --color-surface-glass-hover: hsla(215, 0%, 100%, 0.1);
+  --color-surface-overlay: hsla(214, 78%, 4%, 0.55);
+  --color-surface-modal: hsla(222, 54%, 20%, 0.8);
+  --color-surface-input: hsla(215, 0%, 0%, 0.3);
+  
+  /* System Borders */
+  --color-border: hsl(222, 45%, 30%);
+  --color-border-glass: hsla(215, 0%, 100%, 0.12);
+  --color-border-glass-hover: hsla(215, 0%, 100%, 0.2);
+  --color-divider: var(--color-border);
+  
+  /* System Accents */
+  --color-accent: hsl(203, 100%, 46%);
+  --color-accent-hover: hsl(203, 100%, 38%);
+  --color-accent-alpha: hsla(203, 100%, 46%, 0.12);
+  --color-accent-text: hsl(201, 100%, 69%);
+  
+  /* Semantic Colors */
+  --color-green: hsl(145, 100%, 39%);
+  --color-green-alpha: hsla(145, 100%, 39%, 0.12);
+  --color-red: hsl(0, 90%, 71%);
+  --color-red-alpha: hsla(0, 90%, 71%, 0.2);
+  --color-yellow: hsl(45, 97%, 60%);
+  --color-yellow-alpha: hsla(45, 97%, 60%, 0.2);
+  --color-info: hsl(214, 97%, 78%);
+  --color-info-alpha: hsla(214, 97%, 78%, 0.2);
+  
+  /* Text */
+  --color-text: hsl(214, 32%, 91%);
+  --color-text-muted: hsl(215, 25%, 65%);
+  --color-text-dim: hsl(213, 27%, 84%);
+  --color-text-inverse: hsl(0, 0%, 100%);
+  
+  /* Buttons */
+  --btn-bg: transparent;
+  --btn-border: transparent;
+  --btn-text: var(--color-text);
+  
+  /* Progress */
+  --progress-track: hsla(0, 0%, 100%, 0.15);
+  --progress-fill: hsl(210, 71%, 54%);
+  --progress-done: var(--color-green);
+  --progress-low: var(--color-yellow);
+  
+  /* Dimensions & Shadows */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
+  --sidebar-w: 280px;
+  --shadow: 0 4px 24px hsla(0,0%,0%,0.5);
+  --shadow-sm: 0 2px 16px hsla(203,100%,46%,0.2);
+  --shadow-glass: 0 8px 32px hsla(0,0%,0%,0.35);
+  --shadow-glass-hover: 0 12px 40px hsla(203,100%,46%,0.2);
+  
+  /* Plyr */
+  --plyr-color-main: var(--color-accent);
+  --plyr-video-background: hsl(0, 0%, 0%);
+  --plyr-range-fill-background: var(--color-accent);
+  --plyr-video-controls-background: linear-gradient(hsla(0,0%,0%,0), hsla(0,0%,0%,0.85));
+  --plyr-control-radius: var(--radius-sm);
+  --plyr-font-family: system-ui, sans-serif;
 }
 
 /* ============================================================
    RESET & BASE
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { background: #020810; } /* fallback màu tối khi canvas chưa load */
+html { background: var(--color-bg); } /* fallback màu tối khi canvas chưa load */
 body {
   font-family: system-ui, sans-serif;
   background: transparent;
-  color: var(--text);
+  color: var(--color-text);
   min-height: 100vh;
 }
 #bg-canvas {
@@ -56,31 +97,40 @@ button { cursor: pointer; font-family: inherit; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--color-bg-alt); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 
 /* ============================================================
    BUTTONS
    ============================================================ */
 .btn {
+  background: var(--btn-bg, transparent);
+  border: 1.5px solid var(--btn-border, transparent);
+  color: var(--btn-text, var(--color-text));
   padding: 8px 18px;
   border-radius: var(--radius);
-  border: none;
   font-size: .9rem;
   font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
 }
 .btn-primary {
-  background: var(--accent);
-  color: #fff;
+  --btn-bg: var(--color-accent);
+  --btn-border: var(--color-accent);
+  --btn-text: var(--color-text-inverse);
 }
-.btn-primary:hover { background: var(--accent-hover); }
-
+.btn-primary:hover {
+  --btn-bg: var(--color-accent-hover);
+  --btn-border: var(--color-accent-hover);
+}
 .btn-outline {
-  background: transparent;
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
+  --btn-bg: transparent;
+  --btn-border: var(--color-accent);
+  --btn-text: var(--color-accent);
 }
-.btn-outline:hover { background: rgba(0,145,234,.12); }
+.btn-outline:hover {
+  --btn-bg: var(--color-accent-alpha);
+}
 
 .btn-sm { padding: 5px 12px; font-size: .82rem; }
 
@@ -90,9 +140,9 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 1.2rem;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  color: var(--text);
+  color: var(--color-text);
 }
-.btn-icon:hover { background: var(--surface2); }
+.btn-icon:hover { background: var(--color-surface2); }
 
 /* ============================================================
    LOADING OVERLAY
@@ -101,12 +151,12 @@ button { cursor: pointer; font-family: inherit; }
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(23,39,77,.8);
+  background: var(--color-surface-modal);
   align-items: center;
   justify-content: center;
   z-index: 999;
   font-size: 1rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 #loading.show { display: flex; }
 
@@ -114,11 +164,11 @@ button { cursor: pointer; font-family: inherit; }
    HEADER
    ============================================================ */
 #header {
-  background: rgba(2,8,16,.55);
-  border-bottom: 1px solid var(--border);
+  background: var(--color-surface-overlay);
+  border-bottom: 1px solid var(--color-border);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
   padding: 0 16px;
   height: 52px;
   display: flex;
@@ -131,7 +181,7 @@ button { cursor: pointer; font-family: inherit; }
 #header .logo {
   font-weight: 700;
   font-size: 1.15rem;
-  color: var(--accent);
+  color: var(--color-accent);
   cursor: pointer;
 }
 #header .header-right {
@@ -139,7 +189,7 @@ button { cursor: pointer; font-family: inherit; }
   align-items: center;
   gap: 12px;
 }
-#user-info { font-size: .85rem; color: var(--text-muted); }
+#user-info { font-size: .85rem; color: var(--color-text-muted); }
 
 /* ============================================================
    ADMIN PANEL
@@ -147,8 +197,8 @@ button { cursor: pointer; font-family: inherit; }
 #admin-panel {
   position: fixed;
   top: 60px; right: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 16px;
   min-width: 260px;
@@ -157,56 +207,56 @@ button { cursor: pointer; font-family: inherit; }
   display: none;
 }
 #admin-panel.open { display: block; }
-#admin-panel h4 { margin-bottom: 10px; font-size: .95rem; color: var(--text); }
-#admin-panel p  { font-size: .82rem; color: var(--text-muted); margin-bottom: 12px; }
+#admin-panel h4 { margin-bottom: 10px; font-size: .95rem; color: var(--color-text); }
+#admin-panel p  { font-size: .82rem; color: var(--color-text-muted); margin-bottom: 12px; }
 #admin-panel .section-label {
   margin-bottom: 8px;
   font-size: .82rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--color-text);
 }
-#admin-panel hr { margin: 12px 0; border: none; border-top: 1px solid var(--border); }
+#admin-panel hr { margin: 12px 0; border: none; border-top: 1px solid var(--color-border); }
 #admin-panel input {
   flex: 1;
   padding: 5px 8px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: .82rem;
-  color: var(--text);
+  color: var(--color-text);
 }
-#admin-panel input::placeholder { color: var(--text-muted); }
+#admin-panel input::placeholder { color: var(--color-text-muted); }
 .admin-row { display: flex; gap: 6px; margin-bottom: 8px; }
-#whitelist-list {
+#var(--color-text-inverse)list-list {
   font-size: .8rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   max-height: 120px;
   overflow-y: auto;
 }
-.whitelist-item {
+.var(--color-text-inverse)list-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 2px 0;
 }
-.whitelist-remove {
+.var(--color-text-inverse)list-remove {
   background: none;
   border: none;
-  color: var(--red);
+  color: var(--color-red);
   cursor: pointer;
   font-size: .8rem;
 }
 #security-logs {
   font-size: .78rem;
-  color: var(--red);
+  color: var(--color-red);
   max-height: 100px;
   overflow-y: auto;
 }
 .log-item { padding: 2px 0; border-bottom: 1px solid #3f1d1d; }
 .btn-reload {
   margin-top: 8px;
-  background: var(--surface2);
-  color: var(--text);
+  background: var(--color-surface2);
+  color: var(--color-text);
   border: none;
   padding: 5px 12px;
   border-radius: var(--radius-sm);
@@ -248,10 +298,10 @@ button { cursor: pointer; font-family: inherit; }
 }
 #page-landing h1 {
   font-size: 2.4rem;
-  color: #fff;
+  color: var(--color-text-inverse);
   text-shadow: 0 2px 16px rgba(0,145,234,.4);
 }
-#page-landing p { color: var(--text-muted); font-size: 1rem; }
+#page-landing p { color: var(--color-text-muted); font-size: 1rem; }
 
 /* Tất cả page containers phải transparent để canvas bg nhìn xuyên qua */
 #page-home,
@@ -261,7 +311,7 @@ button { cursor: pointer; font-family: inherit; }
 .lesson-main {
   background: transparent;
 }
-#page-home h2 { font-size: 1.2rem; margin-bottom: 16px; color: var(--text); }
+#page-home h2 { font-size: 1.2rem; margin-bottom: 16px; color: var(--color-text); }
 
 .course-grid {
   display: grid;
@@ -269,8 +319,8 @@ button { cursor: pointer; font-family: inherit; }
   gap: 16px;
 }
 .course-card {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.1);
+  background: var(--color-surface-glass);
+  border: 1px solid var(--color-surface-glass-hover);
   border-radius: var(--radius);
   padding: 18px;
   cursor: pointer;
@@ -280,23 +330,23 @@ button { cursor: pointer; font-family: inherit; }
 }
 .course-card:hover {
   box-shadow: var(--shadow-sm);
-  border-color: var(--accent);
+  border-color: var(--color-accent);
 }
-.course-card h3 { font-size: 1rem; margin-bottom: 10px; color: var(--text); }
+.course-card h3 { font-size: 1rem; margin-bottom: 10px; color: var(--color-text); }
 .progress-bar {
-  background: var(--surface2);
+  background: var(--color-surface2);
   border-radius: 99px;
   height: 7px;
   overflow: hidden;
   margin-bottom: 6px;
 }
 .progress-fill {
-  background: var(--green);
+  background: var(--color-green);
   height: 100%;
   border-radius: 99px;
   transition: width .3s;
 }
-.progress-label { font-size: .8rem; color: var(--text-muted); }
+.progress-label { font-size: .8rem; color: var(--color-text-muted); }
 
 /* ── Course ── */
 #page-course { display: none; }
@@ -306,8 +356,8 @@ button { cursor: pointer; font-family: inherit; }
 .sidebar {
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
-  background: rgba(2,8,16,.45);
-  border-right: 1px solid var(--border);
+  background: var(--color-surface-overlay);
+  border-right: 1px solid var(--color-border);
   overflow-y: auto;
   padding: 12px 0;
   backdrop-filter: blur(16px);
@@ -317,9 +367,9 @@ button { cursor: pointer; font-family: inherit; }
   padding: 4px 14px 10px;
   font-weight: 600;
   font-size: .95rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
   margin-bottom: 6px;
-  color: var(--text);
+  color: var(--color-text);
 }
 .tree-label {
   display: flex;
@@ -329,12 +379,12 @@ button { cursor: pointer; font-family: inherit; }
   font-size: .875rem;
   cursor: pointer;
   user-select: none;
-  color: var(--text-dim);
+  color: var(--color-text-dim);
 }
-.tree-label:hover { background: var(--surface2); }
+.tree-label:hover { background: var(--color-surface2); }
 .tree-label.active-lesson {
-  background: rgba(0,145,234,.18);
-  color: #60c8ff;
+  background: var(--color-accent-alpha);
+  color: var(--color-accent-text);
   font-weight: 500;
 }
 .tree-label .icon {
@@ -342,18 +392,18 @@ button { cursor: pointer; font-family: inherit; }
   width: 14px;
   text-align: center;
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
-.tree-label .check { color: var(--green); font-size: .8rem; flex-shrink: 0; }
+.tree-label .check { color: var(--color-green); font-size: .8rem; flex-shrink: 0; }
 .tree-children { display: none; }
 .tree-children.open { display: block; }
-.course-main { flex: 1; padding: 24px; overflow-y: auto; color: var(--text-muted); }
+.course-main { flex: 1; padding: 24px; overflow-y: auto; color: var(--color-text-muted); }
 
 /* ── Lesson ── */
 #page-lesson { display: none; }
 #page-lesson.active { display: flex; min-height: calc(100vh - 52px); }
 .lesson-main { flex: 1; padding: 24px; overflow-y: auto; max-width: 860px; }
-.lesson-main h2 { font-size: 1.15rem; margin-bottom: 16px; color: var(--text); }
+.lesson-main h2 { font-size: 1.15rem; margin-bottom: 16px; color: var(--color-text); }
 
 .video-wrap {
   position: relative;
@@ -401,7 +451,7 @@ button { cursor: pointer; font-family: inherit; }
 #page-lesson .sidebar {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: rgba(2,8,16,.85) !important;
+  background: var(--color-surface-modal) !important;
 }
 #page-lesson .lesson-main {
   backdrop-filter: none !important;
@@ -418,21 +468,28 @@ button { cursor: pointer; font-family: inherit; }
 }
 .watch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .btn-watch {
+  background: var(--btn-bg, transparent);
+  border: 1.5px solid var(--btn-border, var(--color-green));
+  color: var(--btn-text, var(--color-green));
   padding: 8px 20px;
   border-radius: var(--radius);
-  border: 1.5px solid var(--green);
-  background: transparent;
-  color: var(--green);
   font-weight: 500;
   font-size: .9rem;
   cursor: pointer;
+  transition: all 0.2s;
+  --btn-bg: transparent;
+  --btn-border: var(--color-green);
+  --btn-text: var(--color-green);
 }
-.btn-watch.watched { background: var(--green); color: #fff; }
+.btn-watch.watched {
+  --btn-bg: var(--color-green);
+  --btn-text: var(--color-text-inverse);
+}
 
 .docs-section h3 {
   font-size: .78rem;
   margin-bottom: 10px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -440,32 +497,32 @@ button { cursor: pointer; font-family: inherit; }
 .doc-list { display: flex; flex-direction: column; gap: 8px; }
 .doc-card {
   background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid var(--color-surface-glass-hover);
   border-radius: var(--radius);
   padding: 12px 16px;
   display: flex; align-items: center; justify-content: space-between;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-.doc-card span { font-size: .875rem; color: var(--text-dim); }
+.doc-card span { font-size: .875rem; color: var(--color-text-dim); }
 
 /* ============================================================
    CSS GLASS — dùng backdrop-filter, hoạt động trên mọi element
    Chỉ cần thêm class "glass" vào bất kỳ element nào
    ============================================================ */
 .glass {
-  background: rgba(255,255,255,.06) !important;
+  background: var(--color-surface-glass) !important;
   backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
   -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
-  border: 1px solid rgba(255,255,255,.12) !important;
+  border: 1px solid var(--color-border-glass) !important;
   box-shadow:
     0 8px 32px rgba(0,0,0,.35),
-    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 1px 0 var(--color-border-glass),
     inset 0 -1px 0 rgba(0,0,0,.1) !important;
 }
 .glass:hover {
-  background: rgba(255,255,255,.1) !important;
-  border-color: rgba(255,255,255,.2) !important;
+  background: var(--color-surface-glass-hover) !important;
+  border-color: var(--color-border-glass-hover) !important;
   box-shadow:
     0 12px 40px rgba(0,145,234,.2),
     inset 0 1px 0 rgba(255,255,255,.18),
@@ -514,9 +571,9 @@ button { cursor: pointer; font-family: inherit; }
   z-index: 1;
   pointer-events: none;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-inverse);
   font-family: system-ui, -apple-system, sans-serif;
-  white-space: nowrap;
+  var(--color-text-inverse)-space: nowrap;
   text-shadow: 0 1px 4px rgba(0,0,0,.4);
   letter-spacing: .02em;
 }
@@ -531,7 +588,7 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 1rem;
   font-weight: 600;
   font-family: system-ui, sans-serif;
-  color: #fff;
+  color: var(--color-text-inverse);
   border-radius: 99px;
   border: 1px solid rgba(255,255,255,.25);
   cursor: pointer;
@@ -545,7 +602,7 @@ button { cursor: pointer; font-family: inherit; }
   box-shadow:
     0 8px 32px rgba(0,145,234,.3),
     0 2px 8px rgba(0,0,0,.4),
-    inset 0 1px 0 rgba(255,255,255,.2),
+    inset 0 1px 0 var(--color-border-glass-hover),
     inset 0 -1px 0 rgba(0,0,0,.15);
 
   transition: transform .15s, box-shadow .15s, background .15s;
@@ -573,7 +630,7 @@ button { cursor: pointer; font-family: inherit; }
   width: 100%;
   pointer-events: none;
 }
-.glass-card-content h3 { font-size: 1rem; margin-bottom: 10px; color: #fff; }
+.glass-card-content h3 { font-size: 1rem; margin-bottom: 10px; color: var(--color-text-inverse); }
 
 /* Admin panel glass override */
 #admin-panel.glass-admin {
@@ -585,7 +642,7 @@ button { cursor: pointer; font-family: inherit; }
 }
 #admin-panel.glass-admin .admin-inner {
   padding: 16px;
-  color: var(--text);
+  color: var(--color-text);
 }
 
 /* ============================================================
@@ -596,11 +653,11 @@ button { cursor: pointer; font-family: inherit; }
 .arc-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; letter-spacing: -0.5px; }
 
 /* Minibar cho bài học */
-.bar-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-dim); margin-left: auto; }
-.bar-track { width: 36px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); }
-.bar-fill  { height: 100%; border-radius: 2px; background: #378ADD; transition: width 0.3s ease; }
-.bar-fill.done { background: #639922; }
-.bar-fill.low  { background: #EF9F27; }
+.bar-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--color-text-dim); margin-left: auto; }
+.bar-track { width: 36px; height: 4px; background: var(--progress-track); border-radius: 2px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); }
+.bar-fill  { height: 100%; border-radius: 2px; background: var(--progress-fill); transition: width 0.3s ease; }
+.bar-fill.done { background: var(--progress-done); }
+.bar-fill.low  { background: var(--progress-low); }
 
 /* ============================================================
    RESPONSIVE

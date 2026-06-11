@@ -59,6 +59,10 @@
     .plyr__video-wrapper::after {
       content: ""; position: absolute; inset: 0; z-index: 1; cursor: pointer;
     }
+    /* Chặn hoàn toàn hover/click vào YouTube iframe để không hiện GUI của YT */
+    .plyr iframe {
+      pointer-events: none !important;
+    }
   </style>
 
   <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
@@ -400,7 +404,9 @@
       if (!currentUser) return;
       try { 
         const old = getLocalProgress(lessonId) || {};
-        const p = { ...old, watchedTime, duration, updatedAt: Date.now() };
+        // Lưu mốc thời gian lớn nhất để tiến trình không bị lùi khi tua ngược
+        const maxTime = Math.max(old.watchedTime || 0, watchedTime);
+        const p = { ...old, watchedTime: maxTime, duration, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p)); 
       } catch(e) {}
     }
@@ -620,7 +626,8 @@
           youtube: {
             rel: 0,
             iv_load_policy: 3,
-            modestbranding: 1
+            modestbranding: 1,
+            cc_load_policy: 0
           },
           i18n: {
             play: 'Phát', pause: 'Tạm dừng', restart: 'Phát lại từ đầu',
@@ -633,6 +640,12 @@
 
         let hasAutoSeeked = false;
         plyrInstance.on('ready', () => {
+          // Ép tắt phụ đề YouTube ngay khi load
+          if (plyrInstance.embed && plyrInstance.embed.unloadModule) {
+            plyrInstance.embed.unloadModule('captions');
+            plyrInstance._ytCaptionsOn = false;
+          }
+
           const saved = getLocalProgress(currentLessonId);
           if (saved && saved.watchedTime > 0 && !hasAutoSeeked) {
             hasAutoSeeked = true;
@@ -856,14 +869,14 @@
         case 'j':
           handled = true;
           const jumpBack = e.shiftKey ? 10 : 5;
-          plyrInstance.rewind(jumpBack);
+          plyrInstance.currentTime = Math.max(0, plyrInstance.currentTime - jumpBack);
           showToast(`⏪ -${jumpBack}s`);
           break;
         case 'arrowright':
         case 'l':
           handled = true;
           const jumpFwd = e.shiftKey ? 10 : 5;
-          plyrInstance.forward(jumpFwd);
+          plyrInstance.currentTime = Math.min(plyrInstance.duration, plyrInstance.currentTime + jumpFwd);
           showToast(`⏩ +${jumpFwd}s`);
           break;
         case 'arrowup':
@@ -888,9 +901,23 @@
           break;
         case 'c':
           handled = true;
-          const currentCaptions = plyrInstance.captions.active;
-          plyrInstance.toggleCaptions(!currentCaptions);
-          showToast(!currentCaptions ? 'Bật phụ đề' : 'Tắt phụ đề');
+          if (plyrInstance.embed && typeof plyrInstance.embed.loadModule === 'function') {
+            if (!plyrInstance._ytCaptionsOn) {
+              plyrInstance.embed.loadModule('captions');
+              plyrInstance.embed.setOption('captions', 'track', {'languageCode': 'vi'});
+              plyrInstance._ytCaptionsOn = true;
+              showToast('Bật phụ đề');
+            } else {
+              plyrInstance.embed.unloadModule('captions');
+              plyrInstance._ytCaptionsOn = false;
+              showToast('Tắt phụ đề');
+            }
+          } else {
+            // Fallback for native Plyr (if not youtube)
+            const currentCaptions = plyrInstance.captions.active;
+            plyrInstance.toggleCaptions(!currentCaptions);
+            showToast(!currentCaptions ? 'Bật phụ đề' : 'Tắt phụ đề');
+          }
           break;
         case 'home':
           handled = true;

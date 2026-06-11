@@ -165,6 +165,7 @@
     let appData = null, currentUser = null, progress = {};
     let currentCourseId = null, currentLessonId = null;
     let _isAdmin = false; // Cache admin status từ Firestore, không expose email
+    let _openTreeNodes = new Set(); // Lưu ID các thư mục đang mở
 
     // ── HELPERS ──
     const $ = id => document.getElementById(id);
@@ -216,8 +217,15 @@
         destroyPlyr(); // Dọn player khi rời trang lesson
         window.location.hash = '#home'; renderHome(); showPage('home');
       } else if (hash === 'course') {
+        const cId = args[0];
+        // Tự động nhảy thẳng vào bài học cuối cùng nếu có
+        const lastLid = currentUser ? localStorage.getItem(`last_lesson_${cId}_${currentUser.uid}`) : null;
+        if (lastLid) {
+          navigate('lesson', cId, lastLid);
+          return;
+        }
         destroyPlyr();
-        window.location.hash = `#course/${args[0]}`; renderCourse(args[0]);
+        window.location.hash = `#course/${cId}`; renderCourse(cId);
       } else if (hash === 'lesson') {
         window.location.hash = `#lesson/${args[0]}/${args[1]}`; renderLesson(args[0], args[1]);
       }
@@ -301,16 +309,45 @@
 
     async function loadProgress() {
       if (!currentUser) return;
+      progress = {};
       try {
         const snap = await db.collection('progress').where('userId', '==', currentUser.uid).get();
-        progress = {};
         snap.forEach(doc => { const d = doc.data(); if (d.watched) progress[d.lessonId] = true; });
       } catch (e) { console.warn(e); }
+      // Nạp tiến độ local (nếu chưa có trên firebase)
+      try {
+         for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k.startsWith(`prog_${currentUser.uid}_`)) {
+               const lid = k.replace(`prog_${currentUser.uid}_`, '');
+               const d = JSON.parse(localStorage.getItem(k));
+               if (d.watched && !progress[lid]) progress[lid] = true;
+            }
+         }
+      } catch(e) {}
+    }
+
+    function getLocalProgress(lessonId) {
+      if (!currentUser) return null;
+      try { return JSON.parse(localStorage.getItem(`prog_${currentUser.uid}_${lessonId}`)); } catch(e) { return null; }
+    }
+
+    function saveLocalProgress(lessonId, watchedTime, duration) {
+      if (!currentUser) return;
+      try { 
+        const old = getLocalProgress(lessonId) || {};
+        const p = { ...old, watchedTime, duration, updatedAt: Date.now() };
+        localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p)); 
+      } catch(e) {}
     }
 
     async function saveProgress(lessonId, courseId, watched) {
       if (!currentUser) return;
       try {
+        // Lưu local
+        const old = getLocalProgress(lessonId) || {};
+        localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify({ ...old, watched, updatedAt: Date.now() }));
+        // Lưu firebase
         await db.collection('progress').doc(`${currentUser.uid}_${lessonId}`).set({
           userId: currentUser.uid, lessonId, courseId, watched,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -330,6 +367,23 @@
     function countProgress(course) {
       const all = course.tree.flatMap(getAllLessons);
       return { done: all.filter(l => progress[l.id]).length, total: all.length };
+    }
+    
+    function getLessonProgressPct(lessonId) {
+      if (progress[lessonId]) return 100;
+      const p = getLocalProgress(lessonId);
+      if (p && p.duration > 0 && p.watchedTime > 0) {
+        return Math.min(99, Math.floor((p.watchedTime / p.duration) * 100));
+      }
+      return 0;
+    }
+
+    function getChapterProgressPct(node) {
+      const all = getAllLessons(node);
+      if (all.length === 0) return 0;
+      let sum = 0;
+      all.forEach(l => sum += getLessonProgressPct(l.id));
+      return Math.floor(sum / all.length);
     }
 
     // ── RENDER: HOME ──
@@ -357,28 +411,63 @@
     // ── RENDER: TREE ──
     function buildTree(nodes, courseId, indent, activeId) {
       const ul = document.createElement('div');
-      nodes.forEach(node => {
+      nodes.forEach((node, i) => {
         const wrap = document.createElement('div'); wrap.className = 'tree-node';
         const label = document.createElement('div'); label.className = 'tree-label';
         label.style.paddingLeft = (14 + indent * 14) + 'px';
+        
         if (node.type === 'lesson') {
-          // Dùng DOM API thay innerHTML để tránh XSS từ dữ liệu Firestore
+          const pct = getLessonProgressPct(node.id);
+          const isDone = pct === 100;
+          
+          // Giao diện Mini bar cho bài học
+          const barTrack = el('div', { className: 'bar-track' });
+          const barFill = el('div', { className: 'bar-fill ' + (isDone ? 'done' : pct > 0 ? '' : 'low'), style: `width:${pct}%` });
+          barTrack.appendChild(barFill);
+          const barBadge = el('span', { className: 'bar-badge' }, barTrack, el('span', { textContent: pct + '%' }));
+          
           const icon = el('span', { className: 'icon', textContent: '📄' });
           const title = el('span', { style: 'flex:1', textContent: node.title });
-          const check = el('span', { className: 'check', textContent: progress[node.id] ? '✓' : '' });
-          label.appendChild(icon); label.appendChild(title); label.appendChild(check);
+          
+          label.appendChild(icon); label.appendChild(title); label.appendChild(barBadge);
           if (node.id === activeId) label.classList.add('active-lesson');
           label.addEventListener('click', () => navigate('lesson', courseId, node.id));
         } else {
+          // Thư mục
           const ch = document.createElement('div'); ch.className = 'tree-children';
-          // Dùng DOM API thay innerHTML để tránh XSS
-          const icon = el('span', { className: 'icon toggle-icon', textContent: '▶' });
-          const title = el('span', { textContent: node.title });
-          label.appendChild(icon); label.appendChild(title);
+          const nodeId = node.id || `folder_${indent}_${i}`; // Dùng ID tạm nếu không có
+          
+          const isOpen = _openTreeNodes.has(nodeId);
+          if (isOpen) ch.classList.add('open');
+          
+          const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
+          const title = el('span', { style: 'flex:1', textContent: node.title });
+          
+          // Giao diện Mini Arc cho thư mục
+          const pct = getChapterProgressPct(node);
+          const color = pct === 100 ? '#639922' : pct >= 50 ? '#378ADD' : '#EF9F27';
+          const dash = (pct * 87.96) / 100;
+          
+          // Tạo SVG Arc dùng innerHTML (an toàn vì chỉ là số và chuỗi hằng)
+          const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
+          arcWrap.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4" 
+                stroke-dasharray="${dash} 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"/>
+            </svg>
+            <span class="arc-label" style="font-size:8px; color:${color}; font-weight:bold;">${pct}%</span>
+          `;
+          
+          label.appendChild(icon); label.appendChild(title); label.appendChild(arcWrap);
+          
           label.addEventListener('click', () => {
             const o = ch.classList.toggle('open');
             label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
+            if (o) _openTreeNodes.add(nodeId);
+            else _openTreeNodes.delete(nodeId);
           });
+          
           if (node.children) ch.appendChild(buildTree(node.children, courseId, indent + 1, activeId));
           wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;
         }
@@ -405,6 +494,11 @@
       $('sidebar-lesson-tree').appendChild(buildTree(course.tree, courseId, 0, lessonId));
       const lesson = findLesson(course, lessonId); if (!lesson) return;
       $('lesson-title').textContent = lesson.title;
+
+      // Lưu lịch sử bài học vừa mở
+      if (currentUser) {
+        localStorage.setItem(`last_lesson_${courseId}_${currentUser.uid}`, lessonId);
+      }
 
       // ── Plyr YouTube player (thay iframe thô) ──
       const nv = $('no-video');

@@ -115,10 +115,33 @@ function initPlyr(youtubeId) {
   });
 
   _playerReady = false;
+  let hasAutoSeeked = false;
+
   plyrInstance.on('ready', () => {
     _playerReady = true;
     setupPlyrOverlay();
-    setupSpeedSliderUI();
+    
+    // Tự động tua đến thời gian đã lưu và play
+    if (typeof getLocalProgress === 'function' && typeof currentLessonId !== 'undefined') {
+      const saved = getLocalProgress(currentLessonId);
+      if (saved && saved.watchedTime > 0 && !hasAutoSeeked) {
+        hasAutoSeeked = true;
+        safeSeek(saved.watchedTime);
+      }
+    }
+    try { plyrInstance.play(); } catch(e) {}
+  });
+
+  // Lưu thời gian xem mỗi 5 giây
+  let lastSavedTime = 0;
+  plyrInstance.on('timeupdate', () => {
+    if (!_playerReady || !plyrInstance) return;
+    const t = plyrInstance.currentTime;
+    const d = plyrInstance.duration;
+    if (Math.abs(t - lastSavedTime) > 5 && typeof saveLocalProgress === 'function' && typeof currentLessonId !== 'undefined') {
+      lastSavedTime = t;
+      saveLocalProgress(currentLessonId, t, d);
+    }
   });
 
   // Keyboard shortcuts
@@ -128,16 +151,21 @@ function initPlyr(youtubeId) {
 // ── Hủy Plyr cũ ──
 function destroyPlyr() {
   _playerReady = false;
-  // Dọn speed popup nếu có
-  const sp = document.getElementById('speed-popup');
-  if (sp) sp.remove();
   if (plyrInstance) {
-    try { plyrInstance.destroy(); } catch(e) {}
+    try { 
+      plyrInstance.stop();
+      plyrInstance.destroy(); 
+    } catch(e) {}
     plyrInstance = null;
   }
   removeKeyboardShortcuts();
   const old = document.getElementById('plyr-wrapper');
-  if (old) old.remove();
+  if (old) {
+    // Ép iframe dừng hẳn (xoá src) trước khi xóa khỏi DOM để tránh chạy nền
+    const ifr = old.querySelector('iframe');
+    if (ifr) ifr.src = '';
+    old.remove();
+  }
   clearHoldSpace();
 }
 
@@ -160,150 +188,7 @@ function setupPlyrOverlay() {
   }
 }
 
-// ── Speed Slider UI (thay thế menu tốc độ của Plyr) ──
-function setupSpeedSliderUI() {
-  const wrapper = document.getElementById('plyr-wrapper');
-  if (!wrapper) return;
-
-  // Tạo nút tốc độ tùy chỉnh cạnh controls Plyr
-  const existingSpeedBtn = document.getElementById('custom-speed-btn');
-  if (existingSpeedBtn) existingSpeedBtn.remove();
-
-  const plyrControls = wrapper.querySelector('.plyr__controls');
-  if (!plyrControls) return;
-
-  // Tạo popup slider tốc độ
-  const speedPopup = document.createElement('div');
-  speedPopup.id = 'speed-popup';
-  speedPopup.style.cssText = [
-    'position:fixed',
-    'background:rgba(20,20,30,0.97)', 'border:1px solid rgba(255,255,255,0.15)',
-    'border-radius:12px', 'padding:14px 18px', 'z-index:9999',
-    'display:none', 'min-width:200px',
-    'backdrop-filter:blur(12px)', 'box-shadow:0 8px 32px rgba(0,0,0,0.5)',
-    'transform:translateY(-8px)',
-  ].join(';');
-  document.body.appendChild(speedPopup);
-
-  const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-  const labels = {0.25:'0.25×', 0.5:'0.5×', 0.75:'0.75×', 1:'Bình thường', 1.25:'1.25×', 1.5:'1.5×', 1.75:'1.75×', 2:'2×'};
-
-  speedPopup.innerHTML = `
-    <div style="color:#aaa;font-size:11px;margin-bottom:10px;letter-spacing:1px;text-transform:uppercase;">Tốc độ phát</div>
-    <div id="speed-btns" style="display:flex;flex-direction:column;gap:4px;"></div>
-    <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
-      <div style="color:#aaa;font-size:11px;margin-bottom:8px;">Tùy chỉnh</div>
-      <input id="speed-range" type="range" min="0" max="7" step="1" value="3"
-        style="width:100%;accent-color:#3b82f6;cursor:pointer;">
-      <div id="speed-range-label" style="text-align:center;color:#fff;font-size:13px;margin-top:4px;">Bình thường</div>
-    </div>
-  `;
-
-  // Tạo nút bấm trong controls Plyr
-  const speedBtnWrap = document.createElement('div');
-  speedBtnWrap.className = 'plyr__controls__item';
-  speedBtnWrap.id = 'custom-speed-btn';
-
-  const speedBtn = document.createElement('button');
-  speedBtn.type = 'button';
-  speedBtn.className = 'plyr__control';
-  speedBtn.id = 'speed-btn-trigger';
-  speedBtn.title = 'Tốc độ phát';
-  speedBtn.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.5px;min-width:32px;padding:4px 6px;';
-  speedBtn.textContent = '1×';
-  speedBtnWrap.appendChild(speedBtn);
-
-  // Chèn trước nút fullscreen
-  const fsBtn = plyrControls.querySelector('[data-plyr="fullscreen"]');
-  if (fsBtn && fsBtn.parentNode) {
-    plyrControls.insertBefore(speedBtnWrap, fsBtn.closest('.plyr__controls__item') || fsBtn);
-  } else {
-    plyrControls.appendChild(speedBtnWrap);
-  }
-
-  // Render speed buttons
-  const speedBtnsEl = speedPopup.querySelector('#speed-btns');
-  speeds.forEach(s => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.dataset.speed = s;
-    b.style.cssText = [
-      'background:none', 'border:none', 'color:#fff', 'text-align:left',
-      'padding:6px 10px', 'border-radius:6px', 'cursor:pointer',
-      'font-size:13px', 'transition:background 0.15s',
-      s === 1 ? 'background:rgba(59,130,246,0.25);color:#60a5fa;font-weight:700;' : '',
-    ].join(';');
-    b.textContent = labels[s];
-    b.addEventListener('mouseenter', () => { if (b.dataset.speed != plyrInstance?.speed) b.style.background = 'rgba(255,255,255,0.08)'; });
-    b.addEventListener('mouseleave', () => { if (b.dataset.speed != plyrInstance?.speed) b.style.background = 'none'; });
-    b.addEventListener('click', () => setSpeed(parseFloat(b.dataset.speed)));
-    speedBtnsEl.appendChild(b);
-  });
-
-  // Slider
-  const range = speedPopup.querySelector('#speed-range');
-  range.addEventListener('input', () => {
-    const s = speeds[parseInt(range.value)];
-    setSpeed(s);
-  });
-
-  // Toggle popup — position theo nút trigger
-  let popupOpen = false;
-  speedBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    popupOpen = !popupOpen;
-    if (popupOpen) {
-      updateSpeedUI(plyrInstance?.speed || 1);
-      speedPopup.style.display = 'block';
-      // Tính vị trí popup ngay trên nút trigger
-      const rect = speedBtn.getBoundingClientRect();
-      const popH = speedPopup.offsetHeight || 280;
-      speedPopup.style.left = Math.max(4, rect.left - 100 + rect.width / 2) + 'px';
-      speedPopup.style.top  = Math.max(4, rect.top - popH - 8) + 'px';
-    } else {
-      speedPopup.style.display = 'none';
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!speedPopup.contains(e.target) && e.target !== speedBtn) {
-      popupOpen = false;
-      speedPopup.style.display = 'none';
-    }
-  });
-
-  // Dọn popup khi destroy
-  const origDestroy = destroyPlyr;
-  speedPopup._cleanup = () => { speedPopup.remove(); };
-}
-
-function setSpeed(s) {
-  if (!plyrInstance || !_playerReady) return;
-  _prevSpeed = s;
-  try { plyrInstance.speed = s; } catch(e) {}
-  updateSpeedUI(s);
-}
-
-function updateSpeedUI(s) {
-  const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-  const labels = {0.25:'0.25×', 0.5:'0.5×', 0.75:'0.75×', 1:'Bình thường', 1.25:'1.25×', 1.5:'1.5×', 1.75:'1.75×', 2:'2×'};
-  const displayLabel = s === 1 ? '1×' : s + '×';
-
-  const btn = document.getElementById('speed-btn-trigger');
-  if (btn) btn.textContent = displayLabel;
-
-  const rangeEl = document.getElementById('speed-range');
-  const rangeLbl = document.getElementById('speed-range-label');
-  if (rangeEl) rangeEl.value = speeds.indexOf(s);
-  if (rangeLbl) rangeLbl.textContent = labels[s] || s + '×';
-
-  document.querySelectorAll('#speed-btns button').forEach(b => {
-    const active = parseFloat(b.dataset.speed) === s;
-    b.style.background = active ? 'rgba(59,130,246,0.25)' : 'none';
-    b.style.color = active ? '#60a5fa' : '#fff';
-    b.style.fontWeight = active ? '700' : '400';
-  });
-}
+// Đã xóa setupSpeedSliderUI() vì sẽ dùng menu gốc của Plyr
 
 // ── Safe seek (tránh bug tua khi paused) ──
 function safeSeek(targetTime) {
@@ -351,7 +236,6 @@ function endHoldSpace() {
     _holdSpeedActive = false;
     try { if (plyrInstance && _playerReady) plyrInstance.speed = _prevSpeed; } catch(e) {}
     showSpeedIndicator(false);
-    updateSpeedUI(_prevSpeed);
   }
 }
 

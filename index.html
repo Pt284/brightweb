@@ -199,6 +199,7 @@
     let currentCourseId = null, currentLessonId = null;
     let _isAdmin = false; // Cache admin status từ Firestore, không expose email
     let _openTreeNodes = new Set(); // Lưu ID các thư mục đang mở
+    let plyrInstance = null;
 
     // ── HELPERS ──
     const $ = id => document.getElementById(id);

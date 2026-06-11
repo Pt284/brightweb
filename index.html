@@ -404,8 +404,12 @@
       if (!currentUser) return;
       try { 
         const old = getLocalProgress(lessonId) || {};
+        const oldMax = old.watchedTime || 0;
+        // Anti-cheat: nếu tua video quá 10 phút (600s) so với mốc lớn nhất, bỏ qua không ghi nhận
+        if (watchedTime - oldMax > 600) return;
+        
         // Lưu mốc thời gian lớn nhất để tiến trình không bị lùi khi tua ngược
-        const maxTime = Math.max(old.watchedTime || 0, watchedTime);
+        const maxTime = Math.max(oldMax, watchedTime);
         const p = { ...old, watchedTime: maxTime, duration, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p)); 
       } catch(e) {}
@@ -456,13 +460,34 @@
       return Math.floor(sum / all.length);
     }
 
+    function getCourseProgressPct(course) {
+      const all = course.tree.flatMap(getAllLessons);
+      if (all.length === 0) return 0;
+      let sum = 0;
+      all.forEach(l => sum += getLessonProgressPct(l.id));
+      return Math.floor(sum / all.length);
+    }
+
+    function updateRealtimeProgressUI() {
+      const course = findCourse(currentCourseId);
+      if (course) {
+        const pct = getCourseProgressPct(course);
+        if ($('sidebar-lesson-tree')) {
+          $('sidebar-lesson-tree').innerHTML = '';
+          $('sidebar-lesson-tree').appendChild(buildTree(course.tree, currentCourseId, 0, currentLessonId));
+        }
+        if ($('sidebar-lesson-title')) $('sidebar-lesson-title').textContent = `${course.title} - ${pct}%`;
+        if ($('sidebar-title')) $('sidebar-title').textContent = `${course.title} - ${pct}%`;
+      }
+    }
+
     // ── RENDER: HOME ──
     function renderHome() {
       showPage('home');
       const grid = $('course-grid'); grid.innerHTML = '';
       appData.courses.forEach(course => {
         const { done, total } = countProgress(course);
-        const pct = total ? Math.round(done / total * 100) : 0;
+        const pct = getCourseProgressPct(course);
         // Dùng DOM API thay innerHTML để tránh XSS
         const fill = el('div', { className: 'progress-fill', style: `width:${pct}%` });
         const bar = el('div', { className: 'progress-bar' }, fill);
@@ -550,7 +575,7 @@
     function renderCourse(courseId) {
       currentCourseId = courseId; showPage('course');
       const course = findCourse(courseId); if (!course) { navigate('home'); return; }
-      $('sidebar-title').textContent = course.title;
+      $('sidebar-title').textContent = `${course.title} - ${getCourseProgressPct(course)}%`;
       $('sidebar-tree').innerHTML = '';
       $('sidebar-tree').appendChild(buildTree(course.tree, courseId, 0, null));
     }
@@ -559,7 +584,7 @@
     function renderLesson(courseId, lessonId) {
       currentCourseId = courseId; currentLessonId = lessonId; showPage('lesson');
       const course = findCourse(courseId); if (!course) { navigate('home'); return; }
-      $('sidebar-lesson-title').textContent = course.title;
+      $('sidebar-lesson-title').textContent = `${course.title} - ${getCourseProgressPct(course)}%`;
       $('sidebar-lesson-tree').innerHTML = '';
       $('sidebar-lesson-tree').appendChild(buildTree(course.tree, courseId, 0, lessonId));
       const lesson = findLesson(course, lessonId); if (!lesson) return;
@@ -661,13 +686,17 @@
           if (Math.abs(t - lastSavedTime) >= 5) {
             lastSavedTime = t;
             saveLocalProgress(currentLessonId, t, d);
-            // Real-time update progress on UI
-            const course = findCourse(currentCourseId);
-            if (course) {
-              const activeTree = buildTree(course.tree, currentCourseId, 0, currentLessonId);
-              $('sidebar-lesson-tree').innerHTML = '';
-              $('sidebar-lesson-tree').appendChild(activeTree);
-            }
+            updateRealtimeProgressUI();
+          }
+        });
+
+        plyrInstance.on('ended', () => {
+          const old = getLocalProgress(currentLessonId) || {};
+          const oldMax = old.watchedTime || 0;
+          const d = plyrInstance.duration || 1;
+          // Chống giả mạo: chỉ hoàn thành nếu thời gian cuối - mốc legit <= 10 phút
+          if (d - oldMax <= 600) {
+            if (!progress[currentLessonId]) toggleWatch(true);
           }
         });
 
@@ -713,10 +742,23 @@
       btn.textContent = w ? '✓ Đã xem' : 'Đánh dấu đã xem';
       btn.className = 'btn-watch' + (w ? ' watched' : '');
     }
-    async function toggleWatch() {
+    async function toggleWatch(forceValue) {
       if (!currentLessonId || !currentCourseId) return;
-      const v = !progress[currentLessonId]; progress[currentLessonId] = v;
-      updateWatchBtn(); await saveProgress(currentLessonId, currentCourseId, v);
+      const v = forceValue !== undefined ? forceValue : !progress[currentLessonId];
+      progress[currentLessonId] = v;
+      
+      try {
+        const old = getLocalProgress(currentLessonId) || {};
+        const d = (plyrInstance && plyrInstance.duration) ? plyrInstance.duration : 1;
+        const t = v ? d : 0;
+        // Lưu thẳng vào local, bỏ qua saveLocalProgress để tránh anti-cheat
+        const p = { ...old, watchedTime: t, duration: d, updatedAt: Date.now() };
+        localStorage.setItem(`prog_${currentUser.uid}_${currentLessonId}`, JSON.stringify(p));
+      } catch(e) {}
+
+      updateWatchBtn(); 
+      await saveProgress(currentLessonId, currentCourseId, v);
+      updateRealtimeProgressUI();
     }
 
     // ── ADMIN ──

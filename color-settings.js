@@ -7,30 +7,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const BASE_TOKENS = {
     // --- Backgrounds ---
-    '--color-bg':               { type: 'color',  h: 213, s: 78, l: 4,  a: 1 },
-    '--color-bg-alt':           { type: 'color',  h: 222, s: 54, l: 20, a: 1 },
+    '--color-bg': { type: 'color', h: 213, s: 78, l: 4, a: 1 },
+    '--color-bg-alt': { type: 'color', h: 222, s: 54, l: 20, a: 1 },
     // --- Surfaces ---
-    '--color-surface':          { type: 'color',  h: 223, s: 52, l: 25, a: 1 },
-    '--color-surface2':         { type: 'color',  h: 225, s: 52, l: 29, a: 1 },
-    '--color-surface3':         { type: 'color',  h: 221, s: 53, l: 22, a: 1 },
-    '--color-surface-modal':    { type: 'color',  h: 222, s: 54, l: 20, a: 0.8 },
-    '--color-surface-overlay':  { type: 'color',  h: 214, s: 78, l: 4,  a: 0.55 },
+    '--color-surface': { type: 'color', h: 223, s: 52, l: 25, a: 1 },
+    '--color-surface2': { type: 'color', h: 225, s: 52, l: 29, a: 1 },
+    '--color-surface3': { type: 'color', h: 221, s: 53, l: 22, a: 1 },
+    '--color-surface-modal': { type: 'color', h: 222, s: 54, l: 20, a: 0.8 },
+    '--color-surface-overlay': { type: 'color', h: 214, s: 78, l: 4, a: 0.55 },
     // --- Border ---
-    '--color-border':           { type: 'color',  h: 222, s: 45, l: 30, a: 1 },
+    '--color-border': { type: 'color', h: 222, s: 45, l: 30, a: 1 },
     // --- Accents ---
-    '--color-accent':           { type: 'color',  h: 203, s: 100, l: 46, a: 1 },
-    '--color-accent-hover':     { type: 'color',  h: 203, s: 100, l: 38, a: 1 },
-    '--color-accent-alpha':     { type: 'color',  h: 203, s: 100, l: 46, a: 0.12 },
-    '--color-accent-text':      { type: 'color',  h: 201, s: 100, l: 69, a: 1 },
+    '--color-accent': { type: 'color', h: 203, s: 100, l: 46, a: 1 },
+    '--color-accent-hover': { type: 'color', h: 203, s: 100, l: 38, a: 1 },
+    '--color-accent-alpha': { type: 'color', h: 203, s: 100, l: 46, a: 0.12 },
+    '--color-accent-text': { type: 'color', h: 201, s: 100, l: 69, a: 1 },
     // --- Typography ---
-    '--color-text':             { type: 'color',  h: 214, s: 32, l: 91, a: 1 },
-    '--color-text-muted':       { type: 'color',  h: 215, s: 25, l: 65, a: 1 },
-    '--color-text-dim':         { type: 'color',  h: 213, s: 27, l: 84, a: 1 },
+    '--color-text': { type: 'color', h: 214, s: 32, l: 91, a: 1 },
+    '--color-text-muted': { type: 'color', h: 215, s: 25, l: 65, a: 1 },
+    '--color-text-dim': { type: 'color', h: 213, s: 27, l: 84, a: 1 },
     // --- Progress ---
-    '--progress-fill':          { type: 'color',  h: 210, s: 71, l: 54, a: 1 },
+    '--progress-fill': { type: 'color', h: 210, s: 71, l: 54, a: 1 },
     // --- Shadows ---
-    '--shadow-sm':              { type: 'shadow', format: '0 2px 16px hsla({h}, {s}%, {l}%, {a})', h: 203, s: 100, l: 46, a: 0.2 },
-    '--shadow-glass-hover':     { type: 'shadow', format: '0 12px 40px hsla({h}, {s}%, {l}%, {a})', h: 203, s: 100, l: 46, a: 0.2 }
+    '--shadow-sm': { type: 'shadow', format: '0 2px 16px hsla({h}, {s}%, {l}%, {a})', h: 203, s: 100, l: 46, a: 0.2 },
+    '--shadow-glass-hover': { type: 'shadow', format: '0 12px 40px hsla({h}, {s}%, {l}%, {a})', h: 203, s: 100, l: 46, a: 0.2 }
   };
 
   // Token overrides from Advanced tab (lưu màu hex từng token riêng)
@@ -47,39 +47,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Helper: hex → hsl ---
   function hexToHsl(hex) {
-    let r = parseInt(hex.slice(1,3),16)/255;
-    let g = parseInt(hex.slice(3,5),16)/255;
-    let b = parseInt(hex.slice(5,7),16)/255;
-    const max = Math.max(r,g,b), min = Math.min(r,g,b);
-    let h, s, l = (max+min)/2;
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
     if (max === min) { h = s = 0; }
     else {
       const d = max - min;
-      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-      switch(max){
-        case r: h = ((g-b)/d + (g<b?6:0))/6; break;
-        case g: h = ((b-r)/d + 2)/6; break;
-        case b: h = ((r-g)/d + 4)/6; break;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
       }
     }
-    return { h: Math.round(h*360), s: Math.round(s*100), l: Math.round(l*100) };
+    return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
   }
 
   // --- Helper: hsl → hex (for color input value) ---
   function hslToHex(h, s, l) {
     s /= 100; l /= 100;
-    const k = n => (n + h/30) % 12;
-    const a = s * Math.min(l, 1-l);
-    const f = n => Math.round(255*(l - a*Math.max(-1,Math.min(k(n)-3, Math.min(9-k(n),1)))));
-    return '#' + [f(0),f(8),f(4)].map(x => x.toString(16).padStart(2,'0')).join('');
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+    return '#' + [f(0), f(8), f(4)].map(x => x.toString(16).padStart(2, '0')).join('');
   }
 
   // --- Blob palette sinh từ 1 màu (HSL) ---
   // User chọn màu sáng nhất (màu cuối) → sinh 8 màu tối dần
   function generateBlobPaletteFromHsl(h, s, l) {
     const lightnessStops = [6, 8, 10, 15, 19, 24, 29, 33];
-    const satMul         = [1, 1, 1,  1,  1, 0.98, 0.96, 0.93];
-    const hueShift       = [0, 0, 0, -1, -2, -4,  -7,  -10];
+    const satMul = [1, 1, 1, 1, 1, 0.98, 0.96, 0.93];
+    const hueShift = [0, 0, 0, -1, -2, -4, -7, -10];
     // Normalize: l là lightness của màu sáng nhất (index 7 = 33%)
     // Scale các stops theo tỉ lệ l/33
     const lScale = l / 33;
@@ -184,7 +184,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (settings.blobHsl !== undefined) {
       currentSettings.blobHsl = settings.blobHsl;
-      if (settings.blobHsl) applyBlobPalette(settings.blobHsl);
+      if (settings.blobHsl) {
+        applyBlobPalette(settings.blobHsl);
+        // Tự động tính --color-bg từ shade tối nhất của palette blob
+        const { h, s, l } = settings.blobHsl;
+        const darkL = Math.round(6 * (l / 33));
+        const darkS = Math.round(81 * (s / 81));
+        const bgVal = `hsl(${((h + 360) % 360)}, ${darkS}%, ${darkL}%)`;
+        document.documentElement.style.setProperty('--color-bg', bgVal);
+        if (window.BlobController) window.BlobController.setBgColor(bgVal);
+        // Lock lại để hue slider không ghi đè --color-bg khi đang dùng blob color thủ công
+        tokenOverrides['--color-bg'] = bgVal;
+      }
       const blobPicker = document.getElementById('cs-blob-color');
       if (blobPicker && settings.blobHsl) {
         blobPicker.value = hslToHex(settings.blobHsl.h, settings.blobHsl.s, settings.blobHsl.l);
@@ -225,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const parsed = JSON.parse(saved);
         if (parsed.tokenOverrides) tokenOverrides = parsed.tokenOverrides;
         applySettings(parsed);
-      } catch(e) {}
+      } catch (e) { }
     } else {
       applySettings(currentSettings);
     }
@@ -326,6 +337,8 @@ document.addEventListener('DOMContentLoaded', () => {
     blobResetBtn.textContent = 'Tự động';
     blobResetBtn.style.fontSize = '0.78rem';
     blobResetBtn.addEventListener('click', () => {
+      // Xóa lock --color-bg để applyTheme có thể khôi phục từ hue slider
+      delete tokenOverrides['--color-bg'];
       applySettings({ blobHsl: null });
       applyTheme(currentSettings.hue); // sẽ tính lại từ hue
       blobPicker.value = hslToHex(

@@ -54,6 +54,11 @@
       color: #fff; font-size: 1.15rem; font-weight: 600;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8); pointer-events: none;
     }
+    
+    /* Chặn click vào iframe youtube để không bị mất focus của phím tắt */
+    .plyr__video-wrapper::after {
+      content: ""; position: absolute; inset: 0; z-index: 1; cursor: pointer;
+    }
   </style>
 
   <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
@@ -266,13 +271,20 @@
       }
 
       if (hash === 'home') {
-        if (typeof destroyPlyr === 'function') destroyPlyr(); // Dọn player khi rời trang lesson
+        if (typeof destroyPlyr === 'function') destroyPlyr();
         window.location.hash = '#home'; renderHome(); showPage('home');
       } else if (hash === 'course') {
         const cId = args[0];
-        // Tự động nhảy thẳng vào bài học cuối cùng nếu có
         const lastLid = currentUser ? localStorage.getItem(`last_lesson_${cId}_${currentUser.uid}`) : null;
         if (lastLid) {
+          const course = findCourse(cId);
+          if (course) {
+            course.tree.forEach((chapter, i) => {
+              if (chapter.type !== 'lesson' && getAllLessons(chapter).find(l => l.id === lastLid)) {
+                _openTreeNodes.add(chapter.id || `folder_0_${i}`);
+              }
+            });
+          }
           navigate('lesson', cId, lastLid);
           return;
         }
@@ -576,6 +588,11 @@
         const customTitle = document.createElement('div');
         customTitle.id = 'custom-video-title';
         customTitle.textContent = lesson.title;
+        // Fetch real YouTube title
+        fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${lesson.youtubeId}`)
+          .then(r => r.json())
+          .then(data => { if (data.title) customTitle.textContent = data.title; })
+          .catch(() => {});
 
         const img = document.createElement('img');
         img.src = `https://i.ytimg.com/vi/${lesson.youtubeId}/maxresdefault.jpg`;
@@ -597,6 +614,7 @@
             'current-time', 'duration', 'mute', 'volume', 'captions', 'settings',
             'fullscreen'],
           settings: ['captions', 'quality', 'speed'],
+          captions: { active: false, update: true },
           speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
           keyboard: { focused: false, global: false },
           youtube: {
@@ -627,9 +645,16 @@
           if (!plyrInstance) return;
           const t = plyrInstance.currentTime;
           const d = plyrInstance.duration;
-          if (Math.abs(t - lastSavedTime) > 5) {
+          if (Math.abs(t - lastSavedTime) >= 5) {
             lastSavedTime = t;
             saveLocalProgress(currentLessonId, t, d);
+            // Real-time update progress on UI
+            const course = findCourse(currentCourseId);
+            if (course) {
+              const activeTree = buildTree(course.tree, currentCourseId, 0, currentLessonId);
+              $('sidebar-lesson-tree').innerHTML = '';
+              $('sidebar-lesson-tree').appendChild(activeTree);
+            }
           }
         });
 

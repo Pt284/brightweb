@@ -6,7 +6,7 @@
 <!-- Content Security Policy: giới hạn script/style chỉ từ domain tin cậy — giảm nhẹ XSS -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
-  script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com;
+  script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com 'unsafe-inline';
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' https://fonts.gstatic.com data:;
@@ -25,6 +25,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="bg.js" defer></script>
+<script>
+  function signOut() {
+    firebase.auth().signOut().then(() => {
+      window.location.href = 'index.html';
+    });
+  }
+</script>
 </head>
 <body>
 
@@ -34,6 +41,7 @@
   <span class="logo" onclick="window.location.href='index.html'">🏠 QUAY LẠI TRANG CHỦ</span>
   <div class="header-right">
     <span id="user-info"></span>
+    <button class="btn-icon" title="Cài đặt" onclick="window.location.href='index.html'" style="margin-right: 10px;">⚙</button>
     <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
   </div>
 </div>

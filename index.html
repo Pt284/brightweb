@@ -19,16 +19,49 @@
   <link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="glass.css">
-  <!-- Plyr CSS — YouTube player UI đẹp -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
+  <!-- Plyr CSS & Custom Video Styles -->
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+  <style>
+    .video-container {
+      position: absolute; inset: 0; width: 100%; height: 100%; background: #000;
+    }
+    #custom-poster {
+      position: absolute; inset: 0; z-index: 10; transition: opacity 0.3s;
+      cursor: pointer; background: black;
+    }
+    #custom-poster img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    #poster-play-btn {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 68px; height: 68px; border-radius: 50%; background: rgba(220, 0, 0, 0.9);
+      border: none; color: white; font-size: 28px; cursor: pointer;
+      transition: transform 0.15s, background 0.15s; display: flex; align-items: center; justify-content: center;
+    }
+    #poster-play-btn::before { content: '▶'; margin-left: 5px; }
+    #poster-play-btn:hover { background: rgb(220, 0, 0); transform: translate(-50%, -50%) scale(1.1); }
+
+    #player-toast {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.85);
+      background: rgba(0, 0, 0, 0.72); color: white; padding: 10px 20px;
+      border-radius: 8px; font-size: 17px; opacity: 0; pointer-events: none; z-index: 20;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    #player-toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    #custom-video-title {
+      position: absolute; top: 16px; left: 16px; right: 16px; z-index: 15;
+      color: #fff; font-size: 1.15rem; font-weight: 600;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8); pointer-events: none;
+    }
+  </style>
+
+  <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-  <!-- Plyr JS -->
-  <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="plyr-player.js"></script>
   <script src="bg.js" defer></script>
   <script src="container.js"></script>
   <script src="button.js"></script>
@@ -213,8 +246,26 @@
     }
 
     function navigate(hash, ...args) {
+      // Quản lý particles
+      if (hash === 'lesson' || hash === 'course') {
+        if (window.pJSDom && window.pJSDom.length > 0) {
+          window.pJSDom[0].pJS.fn.vendors.destroypJS();
+          window.pJSDom = [];
+        }
+        const pjs = document.getElementById('particles-js');
+        if (pjs) pjs.style.display = 'none';
+      } else if (hash === 'home' || hash === 'landing') {
+        const pjs = document.getElementById('particles-js');
+        if (pjs) pjs.style.display = 'block';
+        if (!window.pJSDom || window.pJSDom.length === 0) {
+          if (window.particlesJS && typeof PARTICLES_CONFIG !== 'undefined') {
+            particlesJS('particles-js', PARTICLES_CONFIG);
+          }
+        }
+      }
+
       if (hash === 'home') {
-        destroyPlyr(); // Dọn player khi rời trang lesson
+        if (typeof destroyPlyr === 'function') destroyPlyr(); // Dọn player khi rời trang lesson
         window.location.hash = '#home'; renderHome(); showPage('home');
       } else if (hash === 'course') {
         const cId = args[0];
@@ -224,7 +275,7 @@
           navigate('lesson', cId, lastLid);
           return;
         }
-        destroyPlyr();
+        if (typeof destroyPlyr === 'function') destroyPlyr();
         window.location.hash = `#course/${cId}`; renderCourse(cId);
       } else if (hash === 'lesson') {
         window.location.hash = `#lesson/${args[0]}/${args[1]}`; renderLesson(args[0], args[1]);
@@ -501,12 +552,100 @@
       }
 
       // ── Plyr YouTube player (thay iframe thô) ──
+      if (typeof destroyPlyr === 'function') destroyPlyr();
+      const vw = $('video-wrap');
       const nv = $('no-video');
+      vw.innerHTML = '';
+      vw.appendChild(nv);
+
       if (lesson.youtubeId) {
         nv.style.display = 'none';
-        initPlyr(lesson.youtubeId);  // từ plyr-player.js
+
+        const container = document.createElement('div');
+        container.className = 'video-container';
+
+        const plyrPlayer = document.createElement('div');
+        plyrPlayer.id = 'plyr-player';
+        plyrPlayer.setAttribute('data-plyr-provider', 'youtube');
+        plyrPlayer.setAttribute('data-plyr-embed-id', lesson.youtubeId);
+
+        const poster = document.createElement('div');
+        poster.id = 'custom-poster';
+
+        const customTitle = document.createElement('div');
+        customTitle.id = 'custom-video-title';
+        customTitle.textContent = lesson.title;
+
+        const img = document.createElement('img');
+        img.src = `https://i.ytimg.com/vi/${lesson.youtubeId}/maxresdefault.jpg`;
+        img.onerror = () => { img.src = img.src.replace('maxresdefault', 'hqdefault'); };
+
+        const playBtn = document.createElement('button');
+        playBtn.id = 'poster-play-btn';
+
+        poster.appendChild(img);
+        poster.appendChild(customTitle);
+        poster.appendChild(playBtn);
+
+        container.appendChild(plyrPlayer);
+        container.appendChild(poster);
+        vw.appendChild(container);
+
+        plyrInstance = new Plyr('#plyr-player', {
+          controls: ['play-large', 'play', 'progress',
+            'current-time', 'duration', 'mute', 'volume', 'captions', 'settings',
+            'fullscreen'],
+          settings: ['captions', 'quality', 'speed'],
+          speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
+          keyboard: { focused: false, global: false },
+          youtube: {
+            rel: 0,
+            iv_load_policy: 3,
+            modestbranding: 1
+          },
+          i18n: {
+            play: 'Phát', pause: 'Tạm dừng', restart: 'Phát lại từ đầu',
+            mute: 'Tắt tiếng', unmute: 'Bật tiếng', settings: 'Cài đặt',
+            speed: 'Tốc độ', normal: 'Bình thường',
+            fullscreen: 'Toàn màn hình', exitFullscreen: 'Thoát toàn màn hình',
+            duration: 'Thời lượng', captions: 'Phụ đề', disableCaptions: 'Tắt phụ đề', enableCaptions: 'Bật phụ đề'
+          }
+        });
+
+        let hasAutoSeeked = false;
+        plyrInstance.on('ready', () => {
+          const saved = getLocalProgress(currentLessonId);
+          if (saved && saved.watchedTime > 0 && !hasAutoSeeked) {
+            hasAutoSeeked = true;
+            try { plyrInstance.currentTime = saved.watchedTime; } catch(e){}
+          }
+        });
+
+        let lastSavedTime = 0;
+        plyrInstance.on('timeupdate', () => {
+          if (!plyrInstance) return;
+          const t = plyrInstance.currentTime;
+          const d = plyrInstance.duration;
+          if (Math.abs(t - lastSavedTime) > 5) {
+            lastSavedTime = t;
+            saveLocalProgress(currentLessonId, t, d);
+          }
+        });
+
+        playBtn.addEventListener('click', () => {
+            try { plyrInstance.play(); } catch(e) {}
+        });
+
+        plyrInstance.on('playing', () => {
+          const p = document.getElementById('custom-poster');
+          if (p) {
+            p.style.opacity = '0';
+            p.style.pointerEvents = 'none';
+            setTimeout(() => p.remove(), 300);
+          }
+        });
+
       } else {
-        destroyPlyr();
         nv.style.display = 'flex';
       }
 
@@ -620,6 +759,174 @@
     }
 
     window.addEventListener('hashchange', handleHash);
+
+    // ── PLYR GLOBAL SHORTCUTS & HELPERS ──
+    function destroyPlyr() {
+      if (plyrInstance) {
+        try { 
+          plyrInstance.stop();
+          plyrInstance.destroy(); 
+        } catch(e) {}
+        plyrInstance = null;
+      }
+      const vw = $('video-wrap');
+      if (vw) {
+        // Ép iframe xóa src trước khi loại bỏ để chặn chạy nền
+        const ifr = vw.querySelector('iframe');
+        if (ifr) ifr.src = '';
+        vw.innerHTML = '';
+        const nv = document.createElement('div');
+        nv.id = 'no-video'; nv.className = 'no-video';
+        nv.style.display = 'none';
+        nv.innerHTML = '<span class="icon">Chọn một bài học để bắt đầu</span>';
+        vw.appendChild(nv);
+      }
+      _holdSpeedActive = false;
+    }
+
+    let _holdSpeedActive = false;
+    let _prevSpeed = 1;
+    let _spaceTimer = null;
+
+    function showToast(msg) {
+      const container = document.querySelector('.video-container');
+      if (!container) return;
+      let toast = document.getElementById('player-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'player-toast';
+        container.appendChild(toast);
+      }
+      toast.textContent = msg;
+      toast.classList.remove('show');
+      void toast.offsetWidth;
+      toast.classList.add('show');
+      if (toast.timeoutId) clearTimeout(toast.timeoutId);
+      toast.timeoutId = setTimeout(() => { toast.classList.remove('show'); }, 800);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (!plyrInstance) return;
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      if (activeTag === 'input' || activeTag === 'textarea') return;
+
+      let handled = false;
+      const key = e.key.toLowerCase();
+
+      switch (key) {
+        case ' ':
+        case 'k':
+          handled = true;
+          if (key === ' ' && !e.repeat && plyrInstance.playing) {
+            _spaceTimer = setTimeout(() => {
+              _holdSpeedActive = true;
+              _prevSpeed = plyrInstance.speed;
+              plyrInstance.speed = 2;
+              showToast('🐇 2x Speed');
+            }, 300);
+          }
+          break;
+        case 'arrowleft':
+        case 'j':
+          handled = true;
+          const jumpBack = e.shiftKey ? 10 : 5;
+          plyrInstance.rewind(jumpBack);
+          showToast(`⏪ -${jumpBack}s`);
+          break;
+        case 'arrowright':
+        case 'l':
+          handled = true;
+          const jumpFwd = e.shiftKey ? 10 : 5;
+          plyrInstance.forward(jumpFwd);
+          showToast(`⏩ +${jumpFwd}s`);
+          break;
+        case 'arrowup':
+          handled = true;
+          plyrInstance.increaseVolume(0.05);
+          showToast(`🔊 ${Math.round(plyrInstance.volume * 100)}%`);
+          break;
+        case 'arrowdown':
+          handled = true;
+          plyrInstance.decreaseVolume(0.05);
+          showToast(`🔉 ${Math.round(plyrInstance.volume * 100)}%`);
+          break;
+        case 'm':
+          handled = true;
+          plyrInstance.muted = !plyrInstance.muted;
+          showToast(plyrInstance.muted ? '🔇 Đã tắt tiếng' : '🔊 Đã bật tiếng');
+          break;
+        case 'f':
+          handled = true;
+          if (plyrInstance.fullscreen.active) plyrInstance.fullscreen.exit();
+          else plyrInstance.fullscreen.enter();
+          break;
+        case 'c':
+          handled = true;
+          const currentCaptions = plyrInstance.captions.active;
+          plyrInstance.toggleCaptions(!currentCaptions);
+          showToast(!currentCaptions ? 'Bật phụ đề' : 'Tắt phụ đề');
+          break;
+        case 'home':
+          handled = true;
+          plyrInstance.currentTime = 0;
+          showToast('Đầu video');
+          break;
+        case 'end':
+          handled = true;
+          plyrInstance.currentTime = plyrInstance.duration;
+          showToast('Cuối video');
+          break;
+        case ',':
+          if (!plyrInstance.playing) {
+            handled = true;
+            plyrInstance.currentTime = Math.max(0, plyrInstance.currentTime - 0.033);
+            showToast('⏮ -1 frame');
+          }
+          break;
+        case '.':
+          if (!plyrInstance.playing) {
+            handled = true;
+            plyrInstance.currentTime = Math.min(plyrInstance.duration, plyrInstance.currentTime + 0.033);
+            showToast('⏭ +1 frame');
+          }
+          break;
+        case '<':
+          handled = true;
+          plyrInstance.speed = Math.max(0.25, plyrInstance.speed - 0.25);
+          showToast(`🐢 ${plyrInstance.speed}x`);
+          break;
+        case '>':
+          handled = true;
+          plyrInstance.speed = Math.min(2, plyrInstance.speed + 0.25);
+          showToast(`🐇 ${plyrInstance.speed}x`);
+          break;
+        default:
+          if (e.key >= '0' && e.key <= '9') {
+            handled = true;
+            const pct = parseInt(e.key) / 10;
+            plyrInstance.currentTime = plyrInstance.duration * pct;
+            showToast(`Nhảy đến ${pct * 100}%`);
+          }
+          break;
+      }
+
+      if (handled) e.preventDefault();
+    });
+
+    document.addEventListener('keyup', e => {
+      if (!plyrInstance) return;
+      if (e.key === ' ' || e.key.toLowerCase() === 'k') {
+        if (_spaceTimer) clearTimeout(_spaceTimer);
+        if (_holdSpeedActive) {
+          _holdSpeedActive = false;
+          plyrInstance.speed = _prevSpeed;
+          showToast(`Bình thường (${_prevSpeed}x)`);
+        } else {
+          plyrInstance.togglePlay();
+          showToast(plyrInstance.playing ? '▶ Phát' : '⏸ Tạm dừng');
+        }
+      }
+    });
 
     // ── MOCK DATA ──
     function getMockData() {

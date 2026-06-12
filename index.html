@@ -261,6 +261,8 @@
     let _isAdmin = false;
     let _openTreeNodes = new Set();
     let plyrInstance = null;
+    let _overrides = {};
+    let _rawAutoData = null;
 
     // ── HELPERS ──
     const $ = id => document.getElementById(id);
@@ -437,6 +439,10 @@
         } else {
           appData = rawAutoData;
         }
+
+        await loadOverrides();
+        _rawAutoData = JSON.parse(JSON.stringify(appData.courses));
+        appData.courses = getMergedCourses(_rawAutoData, _overrides);
 
         if ($('admin-last-updated'))
           $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');

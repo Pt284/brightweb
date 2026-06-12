@@ -627,14 +627,21 @@ button {
 
 /* ── Plyr theme — khớp với màu web ── */
 .plyr {
-  --plyr-color-main: #0091EA;
+  --plyr-color-main: var(--color-accent);
   --plyr-video-background: #000;
-  --plyr-range-fill-background: #0091EA;
+  --plyr-range-fill-background: var(--color-accent);
   --plyr-video-controls-background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85));
   --plyr-control-radius: 6px;
   --plyr-font-family: system-ui, sans-serif;
   border-radius: 10px;
   overflow: hidden;
+}
+
+/* ── Ép chết hai thanh seek và volume đổi sang màu chủ đề ── */
+.plyr input[type="range"] {
+  color: var(--color-accent) !important;
+  accent-color: var(--color-accent) !important;
+  /* Đè hoàn toàn màu mặc định của trình duyệt */
 }
 
 /* Wrapper plyr-player.js tạo */

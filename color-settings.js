@@ -174,7 +174,11 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSettings.blobSpeed = settings.blobSpeed;
       if (window.BlobController) window.BlobController.setSpeed(settings.blobSpeed);
       const spd = document.getElementById('cs-speed-slider');
-      if (spd) spd.value = settings.blobSpeed;
+      if (spd) {
+        spd.value = settings.blobSpeed;
+        const pct = ((settings.blobSpeed - 0.1) / (3 - 0.1) * 100).toFixed(1) + '%';
+        spd.style.setProperty('--pct', pct);
+      }
     }
     if (settings.glassActive !== undefined) {
       currentSettings.glassActive = settings.glassActive;
@@ -368,7 +372,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const speedSlider = document.createElement('input');
     speedSlider.type = 'range'; speedSlider.id = 'cs-speed-slider';
     speedSlider.className = 'cs-range'; speedSlider.min = 0.1; speedSlider.max = 3; speedSlider.step = 0.1; speedSlider.value = 1;
-    speedSlider.addEventListener('input', e => { applySettings({ blobSpeed: parseFloat(e.target.value) }); saveSettings(); });
+    speedSlider.addEventListener('input', e => {
+      const val = parseFloat(e.target.value);
+      // Cập nhật fill gradient: min=0.1, max=3
+      const pct = ((val - 0.1) / (3 - 0.1) * 100).toFixed(1) + '%';
+      e.target.style.setProperty('--pct', pct);
+      applySettings({ blobSpeed: val });
+      saveSettings();
+    });
     tabSimple.appendChild(makeGroup('Tốc độ nền', speedSlider));
 
     // Glass toggle

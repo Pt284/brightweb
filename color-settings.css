@@ -187,6 +187,61 @@
   width: 100%;
 }
 
+/* Speed slider — match progress bar colors */
+#cs-speed-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(to right,
+      var(--progress-fill) 0%,
+      var(--progress-fill) var(--pct, 30%),
+      var(--progress-track) var(--pct, 30%),
+      var(--progress-track) 100%);
+}
+
+#cs-speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text-inverse);
+  border: 2.5px solid var(--progress-fill);
+  cursor: pointer;
+  box-shadow: 0 1px 6px hsla(0, 0%, 0%, 0.4);
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+#cs-speed-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  border-color: var(--color-accent);
+}
+
+#cs-speed-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--progress-track);
+}
+
+#cs-speed-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--progress-fill);
+}
+
+#cs-speed-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text-inverse);
+  border: 2.5px solid var(--progress-fill);
+  cursor: pointer;
+  box-shadow: 0 1px 6px hsla(0, 0%, 0%, 0.4);
+}
+
 .cs-token-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

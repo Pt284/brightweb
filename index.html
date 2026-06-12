@@ -153,6 +153,7 @@
     <p id="admin-last-updated">lastUpdated: —</p>
     <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
     <button class="btn btn-outline btn-sm" onclick="window.open('admin-check.html', '_blank')">🔍 Check Video</button>
+    <button class="btn btn-outline btn-sm" onclick="downloadBackup()">⬇ Tải backup</button>
     <hr>
     <div class="section-label">Whitelist</div>
     <div class="admin-row">
@@ -420,36 +421,17 @@
     // THAY ĐỔI 2 & 3: Tải đồng thời courses + overrides và mapping window context phục vụ downloadBackup()
     async function loadData() {
       try {
-        const [coursesDoc, overridesDoc] = await Promise.all([
-          db.collection('app_data').doc('courses').get(),
-          db.collection('app_data').doc('overrides').get()
-        ]);
+        const doc = await db.collection('app_data').doc('courses').get();
+        appData = doc.exists ? JSON.parse(doc.data().json) : getMockData();
+        if ($('admin-last-updated'))
+          $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
 
-        // Tải dữ liệu thô gốc và dữ liệu ghi đè của admin
-        const rawAutoData = coursesDoc.exists ? JSON.parse(coursesDoc.data().json) : getMockData();
-        const overridesData = overridesDoc.exists ? overridesDoc.data() : {};
-
-        // Gán biến toàn cục vào window để backup phục vụ đúng yêu cầu kiểm thử
-        window.rawAutoData = rawAutoData;
-        window.overridesData = overridesData;
-
-        // Nếu có hàm xử lý gộp từ file overrides.js thì tiến hành gộp dữ liệu
-        if (typeof applyOverrides === 'function') {
-          appData = applyOverrides(rawAutoData, overridesData);
-        } else {
-          appData = rawAutoData;
-        }
-
+        // Phase 1: load overrides → snapshot raw data → merge
         await loadOverrides();
         _rawAutoData = JSON.parse(JSON.stringify(appData.courses));
         appData.courses = getMergedCourses(_rawAutoData, _overrides);
 
-        if ($('admin-last-updated'))
-          $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
-      } catch (e) {
-        console.warn('Lỗi loadData, đang chạy fallback mock data:', e);
-        appData = getMockData();
-      }
+      } catch (e) { console.warn(e); appData = getMockData(); }
     }
 
     // ── PROGRESS SYNC ──

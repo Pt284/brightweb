@@ -5,7 +5,7 @@
   /* System Backgrounds */
   --color-bg: hsl(213, 78%, 4%);
   --color-bg-alt: hsl(222, 54%, 20%);
-  
+
   /* System Surfaces */
   --color-surface: hsl(223, 52%, 25%);
   --color-surface2: hsl(225, 52%, 29%);
@@ -15,19 +15,19 @@
   --color-surface-overlay: hsla(214, 78%, 4%, 0.55);
   --color-surface-modal: hsla(222, 54%, 20%, 0.8);
   --color-surface-input: hsla(215, 0%, 0%, 0.3);
-  
+
   /* System Borders */
   --color-border: hsl(222, 45%, 30%);
   --color-border-glass: hsla(215, 0%, 100%, 0.12);
   --color-border-glass-hover: hsla(215, 0%, 100%, 0.2);
   --color-divider: var(--color-border);
-  
+
   /* System Accents */
   --color-accent: hsl(203, 100%, 46%);
   --color-accent-hover: hsl(203, 100%, 38%);
   --color-accent-alpha: hsla(203, 100%, 46%, 0.12);
   --color-accent-text: hsl(201, 100%, 69%);
-  
+
   /* Semantic Colors */
   --color-green: hsl(145, 100%, 39%);
   --color-green-alpha: hsla(145, 100%, 39%, 0.12);
@@ -37,54 +37,95 @@
   --color-yellow-alpha: hsla(45, 97%, 60%, 0.2);
   --color-info: hsl(214, 97%, 78%);
   --color-info-alpha: hsla(214, 97%, 78%, 0.2);
-  
+
   /* Text */
   --color-text: hsl(214, 32%, 91%);
   --color-text-muted: hsl(215, 25%, 65%);
   --color-text-dim: hsl(213, 27%, 84%);
   --color-text-inverse: hsl(0, 0%, 100%);
-  
+
   /* Buttons */
   --btn-bg: transparent;
   --btn-border: transparent;
   --btn-text: var(--color-text);
-  
+
   /* Progress */
   --progress-track: hsla(0, 0%, 100%, 0.15);
   --progress-fill: hsl(210, 71%, 54%);
   --progress-done: var(--color-green);
   --progress-low: var(--color-yellow);
-  
+
   /* Dimensions & Shadows */
   --radius: 10px;
   --radius-sm: 6px;
   --radius-lg: 16px;
   --sidebar-w: 280px;
-  --shadow: 0 4px 24px hsla(0,0%,0%,0.5);
-  --shadow-sm: 0 2px 16px hsla(203,100%,46%,0.2);
-  --shadow-glass: 0 8px 32px hsla(0,0%,0%,0.35);
-  --shadow-glass-hover: 0 12px 40px hsla(203,100%,46%,0.2);
-  
+  --shadow: 0 4px 24px hsla(0, 0%, 0%, 0.5);
+  --shadow-sm: 0 2px 16px hsla(203, 100%, 46%, 0.2);
+  --shadow-glass: 0 8px 32px hsla(0, 0%, 0%, 0.35);
+  --shadow-glass-hover: 0 12px 40px hsla(203, 100%, 46%, 0.2);
+
   /* Plyr */
   --plyr-color-main: var(--color-accent);
   --plyr-video-background: hsl(0, 0%, 0%);
   --plyr-range-fill-background: var(--color-accent);
-  --plyr-video-controls-background: linear-gradient(hsla(0,0%,0%,0), hsla(0,0%,0%,0.85));
+  --plyr-video-controls-background: linear-gradient(hsla(0, 0%, 0%, 0), hsla(0, 0%, 0%, 0.85));
   --plyr-control-radius: var(--radius-sm);
   --plyr-font-family: system-ui, sans-serif;
+
+  /* Plyr */
+  --plyr-color-main: var(--color-accent);
+  --plyr-video-background: hsl(0, 0%, 0%);
+  --plyr-range-fill-background: var(--color-accent);
+  --plyr-video-controls-background: linear-gradient(hsla(0, 0%, 0%, 0), hsla(0, 0%, 0%, 0.85));
+  --plyr-control-radius: var(--radius-sm);
+  --plyr-font-family: system-ui, sans-serif;
+
+  /* Sync additions */
+  --plyr-tooltip-background: var(--color-surface-modal);
+  --plyr-tooltip-color: var(--color-text);
+  --plyr-tooltip-shadow: var(--shadow-glass);
+  --plyr-tooltip-radius: var(--radius-sm);
+  --plyr-menu-background: var(--color-surface-modal);
+  --plyr-menu-color: var(--color-text);
+  --plyr-menu-arrow-color: var(--color-text-muted);
+  --plyr-menu-back-border-color: var(--color-border);
+  --plyr-menu-back-border-shadow-color: transparent;
+  --plyr-menu-shadow: var(--shadow-glass);
+  --plyr-menu-radius: var(--radius);
+  --plyr-badge-background: var(--color-surface3);
+  --plyr-badge-text-color: var(--color-text-muted);
+  --plyr-audio-controls-background: var(--color-surface);
+  --plyr-audio-control-color: var(--color-text);
+  --plyr-audio-control-background-hover: var(--color-accent);
+  --plyr-audio-control-color-hover: var(--color-text-inverse);
+  --plyr-video-control-background-hover: var(--color-accent);
+  --plyr-video-control-color-hover: var(--color-text-inverse);
 }
 
 /* ============================================================
    RESET & BASE
    ============================================================ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { background: var(--color-bg); } /* fallback màu tối khi canvas chưa load */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--color-bg);
+}
+
+/* fallback màu tối khi canvas chưa load */
 body {
   font-family: system-ui, sans-serif;
   background: transparent;
   color: var(--color-text);
   min-height: 100vh;
 }
+
 #bg-canvas {
   position: fixed;
   inset: 0;
@@ -92,13 +133,30 @@ body {
   height: 100% !important;
   z-index: -1;
 }
-a { color: inherit; text-decoration: none; }
-button { cursor: pointer; font-family: inherit; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--color-bg-alt); }
-::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-alt);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
 
 /* ============================================================
    BUTTONS
@@ -114,25 +172,32 @@ button { cursor: pointer; font-family: inherit; }
   transition: all 0.2s;
   cursor: pointer;
 }
+
 .btn-primary {
   --btn-bg: var(--color-accent);
   --btn-border: var(--color-accent);
   --btn-text: var(--color-text-inverse);
 }
+
 .btn-primary:hover {
   --btn-bg: var(--color-accent-hover);
   --btn-border: var(--color-accent-hover);
 }
+
 .btn-outline {
   --btn-bg: transparent;
   --btn-border: var(--color-accent);
   --btn-text: var(--color-accent);
 }
+
 .btn-outline:hover {
   --btn-bg: var(--color-accent-alpha);
 }
 
-.btn-sm { padding: 5px 12px; font-size: .82rem; }
+.btn-sm {
+  padding: 5px 12px;
+  font-size: .82rem;
+}
 
 .btn-icon {
   background: none;
@@ -142,7 +207,10 @@ button { cursor: pointer; font-family: inherit; }
   border-radius: var(--radius-sm);
   color: var(--color-text);
 }
-.btn-icon:hover { background: var(--color-surface2); }
+
+.btn-icon:hover {
+  background: var(--color-surface2);
+}
 
 /* ============================================================
    LOADING OVERLAY
@@ -158,7 +226,10 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 1rem;
   color: var(--color-text-muted);
 }
-#loading.show { display: flex; }
+
+#loading.show {
+  display: flex;
+}
 
 /* ============================================================
    HEADER
@@ -178,25 +249,32 @@ button { cursor: pointer; font-family: inherit; }
   top: 0;
   z-index: 100;
 }
+
 #header .logo {
   font-weight: 700;
   font-size: 1.15rem;
   color: var(--color-accent);
   cursor: pointer;
 }
+
 #header .header-right {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-#user-info { font-size: .85rem; color: var(--color-text-muted); }
+
+#user-info {
+  font-size: .85rem;
+  color: var(--color-text-muted);
+}
 
 /* ============================================================
    ADMIN PANEL
    ============================================================ */
 #admin-panel {
   position: fixed;
-  top: 60px; right: 16px;
+  top: 60px;
+  right: 16px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -206,16 +284,36 @@ button { cursor: pointer; font-family: inherit; }
   z-index: 200;
   display: none;
 }
-#admin-panel.open { display: block; }
-#admin-panel h4 { margin-bottom: 10px; font-size: .95rem; color: var(--color-text); }
-#admin-panel p  { font-size: .82rem; color: var(--color-text-muted); margin-bottom: 12px; }
+
+#admin-panel.open {
+  display: block;
+}
+
+#admin-panel h4 {
+  margin-bottom: 10px;
+  font-size: .95rem;
+  color: var(--color-text);
+}
+
+#admin-panel p {
+  font-size: .82rem;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+
 #admin-panel .section-label {
   margin-bottom: 8px;
   font-size: .82rem;
   font-weight: 600;
   color: var(--color-text);
 }
-#admin-panel hr { margin: 12px 0; border: none; border-top: 1px solid var(--color-border); }
+
+#admin-panel hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
 #admin-panel input {
   flex: 1;
   padding: 5px 8px;
@@ -225,34 +323,51 @@ button { cursor: pointer; font-family: inherit; }
   font-size: .82rem;
   color: var(--color-text);
 }
-#admin-panel input::placeholder { color: var(--color-text-muted); }
-.admin-row { display: flex; gap: 6px; margin-bottom: 8px; }
-#var(--color-text-inverse)list-list {
+
+#admin-panel input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.admin-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+#whitelist-list {
   font-size: .8rem;
   color: var(--color-text-muted);
   max-height: 120px;
   overflow-y: auto;
 }
-.var(--color-text-inverse)list-item {
+
+.whitelist-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 2px 0;
 }
-.var(--color-text-inverse)list-remove {
+
+.whitelist-remove {
   background: none;
   border: none;
   color: var(--color-red);
   cursor: pointer;
   font-size: .8rem;
 }
+
 #security-logs {
   font-size: .78rem;
   color: var(--color-red);
   max-height: 100px;
   overflow-y: auto;
 }
-.log-item { padding: 2px 0; border-bottom: 1px solid #3f1d1d; }
+
+.log-item {
+  padding: 2px 0;
+  border-bottom: 1px solid #3f1d1d;
+}
+
 .btn-reload {
   margin-top: 8px;
   background: var(--color-surface2);
@@ -267,8 +382,13 @@ button { cursor: pointer; font-family: inherit; }
 /* ============================================================
    PAGES
    ============================================================ */
-.page { display: none; }
-.page.active { display: block; }
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
 
 /* ── Landing ── */
 #page-landing {
@@ -280,14 +400,25 @@ button { cursor: pointer; font-family: inherit; }
   flex-direction: column;
   gap: 20px;
   text-align: center;
-  background: transparent; /* canvas bg nhìn xuyên qua */
+  background: transparent;
+  /* canvas bg nhìn xuyên qua */
 }
-#page-landing.active { display: flex; }
+
+#page-landing.active {
+  display: flex;
+}
+
 /* particles-js canvas transparent → blob bg nhìn xuyên qua, particles float trên */
-#particles-js { position: absolute; inset: 0; z-index: 0; }
+#particles-js {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 #particles-js canvas {
   background: transparent !important;
 }
+
 #landing-content {
   position: relative;
   z-index: 1;
@@ -296,12 +427,17 @@ button { cursor: pointer; font-family: inherit; }
   align-items: center;
   gap: 20px;
 }
+
 #page-landing h1 {
   font-size: 2.4rem;
   color: var(--color-text-inverse);
-  text-shadow: 0 2px 16px rgba(0,145,234,.4);
+  text-shadow: 0 2px 16px rgba(0, 145, 234, .4);
 }
-#page-landing p { color: var(--color-text-muted); font-size: 1rem; }
+
+#page-landing p {
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
 
 /* Tất cả page containers phải transparent để canvas bg nhìn xuyên qua */
 #page-home,
@@ -311,13 +447,19 @@ button { cursor: pointer; font-family: inherit; }
 .lesson-main {
   background: transparent;
 }
-#page-home h2 { font-size: 1.2rem; margin-bottom: 16px; color: var(--color-text); }
+
+#page-home h2 {
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
 
 .course-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
 }
+
 .course-card {
   background: var(--color-surface-glass);
   border: 1px solid var(--color-surface-glass-hover);
@@ -328,11 +470,18 @@ button { cursor: pointer; font-family: inherit; }
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
 .course-card:hover {
   box-shadow: var(--shadow-sm);
   border-color: var(--color-accent);
 }
-.course-card h3 { font-size: 1rem; margin-bottom: 10px; color: var(--color-text); }
+
+.course-card h3 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+  color: var(--color-text);
+}
+
 .progress-bar {
   background: var(--color-surface2);
   border-radius: 99px;
@@ -340,17 +489,28 @@ button { cursor: pointer; font-family: inherit; }
   overflow: hidden;
   margin-bottom: 6px;
 }
+
 .progress-fill {
   background: var(--progress-fill);
   height: 100%;
   border-radius: 99px;
   transition: width .3s;
 }
-.progress-label { font-size: .8rem; color: var(--color-text-muted); }
+
+.progress-label {
+  font-size: .8rem;
+  color: var(--color-text-muted);
+}
 
 /* ── Course ── */
-#page-course { display: none; }
-#page-course.active { display: flex; min-height: calc(100vh - 52px); }
+#page-course {
+  display: none;
+}
+
+#page-course.active {
+  display: flex;
+  min-height: calc(100vh - 52px);
+}
 
 /* ── Sidebar ── */
 .sidebar {
@@ -363,6 +523,7 @@ button { cursor: pointer; font-family: inherit; }
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
 .sidebar-title {
   padding: 4px 14px 10px;
   font-weight: 600;
@@ -371,6 +532,7 @@ button { cursor: pointer; font-family: inherit; }
   margin-bottom: 6px;
   color: var(--color-text);
 }
+
 .tree-label {
   display: flex;
   align-items: center;
@@ -381,12 +543,17 @@ button { cursor: pointer; font-family: inherit; }
   user-select: none;
   color: var(--color-text-dim);
 }
-.tree-label:hover { background: var(--color-surface2); }
+
+.tree-label:hover {
+  background: var(--color-surface2);
+}
+
 .tree-label.active-lesson {
   background: var(--color-accent-alpha);
   color: var(--color-accent-text);
   font-weight: 500;
 }
+
 .tree-label .icon {
   font-size: .7rem;
   width: 14px;
@@ -394,16 +561,50 @@ button { cursor: pointer; font-family: inherit; }
   flex-shrink: 0;
   color: var(--color-text-muted);
 }
-.tree-label .check { color: var(--color-green); font-size: .8rem; flex-shrink: 0; }
-.tree-children { display: none; }
-.tree-children.open { display: block; }
-.course-main { flex: 1; padding: 24px; overflow-y: auto; color: var(--color-text-muted); }
+
+.tree-label .check {
+  color: var(--color-green);
+  font-size: .8rem;
+  flex-shrink: 0;
+}
+
+.tree-children {
+  display: none;
+}
+
+.tree-children.open {
+  display: block;
+}
+
+.course-main {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  color: var(--color-text-muted);
+}
 
 /* ── Lesson ── */
-#page-lesson { display: none; }
-#page-lesson.active { display: flex; min-height: calc(100vh - 52px); }
-.lesson-main { flex: 1; padding: 24px; overflow-y: auto; max-width: 860px; }
-.lesson-main h2 { font-size: 1.15rem; margin-bottom: 16px; color: var(--color-text); }
+#page-lesson {
+  display: none;
+}
+
+#page-lesson.active {
+  display: flex;
+  min-height: calc(100vh - 52px);
+}
+
+.lesson-main {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  max-width: 860px;
+}
+
+.lesson-main h2 {
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
 
 .video-wrap {
   position: relative;
@@ -414,33 +615,45 @@ button { cursor: pointer; font-family: inherit; }
   width: 100%;
   aspect-ratio: 16 / 9;
 }
+
 /* Iframe thô fallback (không dùng nữa nhưng giữ lại) */
-.video-wrap > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+.video-wrap>iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
 
 /* ── Plyr theme — khớp với màu web ── */
 .plyr {
   --plyr-color-main: #0091EA;
   --plyr-video-background: #000;
   --plyr-range-fill-background: #0091EA;
-  --plyr-video-controls-background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.85));
+  --plyr-video-controls-background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85));
   --plyr-control-radius: 6px;
   --plyr-font-family: system-ui, sans-serif;
   border-radius: 10px;
   overflow: hidden;
 }
+
 /* Wrapper plyr-player.js tạo */
 #plyr-wrapper {
   border-radius: 10px;
   overflow: hidden;
 }
+
 #plyr-wrapper .plyr {
-  border-radius: 0; /* wrapper đã có radius */
+  border-radius: 0;
+  /* wrapper đã có radius */
 }
+
 /* Speed popup không bị che bởi overflow:hidden của video-wrap */
 #speed-popup {
   position: fixed !important;
   z-index: 9999 !important;
 }
+
 /* Speed indicator */
 #speed-indicator {
   font-family: system-ui, sans-serif;
@@ -453,10 +666,12 @@ button { cursor: pointer; font-family: inherit; }
   -webkit-backdrop-filter: none !important;
   background: var(--color-surface-modal) !important;
 }
+
 #page-lesson .lesson-main {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
 .no-video {
   position: absolute;
   inset: 0;
@@ -466,7 +681,14 @@ button { cursor: pointer; font-family: inherit; }
   color: #555;
   font-size: .9rem;
 }
-.watch-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+
+.watch-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
 .btn-watch {
   background: var(--btn-bg, transparent);
   border: 1.5px solid var(--btn-border, var(--color-green));
@@ -481,6 +703,7 @@ button { cursor: pointer; font-family: inherit; }
   --btn-border: var(--color-green);
   --btn-text: var(--color-green);
 }
+
 .btn-watch.watched {
   --btn-bg: var(--color-green);
   --btn-text: var(--color-text-inverse);
@@ -494,17 +717,29 @@ button { cursor: pointer; font-family: inherit; }
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-.doc-list { display: flex; flex-direction: column; gap: 8px; }
+
+.doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .doc-card {
-  background: rgba(255,255,255,.05);
+  background: rgba(255, 255, 255, .05);
   border: 1px solid var(--color-surface-glass-hover);
   border-radius: var(--radius);
   padding: 12px 16px;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-.doc-card span { font-size: .875rem; color: var(--color-text-dim); }
+
+.doc-card span {
+  font-size: .875rem;
+  color: var(--color-text-dim);
+}
 
 /* ============================================================
    CSS GLASS — dùng backdrop-filter, hoạt động trên mọi element
@@ -516,17 +751,18 @@ button { cursor: pointer; font-family: inherit; }
   -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
   border: 1px solid var(--color-border-glass) !important;
   box-shadow:
-    0 8px 32px rgba(0,0,0,.35),
+    0 8px 32px rgba(0, 0, 0, .35),
     inset 0 1px 0 var(--color-border-glass),
-    inset 0 -1px 0 rgba(0,0,0,.1) !important;
+    inset 0 -1px 0 rgba(0, 0, 0, .1) !important;
 }
+
 .glass:hover {
   background: var(--color-surface-glass-hover) !important;
   border-color: var(--color-border-glass-hover) !important;
   box-shadow:
-    0 12px 40px rgba(0,145,234,.2),
-    inset 0 1px 0 rgba(255,255,255,.18),
-    inset 0 -1px 0 rgba(0,0,0,.12) !important;
+    0 12px 40px rgba(0, 145, 234, .2),
+    inset 0 1px 0 rgba(255, 255, 255, .18),
+    inset 0 -1px 0 rgba(0, 0, 0, .12) !important;
 }
 
 /* ============================================================
@@ -543,12 +779,21 @@ button { cursor: pointer; font-family: inherit; }
   padding: 10px;
   box-sizing: border-box;
 }
-.glass-container-circle { aspect-ratio: 1/1; flex-shrink: 0; flex-grow: 0; }
-.glass-container-pill   { flex-shrink: 0; flex-grow: 0; }
+
+.glass-container-circle {
+  aspect-ratio: 1/1;
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+
+.glass-container-pill {
+  flex-shrink: 0;
+  flex-grow: 0;
+}
 
 .glass-button {
   position: relative;
-  box-shadow: 0 8px 32px rgba(0,145,234,.25), 0 2px 8px rgba(0,0,0,.4);
+  box-shadow: 0 8px 32px rgba(0, 145, 234, .25), 0 2px 8px rgba(0, 0, 0, .4);
   cursor: pointer;
   pointer-events: auto;
   flex-shrink: 0;
@@ -558,23 +803,30 @@ button { cursor: pointer; font-family: inherit; }
   box-sizing: border-box;
   transition: transform .15s, box-shadow .15s;
 }
+
 .glass-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0,145,234,.35), 0 4px 12px rgba(0,0,0,.5);
+  box-shadow: 0 12px 40px rgba(0, 145, 234, .35), 0 4px 12px rgba(0, 0, 0, .5);
 }
-.glass-button-circle { aspect-ratio: 1/1; flex-shrink: 0; flex-grow: 0; }
+
+.glass-button-circle {
+  aspect-ratio: 1/1;
+  flex-shrink: 0;
+  flex-grow: 0;
+}
 
 .glass-button-text {
   position: absolute;
-  top: 50%; left: 50%;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
   pointer-events: none;
   font-weight: 600;
   color: var(--color-text-inverse);
   font-family: system-ui, -apple-system, sans-serif;
-  var(--color-text-inverse)-space: nowrap;
-  text-shadow: 0 1px 4px rgba(0,0,0,.4);
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .4);
   letter-spacing: .02em;
 }
 
@@ -590,32 +842,32 @@ button { cursor: pointer; font-family: inherit; }
   font-family: system-ui, sans-serif;
   color: var(--color-text-inverse);
   border-radius: 99px;
-  border: 1px solid rgba(255,255,255,.25);
+  border: 1px solid rgba(255, 255, 255, .25);
   cursor: pointer;
   letter-spacing: .02em;
 
   /* Live glass effect — capture được cả WebGL canvas */
-  background: rgba(255,255,255,.08);
+  background: rgba(255, 255, 255, .08);
   backdrop-filter: blur(14px) saturate(180%) brightness(1.1);
   -webkit-backdrop-filter: blur(14px) saturate(180%) brightness(1.1);
 
   box-shadow:
-    0 8px 32px rgba(0,145,234,.3),
-    0 2px 8px rgba(0,0,0,.4),
+    0 8px 32px rgba(0, 145, 234, .3),
+    0 2px 8px rgba(0, 0, 0, .4),
     inset 0 1px 0 var(--color-border-glass-hover),
-    inset 0 -1px 0 rgba(0,0,0,.15);
+    inset 0 -1px 0 rgba(0, 0, 0, .15);
 
   transition: transform .15s, box-shadow .15s, background .15s;
 }
 
 .btn-glass-login:hover {
   transform: translateY(-2px);
-  background: rgba(255,255,255,.13);
+  background: rgba(255, 255, 255, .13);
   box-shadow:
-    0 12px 40px rgba(0,145,234,.4),
-    0 4px 12px rgba(0,0,0,.5),
-    inset 0 1px 0 rgba(255,255,255,.25),
-    inset 0 -1px 0 rgba(0,0,0,.2);
+    0 12px 40px rgba(0, 145, 234, .4),
+    0 4px 12px rgba(0, 0, 0, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .25),
+    inset 0 -1px 0 rgba(0, 0, 0, .2);
 }
 
 .btn-glass-login:active {
@@ -630,7 +882,12 @@ button { cursor: pointer; font-family: inherit; }
   width: 100%;
   pointer-events: none;
 }
-.glass-card-content h3 { font-size: 1rem; margin-bottom: 10px; color: var(--color-text-inverse); }
+
+.glass-card-content h3 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+  color: var(--color-text-inverse);
+}
 
 /* Admin panel glass override */
 #admin-panel.glass-admin {
@@ -640,6 +897,7 @@ button { cursor: pointer; font-family: inherit; }
   padding: 0;
   min-width: auto;
 }
+
 #admin-panel.glass-admin .admin-inner {
   padding: 16px;
   color: var(--color-text);
@@ -649,20 +907,101 @@ button { cursor: pointer; font-family: inherit; }
    PROGRESS UI (Arc & Minibar)
    ============================================================ */
 /* Mini Arc cho thư mục */
-.arc-wrap { position: relative; width: 24px; height: 24px; flex-shrink: 0; margin-left: auto; display: flex; align-items: center; justify-content: center; }
-.arc-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; letter-spacing: -0.5px; }
+.arc-wrap {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arc-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+  letter-spacing: -0.5px;
+}
 
 /* Minibar cho bài học */
-.bar-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--color-text-dim); margin-left: auto; }
-.bar-track { width: 36px; height: 4px; background: var(--progress-track); border-radius: 2px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); }
-.bar-fill  { height: 100%; border-radius: 2px; background: var(--progress-fill); transition: width 0.3s ease; }
-.bar-fill.done { background: var(--progress-done); }
-.bar-fill.low  { background: var(--progress-low); }
+.bar-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+  margin-left: auto;
+}
+
+.bar-track {
+  width: 36px;
+  height: 4px;
+  background: var(--progress-track);
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--progress-fill);
+  transition: width 0.3s ease;
+}
+
+.bar-fill.done {
+  background: var(--progress-done);
+}
+
+.bar-fill.low {
+  background: var(--progress-low);
+}
 
 /* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 640px) {
-  .sidebar { width: 220px; min-width: 220px; }
-  .course-grid { grid-template-columns: 1fr; }
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .course-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Plyr glass sync ── */
+.plyr__tooltip,
+.plyr__menu__container {
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--color-border-glass);
+}
+
+/* Separator trong menu: bỏ white highlight mặc định */
+.plyr__menu__container .plyr__control--back::before {
+  background: var(--color-border);
+  box-shadow: none;
+}
+
+/* no-glass: về trắng Plyr mặc định */
+body.no-glass .plyr__tooltip,
+body.no-glass .plyr__menu__container {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  --plyr-tooltip-background: rgba(255, 255, 255, 0.92);
+  --plyr-menu-background: rgba(255, 255, 255, 0.92);
+  --plyr-tooltip-color: #4a5464;
+  --plyr-menu-color: #4a5464;
+  --plyr-menu-arrow-color: #728197;
+  --plyr-menu-back-border-color: #dcdfe5;
+  --plyr-menu-back-border-shadow-color: #fff;
+  border: none;
 }

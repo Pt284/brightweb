@@ -4,7 +4,7 @@
  */
 
 // ── STATE ──
-let _overrides = null;
+let _overrides = defaultOverrides(); // không bao giờ null
 let _rawAutoData = null; // snapshot appData.courses trước merge
 const _undoStack = [];
 const MAX_UNDO = 20;
@@ -99,7 +99,7 @@ function reorderByIds(items, orderedIds) {
 function applyPatch(node, patches, flattenAll) {
   const p = patches[node.id] || {};
   const out = { ...node };
-  if (p.title     !== undefined) out.title     = p.title;
+  if (p.title !== undefined) out.title = p.title;
   if (p.youtubeId !== undefined) out.youtubeId = p.youtubeId;
   if (p.extraDocs?.length) out.documents = [...(out.documents || []), ...p.extraDocs];
 
@@ -116,7 +116,7 @@ function applyPatch(node, patches, flattenAll) {
 
 function getMergedCourses(rawCourses, overrides) {
   if (!rawCourses) return [];
-  if (!overrides)  return rawCourses;
+  if (!overrides) return rawCourses;
   const { patches = {}, flattenAll = false, courseDisplayOrder = [], manualCourses = [] } = overrides;
 
   let courses = rawCourses
@@ -150,15 +150,15 @@ function _recomputeMerged() {
 // ── BACKUP ──
 function downloadBackup() {
   const blob = new Blob([JSON.stringify({
-    exportedAt    : new Date().toISOString(),
-    mergedCourses : appData?.courses ?? [],
-    rawAutoData   : _rawAutoData ?? [],
-    overrides     : _overrides ?? {}
+    exportedAt: new Date().toISOString(),
+    mergedCourses: appData?.courses ?? [],
+    rawAutoData: _rawAutoData ?? [],
+    overrides: _overrides ?? {}
   }, null, 2)], { type: 'application/json' });
 
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), {
-    href    : url,
+    href: url,
     download: `hocmailea-backup-${new Date().toISOString().slice(0, 10)}.json`
   });
   document.body.appendChild(a);

@@ -131,6 +131,7 @@
   <script src="bg.js" defer></script>
   <script src="container.js"></script>
   <script src="button.js"></script>
+  <script src="overrides.js"></script>
   <link rel="stylesheet" href="color-settings.css">
 </head>
 
@@ -225,12 +226,9 @@
       appId: "1:482143691238:web:67dd3871bc93bf08c03627",
       measurementId: "G-LXMQJM43PN"
     };
-    // SYNC_SECRET và ADMIN_EMAIL đã được xóa khỏi client (bảo mật)
-    // Admin check giờ dùng Firestore collection 'admins'
-    // Sync giờ dùng Firebase ID token thay secret
     const SYNC_PROXY_URL = "https://brightweb-sync.mcdg5444.workers.dev";
 
-    // ── PARTICLES CONFIG — paste JSON config của bạn vào đây ──
+    // ── PARTICLES CONFIG ──
     const PARTICLES_CONFIG = {
       "particles": {
         "number": { "value": 50, "density": { "enable": true, "value_area": 300 } },
@@ -260,8 +258,8 @@
     // ── STATE ──
     let appData = null, currentUser = null, progress = {};
     let currentCourseId = null, currentLessonId = null;
-    let _isAdmin = false; // Cache admin status từ Firestore, không expose email
-    let _openTreeNodes = new Set(); // Lưu ID các thư mục đang mở
+    let _isAdmin = false;
+    let _openTreeNodes = new Set();
     let plyrInstance = null;
 
     // ── HELPERS ──
@@ -299,18 +297,16 @@
       const p = $('page-' + name);
       if (p) p.classList.add('active');
       if (name === 'landing' && !window._pjsLoaded) {
-        window._pjsLoaded = true
-        particlesJS('particles-js', PARTICLES_CONFIG)
-        // Làm transparent canvas của particles để blob bg nhìn xuyên qua
+        window._pjsLoaded = true;
+        particlesJS('particles-js', PARTICLES_CONFIG);
         requestAnimationFrame(() => {
-          const pCanvas = document.querySelector('#particles-js canvas')
-          if (pCanvas) pCanvas.style.background = 'transparent'
-        })
+          const pCanvas = document.querySelector('#particles-js canvas');
+          if (pCanvas) pCanvas.style.background = 'transparent';
+        });
       }
     }
 
     function navigate(hash, ...args) {
-      // Quản lý particles
       if (hash === 'lesson' || hash === 'course') {
         if (window.pJSDom && window.pJSDom.length > 0) {
           window.pJSDom[0].pJS.fn.vendors.destroypJS();
@@ -384,7 +380,7 @@
         currentUser = user;
         $('header').style.display = 'flex';
         $('user-info').textContent = user.displayName || user.email;
-        if (_isAdmin) $('btn-admin').style.display = ''; // Dùng _isAdmin từ Firestore, không hardcode email
+        if (_isAdmin) $('btn-admin').style.display = '';
         await loadData();
         await loadProgress();
         hideLoad();
@@ -397,7 +393,6 @@
       }
     });
 
-    // Kiểm tra quyền truy cập qua Firestore thay vì hardcode email
     async function checkAccess(user) {
       try {
         const [wlDoc, adminDoc] = await Promise.all([
@@ -420,16 +415,38 @@
     }
 
     // ── DATA ──
+    // THAY ĐỔI 2 & 3: Tải đồng thời courses + overrides và mapping window context phục vụ downloadBackup()
     async function loadData() {
       try {
-        const doc = await db.collection('app_data').doc('courses').get();
-        appData = doc.exists ? JSON.parse(doc.data().json) : getMockData();
+        const [coursesDoc, overridesDoc] = await Promise.all([
+          db.collection('app_data').doc('courses').get(),
+          db.collection('app_data').doc('overrides').get()
+        ]);
+
+        // Tải dữ liệu thô gốc và dữ liệu ghi đè của admin
+        const rawAutoData = coursesDoc.exists ? JSON.parse(coursesDoc.data().json) : getMockData();
+        const overridesData = overridesDoc.exists ? overridesDoc.data() : {};
+
+        // Gán biến toàn cục vào window để backup phục vụ đúng yêu cầu kiểm thử
+        window.rawAutoData = rawAutoData;
+        window.overridesData = overridesData;
+
+        // Nếu có hàm xử lý gộp từ file overrides.js thì tiến hành gộp dữ liệu
+        if (typeof applyOverrides === 'function') {
+          appData = applyOverrides(rawAutoData, overridesData);
+        } else {
+          appData = rawAutoData;
+        }
+
         if ($('admin-last-updated'))
           $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
-      } catch (e) { console.warn(e); appData = getMockData(); }
+      } catch (e) {
+        console.warn('Lỗi loadData, đang chạy fallback mock data:', e);
+        appData = getMockData();
+      }
     }
 
-    // [PATCH 1] Khôi phục watchedTime/duration từ Firestore về localStorage
+    // ── PROGRESS SYNC ──
     async function loadProgress() {
       if (!currentUser) return;
       progress = {};
@@ -441,7 +458,6 @@
           const d = doc.data();
           if (d.watched) progress[d.lessonId] = true;
 
-          // Khôi phục watchedTime/duration nếu Firestore mới hơn local
           if (d.watchedTime > 0 || d.duration > 0) {
             const localKey = `prog_${currentUser.uid}_${d.lessonId}`;
             let local = null;
@@ -463,7 +479,6 @@
       } catch (e) { console.warn('loadProgress error:', e); }
     }
 
-    // [PATCH 2] Debounced Firestore sync cho watchedTime/duration
     const _syncTimers = {};
 
     function scheduleFirestoreSync(lessonId, courseId, delay = 30000) {
@@ -504,37 +519,30 @@
       try { return JSON.parse(localStorage.getItem(`prog_${currentUser.uid}_${lessonId}`)); } catch (e) { return null; }
     }
 
-    // [PATCH 3] Kích hoạt scheduleFirestoreSync sau khi ghi localStorage
     function saveLocalProgress(lessonId, watchedTime, duration) {
       if (!currentUser) return;
       try {
         const old = getLocalProgress(lessonId) || {};
         const oldMax = old.watchedTime || 0;
-        // Anti-cheat: tua > 10 phút so với mốc cao nhất → bỏ qua
         if (watchedTime - oldMax > 600) return;
 
         const maxTime = Math.max(oldMax, watchedTime);
         const p = { ...old, watchedTime: maxTime, duration, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p));
 
-        // Sync lên Firestore sau 30 giây không có thêm timeupdate
-        scheduleFirestoreSync(lessonId, currentCourseId, 30_000);
+        scheduleFirestoreSync(lessonId, currentCourseId, 30000);
       } catch (e) { }
     }
 
-    // [PATCH 4] Kèm watchedTime/duration khi ghi Firestore
     async function saveProgress(lessonId, courseId, watched) {
       if (!currentUser) return;
       try {
-        // Cập nhật localStorage trước
         const old = getLocalProgress(lessonId) || {};
         const updated = { ...old, watched, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(updated));
 
-        // Lấy lại để có watchedTime/duration chính xác
         const local = getLocalProgress(lessonId) || {};
 
-        // Ghi đủ các trường lên Firestore
         await db.collection('progress')
           .doc(`${currentUser.uid}_${lessonId}`)
           .set({
@@ -608,7 +616,6 @@
       appData.courses.forEach(course => {
         const { done, total } = countProgress(course);
         const pct = getCourseProgressPct(course);
-        // Dùng DOM API thay innerHTML để tránh XSS
         const fill = el('div', { className: 'progress-fill', style: `width:${pct}%` });
         const bar = el('div', { className: 'progress-bar' }, fill);
         const card = el('div', {
@@ -635,7 +642,6 @@
           const pct = getLessonProgressPct(node.id);
           const isDone = pct === 100;
 
-          // Giao diện Mini bar cho bài học
           const barTrack = el('div', { className: 'bar-track' });
           const barFill = el('div', { className: 'bar-fill ' + (isDone ? 'done' : pct > 0 ? '' : 'low'), style: `width:${pct}%` });
           barTrack.appendChild(barFill);
@@ -648,9 +654,8 @@
           if (node.id === activeId) label.classList.add('active-lesson');
           label.addEventListener('click', () => navigate('lesson', courseId, node.id));
         } else {
-          // Thư mục
           const ch = document.createElement('div'); ch.className = 'tree-children';
-          const nodeId = node.id || `folder_${indent}_${i}`; // Dùng ID tạm nếu không có
+          const nodeId = node.id || `folder_${indent}_${i}`;
 
           const isOpen = _openTreeNodes.has(nodeId);
           if (isOpen) ch.classList.add('open');
@@ -658,12 +663,10 @@
           const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
           const title = el('span', { style: 'flex:1', textContent: node.title });
 
-          // Giao diện Mini Arc cho thư mục
           const pct = getChapterProgressPct(node);
           const color = pct === 100 ? 'var(--progress-done)' : pct >= 50 ? 'var(--progress-fill)' : 'var(--progress-low)';
           const dash = (pct * 87.96) / 100;
 
-          // Tạo SVG Arc dùng innerHTML (an toàn vì chỉ là số và chuỗi hằng)
           const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
           arcWrap.innerHTML = `
             <svg width="24" height="24" viewBox="0 0 36 36">
@@ -710,12 +713,10 @@
       const lesson = findLesson(course, lessonId); if (!lesson) return;
       $('lesson-title').textContent = lesson.title;
 
-      // Lưu lịch sử bài học vừa mở
       if (currentUser) {
         localStorage.setItem(`last_lesson_${courseId}_${currentUser.uid}`, lessonId);
       }
 
-      // ── Plyr YouTube player (thay iframe thô) ──
       if (typeof destroyPlyr === 'function') destroyPlyr();
       const vw = $('video-wrap');
       const nv = $('no-video');
@@ -739,7 +740,7 @@
         const customTitle = document.createElement('div');
         customTitle.id = 'custom-video-title';
         customTitle.textContent = lesson.title;
-        // Fetch real YouTube title
+
         fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${lesson.youtubeId}`)
           .then(r => r.json())
           .then(data => { if (data.title) customTitle.textContent = data.title; })
@@ -761,19 +762,12 @@
         vw.appendChild(container);
 
         plyrInstance = new Plyr('#plyr-player', {
-          controls: ['play-large', 'play', 'progress',
-            'current-time', 'duration', 'mute', 'volume', 'captions', 'settings',
-            'fullscreen'],
+          controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'fullscreen'],
           settings: ['captions', 'quality', 'speed'],
           captions: { active: false, update: true },
           speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
           keyboard: { focused: false, global: false },
-          youtube: {
-            rel: 0,
-            iv_load_policy: 3,
-            modestbranding: 1,
-            cc_load_policy: 0
-          },
+          youtube: { rel: 0, iv_load_policy: 3, modestbranding: 1, cc_load_policy: 0 },
           i18n: {
             play: 'Phát', pause: 'Tạm dừng', restart: 'Phát lại từ đầu',
             mute: 'Tắt tiếng', unmute: 'Bật tiếng', settings: 'Cài đặt',
@@ -785,7 +779,6 @@
 
         let hasAutoSeeked = false;
         plyrInstance.on('ready', () => {
-          // Ép tắt phụ đề YouTube ngay khi load
           if (plyrInstance.embed && plyrInstance.embed.unloadModule) {
             plyrInstance.embed.unloadModule('captions');
             plyrInstance._ytCaptionsOn = false;
@@ -810,19 +803,16 @@
           }
         });
 
-        // [PATCH 8] Flush khi pause
         plyrInstance.on('pause', () => {
           if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
         });
 
         plyrInstance.on('ended', () => {
-          // [PATCH 7] Flush ngay lập tức
           flushProgressToFirestore(currentLessonId, currentCourseId);
 
           const old = getLocalProgress(currentLessonId) || {};
           const oldMax = old.watchedTime || 0;
           const d = plyrInstance.duration || 1;
-          // Chống giả mạo: chỉ hoàn thành nếu thời gian cuối - mốc legit <= 10 phút
           if (d - oldMax <= 600) {
             if (!progress[currentLessonId]) toggleWatch(true);
           }
@@ -849,7 +839,6 @@
       const dl = $('doc-list'); dl.innerHTML = '';
       if (lesson.documents?.length) {
         lesson.documents.forEach(doc => {
-          // Validate URL để tránh javascript: injection, dùng DOM API thay innerHTML
           const link = el('a', {
             href: safeUrl(doc.url),
             target: '_blank',
@@ -879,7 +868,6 @@
         const old = getLocalProgress(currentLessonId) || {};
         const d = (plyrInstance && plyrInstance.duration) ? plyrInstance.duration : 1;
         const t = v ? d : 0;
-        // Lưu thẳng vào local, bỏ qua saveLocalProgress để tránh anti-cheat
         const p = { ...old, watchedTime: t, duration: d, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${currentLessonId}`, JSON.stringify(p));
       } catch (e) { }
@@ -891,8 +879,8 @@
 
     // ── ADMIN ──
     function toggleAdmin() {
-      $('admin-panel').classList.toggle('open')
-      if ($('admin-panel').classList.contains('open')) loadAdminData()
+      $('admin-panel').classList.toggle('open');
+      if ($('admin-panel').classList.contains('open')) loadAdminData();
     }
 
     async function loadAdminData() {
@@ -903,7 +891,6 @@
         else {
           wl.innerHTML = '';
           snap.forEach(doc => {
-            // Dùng DOM API + closure thay vì onclick string → tránh XSS qua email độc
             const emailText = el('span', { textContent: doc.id });
             const removeBtn = el('button', {
               className: 'whitelist-remove',
@@ -951,13 +938,11 @@
     async function triggerSync(e) {
       const btn = e.target; btn.disabled = true; btn.textContent = 'Đang sync...';
       try {
-        // Dùng Firebase ID token thay SYNC_SECRET — secret chỉ tồn tại trong Cloudflare Worker
         if (!currentUser) { alert('Bạn chưa đăng nhập.'); return; }
-        const idToken = await currentUser.getIdToken(true); // Firebase tự refresh nếu hết hạn
+        const idToken = await currentUser.getIdToken(true);
         const r = await fetch(SYNC_PROXY_URL, {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + idToken }
-          // Không còn 'x-secret' nào trong client
         });
         if (r.status === 204) alert('✓ Đã trigger sync! GitHub Actions sẽ chạy trong vài giây.');
         else if (r.status === 403) alert('⛔ Bạn không có quyền trigger sync.');
@@ -968,9 +953,7 @@
     }
 
     // ── PLYR GLOBAL SHORTCUTS & HELPERS ──
-    // [PATCH 5] Flush Firestore trước khi huỷ player
     function destroyPlyr() {
-      // Flush ngay khi rời bài để không mất tiến độ
       if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
 
       if (plyrInstance) {
@@ -982,7 +965,6 @@
       }
       const vw = $('video-wrap');
       if (vw) {
-        // Ép iframe xóa src trước khi loại bỏ để chặn chạy nền
         const ifr = vw.querySelector('iframe');
         if (ifr) ifr.src = '';
         vw.innerHTML = '';
@@ -1085,7 +1067,6 @@
               showToast('Tắt phụ đề');
             }
           } else {
-            // Fallback for native Plyr (if not youtube)
             const currentCaptions = plyrInstance.captions.active;
             plyrInstance.toggleCaptions(!currentCaptions);
             showToast(!currentCaptions ? 'Bật phụ đề' : 'Tắt phụ đề');
@@ -1153,15 +1134,12 @@
       }
     });
 
-    // [PATCH 6] Flush khi đóng/ẩn tab
-    // Người dùng chuyển tab, khoá màn hình, thu nhỏ browser
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentLessonId) {
         flushProgressToFirestore(currentLessonId, currentCourseId);
       }
     });
 
-    // Người dùng đóng tab (hỗ trợ mobile tốt hơn beforeunload)
     window.addEventListener('pagehide', () => {
       if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
     });

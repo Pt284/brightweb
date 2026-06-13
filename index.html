@@ -107,7 +107,6 @@
       pointer-events: none;
     }
 
-    /* Chặn click vào iframe youtube để không bị mất focus của phím tắt */
     .plyr__video-wrapper::after {
       content: "";
       position: absolute;
@@ -116,12 +115,11 @@
       cursor: pointer;
     }
 
-    /* Chặn hoàn toàn hover/click vào YouTube iframe để không hiện GUI của YT */
     .plyr iframe {
       pointer-events: none !important;
     }
 
-    /* Vị trí 1: Thêm CSS hỗ trợ Drag & Drop và Edit Mode */
+    /* Phase 2: Drag & Drop + Edit Mode */
     .course-card.dragging {
       opacity: .35;
       transition: opacity .15s;
@@ -232,6 +230,15 @@
     </div>
   </div>
 
+  <!-- Phase 2: Edit modal -->
+  <div id="edit-overlay" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45)"
+    onclick="closeEditModal()">
+  </div>
+  <div id="edit-modal" class="glass" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+           z-index:1001;padding:24px;min-width:300px;max-width:440px;
+           max-height:80vh;overflow-y:auto;">
+  </div>
+
   <script>
     // ── CONFIG ──
     const firebaseConfig = {
@@ -278,7 +285,6 @@
     let _isAdmin = false;
     let _openTreeNodes = new Set();
     let plyrInstance = null;
-    // Vị trí 4: Thêm trạng thái editMode và _dragSrcIndex quản lý drag-and-drop
     let editMode = false;
     let _dragSrcIndex = null;
 
@@ -287,7 +293,6 @@
     const showLoad = () => $('loading').classList.add('show');
     const hideLoad = () => $('loading').classList.remove('show');
 
-    // ── SAFE DOM HELPERS (chống XSS) ──
     function safeUrl(url) {
       try {
         const u = new URL(url);
@@ -400,19 +405,15 @@
         currentUser = user;
         $('header').style.display = 'flex';
         $('user-info').textContent = user.displayName || user.email;
-
-        // Vị trí 5a: Hiện đồng thời cả nút btn-admin và btn-edit cho Admin
         if (_isAdmin) {
           $('btn-admin').style.display = '';
           $('btn-edit').style.display = '';
         }
-
         await loadData();
         await loadProgress();
         hideLoad();
         handleHash();
       } else {
-        // Vị trí 5b: Khôi phục và xóa trạng thái Edit Mode khi người dùng đăng xuất
         _isAdmin = false;
         editMode = false;
         document.body.classList.remove('edit-mode');
@@ -450,11 +451,9 @@
         appData = doc.exists ? JSON.parse(doc.data().json) : getMockData();
         if ($('admin-last-updated'))
           $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
-
         await loadOverrides();
         _rawAutoData = JSON.parse(JSON.stringify(appData.courses));
         appData.courses = getMergedCourses(_rawAutoData, _overrides);
-
       } catch (e) { console.warn(e); appData = getMockData(); }
     }
 
@@ -465,19 +464,15 @@
       try {
         const snap = await db.collection('progress')
           .where('userId', '==', currentUser.uid).get();
-
         snap.forEach(doc => {
           const d = doc.data();
           if (d.watched) progress[d.lessonId] = true;
-
           if (d.watchedTime > 0 || d.duration > 0) {
             const localKey = `prog_${currentUser.uid}_${d.lessonId}`;
             let local = null;
             try { local = JSON.parse(localStorage.getItem(localKey)); } catch (e) { }
-
             const fsTimestamp = d.updatedAt?.toMillis?.() || 0;
             const localTimestamp = local?.updatedAt || 0;
-
             if (!local || fsTimestamp > localTimestamp) {
               localStorage.setItem(localKey, JSON.stringify({
                 watchedTime: d.watchedTime || 0,
@@ -495,34 +490,23 @@
 
     function scheduleFirestoreSync(lessonId, courseId, delay = 30000) {
       if (_syncTimers[lessonId]) clearTimeout(_syncTimers[lessonId]);
-      _syncTimers[lessonId] = setTimeout(
-        () => flushProgressToFirestore(lessonId, courseId),
-        delay
-      );
+      _syncTimers[lessonId] = setTimeout(() => flushProgressToFirestore(lessonId, courseId), delay);
     }
 
     async function flushProgressToFirestore(lessonId, courseId) {
       if (!currentUser || !lessonId) return;
       const local = getLocalProgress(lessonId);
       if (!local || local.watchedTime == null) return;
-
-      if (_syncTimers[lessonId]) {
-        clearTimeout(_syncTimers[lessonId]);
-        delete _syncTimers[lessonId];
-      }
-
+      if (_syncTimers[lessonId]) { clearTimeout(_syncTimers[lessonId]); delete _syncTimers[lessonId]; }
       try {
-        await db.collection('progress')
-          .doc(`${currentUser.uid}_${lessonId}`)
-          .set({
-            userId: currentUser.uid,
-            lessonId,
-            courseId: courseId || currentCourseId || '',
-            watched: !!progress[lessonId],
-            watchedTime: local.watchedTime || 0,
-            duration: local.duration || 0,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
+        await db.collection('progress').doc(`${currentUser.uid}_${lessonId}`).set({
+          userId: currentUser.uid, lessonId,
+          courseId: courseId || currentCourseId || '',
+          watched: !!progress[lessonId],
+          watchedTime: local.watchedTime || 0,
+          duration: local.duration || 0,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
       } catch (e) { console.warn('Firestore flush error:', e); }
     }
 
@@ -537,11 +521,9 @@
         const old = getLocalProgress(lessonId) || {};
         const oldMax = old.watchedTime || 0;
         if (watchedTime - oldMax > 600) return;
-
         const maxTime = Math.max(oldMax, watchedTime);
         const p = { ...old, watchedTime: maxTime, duration, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p));
-
         scheduleFirestoreSync(lessonId, currentCourseId, 30000);
       } catch (e) { }
     }
@@ -552,20 +534,13 @@
         const old = getLocalProgress(lessonId) || {};
         const updated = { ...old, watched, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(updated));
-
         const local = getLocalProgress(lessonId) || {};
-
-        await db.collection('progress')
-          .doc(`${currentUser.uid}_${lessonId}`)
-          .set({
-            userId: currentUser.uid,
-            lessonId,
-            courseId,
-            watched,
-            watchedTime: local.watchedTime || 0,
-            duration: local.duration || 0,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
+        await db.collection('progress').doc(`${currentUser.uid}_${lessonId}`).set({
+          userId: currentUser.uid, lessonId, courseId, watched,
+          watchedTime: local.watchedTime || 0,
+          duration: local.duration || 0,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
       } catch (e) { console.warn('saveProgress error:', e); }
     }
 
@@ -621,7 +596,7 @@
       }
     }
 
-    // ── Vị trí 6: THAY THẾ TOÀN BỘ HÀM renderHome() ĐỂ HỖ TRỢ CHỈNH SỬA VÀ KÉO THẢ ──
+    // ── RENDER: HOME (Phase 2) ──
     function renderHome() {
       showPage('home');
       const grid = $('course-grid');
@@ -644,7 +619,6 @@
           card.style.position = 'relative';
           card.setAttribute('draggable', 'true');
 
-          // Nút ✏️ góc trên phải
           const editBtn = document.createElement('button');
           editBtn.className = 'btn-icon';
           editBtn.textContent = '✏️';
@@ -652,10 +626,8 @@
           editBtn.addEventListener('click', e => { e.stopPropagation(); openCourseModal(course.id); });
           card.appendChild(editBtn);
 
-          // Click thân card → modal
           card.addEventListener('click', () => openCourseModal(course.id));
 
-          // Drag & Drop
           card.addEventListener('dragstart', e => {
             _dragSrcIndex = index;
             e.dataTransfer.effectAllowed = 'move';
@@ -683,7 +655,6 @@
         grid.appendChild(card);
       });
 
-      // Card "+" thêm khóa — chỉ hiện khi edit mode
       if (editMode) {
         const addCard = el('div', {
           className: 'course-card glass',
@@ -695,7 +666,71 @@
       }
     }
 
-    // ── Vị trí 7: THÊM CÁC HÀM MỚI (toggleEditMode, openCourseModal, closeEditModal) ──
+    // ── RENDER: TREE ──
+    function buildTree(nodes, courseId, indent, activeId) {
+      const ul = document.createElement('div');
+      nodes.forEach((node, i) => {
+        const wrap = document.createElement('div'); wrap.className = 'tree-node';
+        const label = document.createElement('div'); label.className = 'tree-label';
+        label.style.paddingLeft = (14 + indent * 14) + 'px';
+
+        if (node.type === 'lesson') {
+          const pct = getLessonProgressPct(node.id);
+          const isDone = pct === 100;
+
+          const barTrack = el('div', { className: 'bar-track' });
+          const barFill = el('div', { className: 'bar-fill ' + (isDone ? 'done' : pct > 0 ? '' : 'low'), style: `width:${pct}%` });
+          barTrack.appendChild(barFill);
+          const barBadge = el('span', { className: 'bar-badge' }, barTrack, el('span', { textContent: pct + '%' }));
+
+          const icon = el('span', { className: 'icon', textContent: '📄' });
+          const title = el('span', { style: 'flex:1', textContent: node.title });
+
+          label.appendChild(icon); label.appendChild(title); label.appendChild(barBadge);
+          if (node.id === activeId) label.classList.add('active-lesson');
+          label.addEventListener('click', () => navigate('lesson', courseId, node.id));
+        } else {
+          const ch = document.createElement('div'); ch.className = 'tree-children';
+          const nodeId = node.id || `folder_${indent}_${i}`;
+
+          const isOpen = _openTreeNodes.has(nodeId);
+          if (isOpen) ch.classList.add('open');
+
+          const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
+          const title = el('span', { style: 'flex:1', textContent: node.title });
+
+          const pct = getChapterProgressPct(node);
+          const color = pct === 100 ? 'var(--progress-done)' : pct >= 50 ? 'var(--progress-fill)' : 'var(--progress-low)';
+          const dash = (pct * 87.96) / 100;
+
+          const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
+          arcWrap.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-track)" stroke-width="4"/>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4"
+                stroke-dasharray="${dash} 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"/>
+            </svg>
+            <span class="arc-label" style="font-size:8px; color:${color}; font-weight:bold;">${pct}%</span>
+          `;
+
+          label.appendChild(icon); label.appendChild(title); label.appendChild(arcWrap);
+
+          label.addEventListener('click', () => {
+            const o = ch.classList.toggle('open');
+            label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
+            if (o) _openTreeNodes.add(nodeId);
+            else _openTreeNodes.delete(nodeId);
+          });
+
+          if (node.children) ch.appendChild(buildTree(node.children, courseId, indent + 1, activeId));
+          wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;
+        }
+        wrap.appendChild(label); ul.appendChild(wrap);
+      });
+      return ul;
+    }
+
+    // ── PHASE 2: Edit Mode Functions ──
     function toggleEditMode() {
       editMode = !editMode;
       document.body.classList.toggle('edit-mode', editMode);
@@ -717,20 +752,15 @@
 
       const modal = $('edit-modal');
       modal.innerHTML = '';
-
-      // Tiêu đề modal
       modal.appendChild(el('h4', { textContent: isNew ? '➕ Thêm khóa học' : '✏️ Chỉnh sửa khóa học' }));
 
       if (isNew) {
-        // ── Thêm mới ──
         modal.appendChild(el('div', { className: 'section-label', textContent: 'Tên khóa học' }));
         const inp = Object.assign(document.createElement('input'), { type: 'text', placeholder: 'Nhập tên...' });
         inp.style.cssText = 'width:100%;margin:4px 0 10px;';
         modal.appendChild(inp);
-
         modal.appendChild(el('button', {
-          className: 'btn btn-primary btn-sm',
-          textContent: '➕ Tạo',
+          className: 'btn btn-primary btn-sm', textContent: '➕ Tạo',
           onclick: async () => {
             const t = inp.value.trim();
             if (!t) { inp.focus(); return; }
@@ -739,9 +769,7 @@
             closeEditModal();
           }
         }));
-
       } else {
-        // ── Đổi tên ──
         modal.appendChild(el('div', { className: 'section-label', textContent: 'Tên hiển thị' }));
         const inp = Object.assign(document.createElement('input'), { type: 'text', value: course.title });
         inp.style.cssText = 'width:100%;margin:4px 0 6px;';
@@ -757,7 +785,6 @@
             closeEditModal();
           }
         }));
-
         if (autoTitle) {
           const resetBtn = el('button', {
             className: 'btn btn-outline btn-sm', textContent: '↩ Auto',
@@ -777,9 +804,10 @@
         }
         modal.appendChild(btnRow);
 
-        // ── Ẩn/hiện ──
         modal.appendChild(document.createElement('hr'));
-        const hideLabel = Object.assign(document.createElement('label'), { style: 'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;' });
+        const hideLabel = Object.assign(document.createElement('label'), {
+          style: 'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'
+        });
         const chk = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!patch.hidden });
         hideLabel.appendChild(chk);
         hideLabel.appendChild(el('span', { textContent: 'Ẩn khóa học này' }));
@@ -789,23 +817,24 @@
           onclick: async () => { await patchNode(courseId, { hidden: chk.checked }); closeEditModal(); }
         }));
 
-        // ── Xóa (manual only) ──
         if (isManual) {
           modal.appendChild(document.createElement('hr'));
           modal.appendChild(el('button', {
             className: 'btn btn-sm',
-            style: 'background:var(--red,#c0392b);color:#fff;',
+            style: 'background:var(--color-red,#c0392b);color:#fff;',
             textContent: '🗑️ Xóa khóa học',
             onclick: async () => {
               if (!confirm(`Xóa khóa "${course.title}"?`)) return;
-              await saveOverrides({ ..._overrides, manualCourses: (_overrides.manualCourses || []).filter(c => c.id !== courseId) });
+              await saveOverrides({
+                ..._overrides,
+                manualCourses: (_overrides.manualCourses || []).filter(c => c.id !== courseId)
+              });
               closeEditModal();
             }
           }));
         }
       }
 
-      // Nút đóng
       modal.appendChild(document.createElement('hr'));
       modal.appendChild(el('button', { className: 'btn btn-outline btn-sm', textContent: 'Đóng', onclick: closeEditModal }));
 
@@ -817,11 +846,6 @@
       $('edit-modal').style.display = 'none';
       $('edit-overlay').style.display = 'none';
     }
-
-    // ── TREE HELPERS ──
-    buildTree = (function (originalBuildTree) {
-      return originalBuildTree;
-    })(buildTree);
 
     // ── RENDER: COURSE ──
     function renderCourse(courseId) {
@@ -912,7 +936,6 @@
             plyrInstance.embed.unloadModule('captions');
             plyrInstance._ytCaptionsOn = false;
           }
-
           const saved = getLocalProgress(currentLessonId);
           if (saved && saved.watchedTime > 0 && !hasAutoSeeked) {
             hasAutoSeeked = true;
@@ -938,7 +961,6 @@
 
         plyrInstance.on('ended', () => {
           flushProgressToFirestore(currentLessonId, currentCourseId);
-
           const old = getLocalProgress(currentLessonId) || {};
           const oldMax = old.watchedTime || 0;
           const d = plyrInstance.duration || 1;
@@ -969,11 +991,9 @@
       if (lesson.documents?.length) {
         lesson.documents.forEach(doc => {
           const link = el('a', {
-            href: safeUrl(doc.url),
-            target: '_blank',
+            href: safeUrl(doc.url), target: '_blank',
             rel: 'noopener noreferrer',
-            className: 'btn btn-outline btn-sm',
-            textContent: 'Mở'
+            className: 'btn btn-outline btn-sm', textContent: 'Mở'
           });
           const icon = el('span', { textContent: '📎 ' + doc.title });
           const card = el('div', { className: 'doc-card' }, icon, link);
@@ -988,11 +1008,11 @@
       btn.textContent = w ? '✓ Đã xem' : 'Đánh dấu đã xem';
       btn.className = 'btn-watch' + (w ? ' watched' : '');
     }
+
     async function toggleWatch(forceValue) {
       if (!currentLessonId || !currentCourseId) return;
       const v = forceValue !== undefined ? forceValue : !progress[currentLessonId];
       progress[currentLessonId] = v;
-
       try {
         const old = getLocalProgress(currentLessonId) || {};
         const d = (plyrInstance && plyrInstance.duration) ? plyrInstance.duration : 1;
@@ -1000,7 +1020,6 @@
         const p = { ...old, watchedTime: t, duration: d, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${currentLessonId}`, JSON.stringify(p));
       } catch (e) { }
-
       updateWatchBtn();
       await saveProgress(currentLessonId, currentCourseId, v);
       updateRealtimeProgressUI();
@@ -1022,12 +1041,10 @@
           snap.forEach(doc => {
             const emailText = el('span', { textContent: doc.id });
             const removeBtn = el('button', {
-              className: 'whitelist-remove',
-              textContent: '✕',
+              className: 'whitelist-remove', textContent: '✕',
               onclick: () => removeWhitelist(doc.id)
             });
-            const row = el('div', { className: 'whitelist-item' }, emailText, removeBtn);
-            wl.appendChild(row);
+            wl.appendChild(el('div', { className: 'whitelist-item' }, emailText, removeBtn));
           });
         }
       } catch (e) { wl.innerHTML = 'Lỗi: ' + e.message; }
@@ -1081,15 +1098,11 @@
       finally { btn.disabled = false; btn.textContent = '🔄 Sync ngay'; }
     }
 
-    // ── PLYR GLOBAL SHORTCUTS & HELPERS ──
+    // ── PLYR ──
     function destroyPlyr() {
       if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
-
       if (plyrInstance) {
-        try {
-          plyrInstance.stop();
-          plyrInstance.destroy();
-        } catch (e) { }
+        try { plyrInstance.stop(); plyrInstance.destroy(); } catch (e) { }
         plyrInstance = null;
       }
       const vw = $('video-wrap');
@@ -1292,13 +1305,6 @@
       };
     }
   </script>
-  <div id="edit-overlay" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45)"
-    onclick="closeEditModal()">
-  </div>
-  <div id="edit-modal" class="glass" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-           z-index:1001;padding:24px;min-width:300px;max-width:440px;
-           max-height:80vh;overflow-y:auto;">
-  </div>
   <script src="color-settings.js"></script>
 </body>
 

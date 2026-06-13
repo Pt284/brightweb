@@ -120,6 +120,20 @@
     .plyr iframe {
       pointer-events: none !important;
     }
+
+    /* Vị trí 1: Thêm CSS hỗ trợ Drag & Drop và Edit Mode */
+    .course-card.dragging {
+      opacity: .35;
+      transition: opacity .15s;
+    }
+
+    .course-card.drag-over {
+      outline: 2px dashed var(--accent, #37b1f8);
+    }
+
+    body.edit-mode .course-card {
+      cursor: grab;
+    }
   </style>
 
   <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
@@ -143,13 +157,15 @@
     <span class="logo" onclick="navigate('home')">🏠 GO TO HOME 😈</span>
     <div class="header-right">
       <span id="user-info"></span>
-      <button id="btn-admin" class="btn-icon" title="Admin" style="display:none" onclick="toggleAdmin()">⚙</button>
+      <button id="btn-admin" class="btn-icon" title="Admin" style="display:none" onclick="toggleAdmin()">⚙️</button>
+      <button id="btn-edit" class="btn-icon" title="Chỉnh sửa" style="display:none"
+        onclick="toggleEditMode()">✏️</button>
       <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
     </div>
   </div>
 
   <div id="admin-panel" class="glass">
-    <h4>⚙ Admin Panel</h4>
+    <h4>⚙️ Admin Panel</h4>
     <p id="admin-last-updated">lastUpdated: —</p>
     <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
     <button class="btn btn-outline btn-sm" onclick="window.open('admin-check.html', '_blank')">🔍 Check Video</button>
@@ -262,6 +278,9 @@
     let _isAdmin = false;
     let _openTreeNodes = new Set();
     let plyrInstance = null;
+    // Vị trí 4: Thêm trạng thái editMode và _dragSrcIndex quản lý drag-and-drop
+    let editMode = false;
+    let _dragSrcIndex = null;
 
     // ── HELPERS ──
     const $ = id => document.getElementById(id);
@@ -381,13 +400,22 @@
         currentUser = user;
         $('header').style.display = 'flex';
         $('user-info').textContent = user.displayName || user.email;
-        if (_isAdmin) $('btn-admin').style.display = '';
+
+        // Vị trí 5a: Hiện đồng thời cả nút btn-admin và btn-edit cho Admin
+        if (_isAdmin) {
+          $('btn-admin').style.display = '';
+          $('btn-edit').style.display = '';
+        }
+
         await loadData();
         await loadProgress();
         hideLoad();
         handleHash();
       } else {
+        // Vị trí 5b: Khôi phục và xóa trạng thái Edit Mode khi người dùng đăng xuất
         _isAdmin = false;
+        editMode = false;
+        document.body.classList.remove('edit-mode');
         currentUser = null; appData = null; progress = {};
         $('header').style.display = 'none';
         showPage('landing');
@@ -416,7 +444,6 @@
     }
 
     // ── DATA ──
-    // THAY ĐỔI 2 & 3: Tải đồng thời courses + overrides và mapping window context phục vụ downloadBackup()
     async function loadData() {
       try {
         const doc = await db.collection('app_data').doc('courses').get();
@@ -424,7 +451,6 @@
         if ($('admin-last-updated'))
           $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
 
-        // Phase 1: load overrides → snapshot raw data → merge
         await loadOverrides();
         _rawAutoData = JSON.parse(JSON.stringify(appData.courses));
         appData.courses = getMergedCourses(_rawAutoData, _overrides);
@@ -595,90 +621,207 @@
       }
     }
 
-    // ── RENDER: HOME ──
+    // ── Vị trí 6: THAY THẾ TOÀN BỘ HÀM renderHome() ĐỂ HỖ TRỢ CHỈNH SỬA VÀ KÉO THẢ ──
     function renderHome() {
       showPage('home');
-      const grid = $('course-grid'); grid.innerHTML = '';
-      appData.courses.forEach(course => {
+      const grid = $('course-grid');
+      grid.innerHTML = '';
+
+      appData.courses.forEach((course, index) => {
         const { done, total } = countProgress(course);
         const pct = getCourseProgressPct(course);
         const fill = el('div', { className: 'progress-fill', style: `width:${pct}%` });
         const bar = el('div', { className: 'progress-bar' }, fill);
-        const card = el('div', {
-          className: 'course-card glass',
-          onclick: () => navigate('course', course.id)
-        },
-          el('h3', { textContent: course.title }),
-          bar,
-          el('div', { className: 'progress-label', textContent: `${done}/${total} bài · ${pct}%` })
-        );
+        const label = el('div', { className: 'progress-label', textContent: `${done}/${total} bài · ${pct}%` });
+        const title = el('h3', { textContent: course.title });
+
+        const card = el('div', { className: 'course-card glass' });
+        card.appendChild(title);
+        card.appendChild(bar);
+        card.appendChild(label);
+
+        if (editMode) {
+          card.style.position = 'relative';
+          card.setAttribute('draggable', 'true');
+
+          // Nút ✏️ góc trên phải
+          const editBtn = document.createElement('button');
+          editBtn.className = 'btn-icon';
+          editBtn.textContent = '✏️';
+          editBtn.style.cssText = 'position:absolute;top:6px;right:6px;font-size:14px;';
+          editBtn.addEventListener('click', e => { e.stopPropagation(); openCourseModal(course.id); });
+          card.appendChild(editBtn);
+
+          // Click thân card → modal
+          card.addEventListener('click', () => openCourseModal(course.id));
+
+          // Drag & Drop
+          card.addEventListener('dragstart', e => {
+            _dragSrcIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => card.classList.add('dragging'), 0);
+          });
+          card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(n => n.classList.remove('drag-over'));
+          });
+          card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+          card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+          card.addEventListener('drop', async e => {
+            e.preventDefault();
+            card.classList.remove('drag-over');
+            if (_dragSrcIndex === null || _dragSrcIndex === index) { _dragSrcIndex = null; return; }
+            const arr = [...appData.courses];
+            arr.splice(index, 0, arr.splice(_dragSrcIndex, 1)[0]);
+            _dragSrcIndex = null;
+            await saveOverrides({ ..._overrides, courseDisplayOrder: arr.map(c => c.id) });
+          });
+        } else {
+          card.addEventListener('click', () => navigate('course', course.id));
+        }
+
         grid.appendChild(card);
       });
+
+      // Card "+" thêm khóa — chỉ hiện khi edit mode
+      if (editMode) {
+        const addCard = el('div', {
+          className: 'course-card glass',
+          style: 'display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:.6;cursor:pointer;',
+          textContent: '＋',
+          onclick: () => openCourseModal(null)
+        });
+        grid.appendChild(addCard);
+      }
     }
 
-    // ── RENDER: TREE ──
-    function buildTree(nodes, courseId, indent, activeId) {
-      const ul = document.createElement('div');
-      nodes.forEach((node, i) => {
-        const wrap = document.createElement('div'); wrap.className = 'tree-node';
-        const label = document.createElement('div'); label.className = 'tree-label';
-        label.style.paddingLeft = (14 + indent * 14) + 'px';
+    // ── Vị trí 7: THÊM CÁC HÀM MỚI (toggleEditMode, openCourseModal, closeEditModal) ──
+    function toggleEditMode() {
+      editMode = !editMode;
+      document.body.classList.toggle('edit-mode', editMode);
+      $('btn-edit').textContent = editMode ? '✅' : '✏️';
+      $('btn-edit').title = editMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa';
+      const active = document.querySelector('.page.active')?.id;
+      if (active === 'page-home') renderHome();
+      else if (active === 'page-course' && currentCourseId) renderCourse(currentCourseId);
+    }
 
-        if (node.type === 'lesson') {
-          const pct = getLessonProgressPct(node.id);
-          const isDone = pct === 100;
+    function openCourseModal(courseId) {
+      const isNew = !courseId;
+      const course = isNew ? null : findCourse(courseId);
+      if (!isNew && !course) return;
 
-          const barTrack = el('div', { className: 'bar-track' });
-          const barFill = el('div', { className: 'bar-fill ' + (isDone ? 'done' : pct > 0 ? '' : 'low'), style: `width:${pct}%` });
-          barTrack.appendChild(barFill);
-          const barBadge = el('span', { className: 'bar-badge' }, barTrack, el('span', { textContent: pct + '%' }));
+      const isManual = !!course?._isManual;
+      const patch = _overrides.patches?.[courseId] || {};
+      const autoTitle = _rawAutoData?.find(c => c.id === courseId)?.title;
 
-          const icon = el('span', { className: 'icon', textContent: '📄' });
-          const title = el('span', { style: 'flex:1', textContent: node.title });
+      const modal = $('edit-modal');
+      modal.innerHTML = '';
 
-          label.appendChild(icon); label.appendChild(title); label.appendChild(barBadge);
-          if (node.id === activeId) label.classList.add('active-lesson');
-          label.addEventListener('click', () => navigate('lesson', courseId, node.id));
-        } else {
-          const ch = document.createElement('div'); ch.className = 'tree-children';
-          const nodeId = node.id || `folder_${indent}_${i}`;
+      // Tiêu đề modal
+      modal.appendChild(el('h4', { textContent: isNew ? '➕ Thêm khóa học' : '✏️ Chỉnh sửa khóa học' }));
 
-          const isOpen = _openTreeNodes.has(nodeId);
-          if (isOpen) ch.classList.add('open');
+      if (isNew) {
+        // ── Thêm mới ──
+        modal.appendChild(el('div', { className: 'section-label', textContent: 'Tên khóa học' }));
+        const inp = Object.assign(document.createElement('input'), { type: 'text', placeholder: 'Nhập tên...' });
+        inp.style.cssText = 'width:100%;margin:4px 0 10px;';
+        modal.appendChild(inp);
 
-          const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
-          const title = el('span', { style: 'flex:1', textContent: node.title });
+        modal.appendChild(el('button', {
+          className: 'btn btn-primary btn-sm',
+          textContent: '➕ Tạo',
+          onclick: async () => {
+            const t = inp.value.trim();
+            if (!t) { inp.focus(); return; }
+            const newCourse = { id: `manual-${Date.now()}`, title: t, order: 99, _isManual: true, tree: [] };
+            await saveOverrides({ ..._overrides, manualCourses: [...(_overrides.manualCourses || []), newCourse] });
+            closeEditModal();
+          }
+        }));
 
-          const pct = getChapterProgressPct(node);
-          const color = pct === 100 ? 'var(--progress-done)' : pct >= 50 ? 'var(--progress-fill)' : 'var(--progress-low)';
-          const dash = (pct * 87.96) / 100;
+      } else {
+        // ── Đổi tên ──
+        modal.appendChild(el('div', { className: 'section-label', textContent: 'Tên hiển thị' }));
+        const inp = Object.assign(document.createElement('input'), { type: 'text', value: course.title });
+        inp.style.cssText = 'width:100%;margin:4px 0 6px;';
+        modal.appendChild(inp);
 
-          const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
-          arcWrap.innerHTML = `
-            <svg width="24" height="24" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-track)" stroke-width="4"/>
-              <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4" 
-                stroke-dasharray="${dash} 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"/>
-            </svg>
-            <span class="arc-label" style="font-size:8px; color:${color}; font-weight:bold;">${pct}%</span>
-          `;
+        const btnRow = el('div', { style: 'display:flex;gap:6px;margin-bottom:12px;' });
+        btnRow.appendChild(el('button', {
+          className: 'btn btn-primary btn-sm', textContent: 'Lưu',
+          onclick: async () => {
+            const t = inp.value.trim();
+            if (!t) { inp.focus(); return; }
+            await patchNode(courseId, { title: t });
+            closeEditModal();
+          }
+        }));
 
-          label.appendChild(icon); label.appendChild(title); label.appendChild(arcWrap);
-
-          label.addEventListener('click', () => {
-            const o = ch.classList.toggle('open');
-            label.querySelector('.toggle-icon').textContent = o ? '▼' : '▶';
-            if (o) _openTreeNodes.add(nodeId);
-            else _openTreeNodes.delete(nodeId);
+        if (autoTitle) {
+          const resetBtn = el('button', {
+            className: 'btn btn-outline btn-sm', textContent: '↩ Auto',
+            onclick: async () => {
+              const patches = { ..._overrides.patches };
+              if (patches[courseId]) {
+                const { title: _, ...rest } = patches[courseId];
+                if (Object.keys(rest).length) patches[courseId] = rest;
+                else delete patches[courseId];
+              }
+              await saveOverrides({ ..._overrides, patches });
+              closeEditModal();
+            }
           });
-
-          if (node.children) ch.appendChild(buildTree(node.children, courseId, indent + 1, activeId));
-          wrap.appendChild(label); wrap.appendChild(ch); ul.appendChild(wrap); return;
+          resetBtn.disabled = !patch.title;
+          btnRow.appendChild(resetBtn);
         }
-        wrap.appendChild(label); ul.appendChild(wrap);
-      });
-      return ul;
+        modal.appendChild(btnRow);
+
+        // ── Ẩn/hiện ──
+        modal.appendChild(document.createElement('hr'));
+        const hideLabel = Object.assign(document.createElement('label'), { style: 'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;' });
+        const chk = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!patch.hidden });
+        hideLabel.appendChild(chk);
+        hideLabel.appendChild(el('span', { textContent: 'Ẩn khóa học này' }));
+        modal.appendChild(hideLabel);
+        modal.appendChild(el('button', {
+          className: 'btn btn-outline btn-sm', textContent: 'Áp dụng ẩn/hiện',
+          onclick: async () => { await patchNode(courseId, { hidden: chk.checked }); closeEditModal(); }
+        }));
+
+        // ── Xóa (manual only) ──
+        if (isManual) {
+          modal.appendChild(document.createElement('hr'));
+          modal.appendChild(el('button', {
+            className: 'btn btn-sm',
+            style: 'background:var(--red,#c0392b);color:#fff;',
+            textContent: '🗑️ Xóa khóa học',
+            onclick: async () => {
+              if (!confirm(`Xóa khóa "${course.title}"?`)) return;
+              await saveOverrides({ ..._overrides, manualCourses: (_overrides.manualCourses || []).filter(c => c.id !== courseId) });
+              closeEditModal();
+            }
+          }));
+        }
+      }
+
+      // Nút đóng
+      modal.appendChild(document.createElement('hr'));
+      modal.appendChild(el('button', { className: 'btn btn-outline btn-sm', textContent: 'Đóng', onclick: closeEditModal }));
+
+      $('edit-overlay').style.display = 'block';
+      modal.style.display = 'block';
     }
+
+    function closeEditModal() {
+      $('edit-modal').style.display = 'none';
+      $('edit-overlay').style.display = 'none';
+    }
+
+    // ── TREE HELPERS ──
+    buildTree = (function (originalBuildTree) {
+      return originalBuildTree;
+    })(buildTree);
 
     // ── RENDER: COURSE ──
     function renderCourse(courseId) {
@@ -1149,6 +1292,13 @@
       };
     }
   </script>
+  <div id="edit-overlay" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45)"
+    onclick="closeEditModal()">
+  </div>
+  <div id="edit-modal" class="glass" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+           z-index:1001;padding:24px;min-width:300px;max-width:440px;
+           max-height:80vh;overflow-y:auto;">
+  </div>
   <script src="color-settings.js"></script>
 </body>
 

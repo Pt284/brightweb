@@ -142,8 +142,23 @@ function getMergedCourses(rawCourses, overrides) {
 }
 
 function _recomputeMerged() {
-  if (_rawAutoData && appData) {
-    appData.courses = getMergedCourses(_rawAutoData, _overrides);
+  if (!_rawAutoData || !appData) return;
+  appData.courses = getMergedCourses(_rawAutoData, _overrides);
+
+  // Auto re-render trang hiện tại
+  const activePage = document.querySelector('.page.active')?.id;
+  if (activePage === 'page-home' && typeof renderHome === 'function') {
+    renderHome();
+  } else if (activePage === 'page-course' && currentCourseId && typeof renderCourse === 'function') {
+    renderCourse(currentCourseId);
+  } else if (activePage === 'page-lesson') {
+    // Không gọi renderLesson (sẽ phá player), chỉ cập nhật title sidebar
+    const course = appData.courses?.find(c => c.id === currentCourseId);
+    if (course) {
+      const pct = typeof getCourseProgressPct === 'function' ? getCourseProgressPct(course) : 0;
+      const el = document.getElementById('sidebar-lesson-title');
+      if (el) el.textContent = `${course.title} - ${pct}%`;
+    }
   }
 }
 

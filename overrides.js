@@ -9,7 +9,7 @@ const _undoStack = [];
 const MAX_UNDO = 20;
 
 function defaultOverrides() {
-  return { v: 1, courseDisplayOrder: [], patches: {}, manualCourses: [], flattenAll: false };
+  return { v: 1, courseDisplayOrder: [], patches: {}, manualCourses: [], manualNodes: [], reparent: {}, flattenAll: false };
 }
 
 async function loadOverrides() {
@@ -103,10 +103,67 @@ function applyPatch(node, patches, flattenAll) {
 function getMergedCourses(rawCourses, overrides) {
   if (!rawCourses) return [];
   if (!overrides) return rawCourses;
-  const { patches = {}, flattenAll = false, courseDisplayOrder = [], manualCourses = [] } = overrides;
+  const { patches = {}, flattenAll = false, courseDisplayOrder = [], manualCourses = [], manualNodes = [], reparent = {} } = overrides;
 
-  // Không filter top-level — chỉ đánh dấu _hidden để renderHome quyết định
-  let courses = rawCourses.map(c => {
+  // 1. Combine all courses
+  let allCourses = [
+    ...JSON.parse(JSON.stringify(rawCourses)),
+    ...JSON.parse(JSON.stringify(manualCourses))
+  ];
+
+  // 2. Detach reparents
+  const detachedNodes = new Map();
+  function traverseAndDetach(node) {
+    let childrenArray = node.tree || node.children;
+    if (childrenArray) {
+      let kept = [];
+      childrenArray.forEach(child => {
+        if (reparent[child.id]) {
+          detachedNodes.set(child.id, child);
+        } else {
+          kept.push(child);
+          traverseAndDetach(child);
+        }
+      });
+      if (node.tree) node.tree = kept;
+      else node.children = kept;
+    }
+  }
+  allCourses.forEach(traverseAndDetach);
+
+  // 3. Inject reparents and manualNodes
+  const nodesToInject = {};
+  for (const [nodeId, newParentId] of Object.entries(reparent)) {
+    if (detachedNodes.has(nodeId)) {
+      if (!nodesToInject[newParentId]) nodesToInject[newParentId] = [];
+      nodesToInject[newParentId].push(detachedNodes.get(nodeId));
+    }
+  }
+  manualNodes.forEach(mn => {
+    if (mn.parentId) {
+      if (!nodesToInject[mn.parentId]) nodesToInject[mn.parentId] = [];
+      nodesToInject[mn.parentId].push(JSON.parse(JSON.stringify(mn)));
+    }
+  });
+
+  function traverseAndInject(node) {
+    if (nodesToInject[node.id]) {
+      if (node.tree) {
+        node.tree.push(...nodesToInject[node.id]);
+      } else {
+        node.children = node.children || [];
+        node.children.push(...nodesToInject[node.id]);
+      }
+    }
+    let childrenArray = node.tree || node.children;
+    if (childrenArray) {
+      childrenArray.forEach(traverseAndInject);
+    }
+  }
+  allCourses.forEach(traverseAndInject);
+
+  // 4. Apply Patches
+  let courses = allCourses.map(c => {
     const cp = patches[c.id] || {};
     const out = { ...c };
     if (cp.title !== undefined) out.title = cp.title;
@@ -122,16 +179,6 @@ function getMergedCourses(rawCourses, overrides) {
     return out;
   });
 
-  // Manual courses — cũng áp dụng patches (title override, hidden)
-  const patchedManual = manualCourses.map(c => {
-    const cp = patches[c.id] || {};
-    const out = { ...c };
-    if (cp.title !== undefined) out.title = cp.title;
-    if (cp.hidden) out._hidden = true;
-    return out;
-  });
-
-  courses = [...courses, ...patchedManual];
   return reorderByIds(courses, courseDisplayOrder);
 }
 

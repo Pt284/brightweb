@@ -287,6 +287,9 @@
     let plyrInstance = null;
     let editMode = false;
     let _dragSrcIndex = null;
+    let _holdSpeedActive = false;
+    let _prevSpeed = 1;
+    let _spaceTimer = null;
 
     // ── HELPERS ──
     const $ = id => document.getElementById(id);
@@ -1118,10 +1121,6 @@
       }
       _holdSpeedActive = false;
     }
-
-    let _holdSpeedActive = false;
-    let _prevSpeed = 1;
-    let _spaceTimer = null;
 
     function showToast(msg) {
       const container = document.querySelector('.video-container');

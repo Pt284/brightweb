@@ -1,11 +1,10 @@
 /**
- * overrides.js — Admin Manual Override Layer
- * Phụ thuộc: db, appData, currentUser (globals từ index.html)
+ * overrides.js — Admin Manual Override Layer v4
  */
 
 // ── STATE ──
-let _overrides = defaultOverrides(); // không bao giờ null
-let _rawAutoData = null; // snapshot appData.courses trước merge
+let _overrides = defaultOverrides();
+let _rawAutoData = null;
 const _undoStack = [];
 const MAX_UNDO = 20;
 
@@ -13,32 +12,24 @@ function defaultOverrides() {
   return { v: 1, courseDisplayOrder: [], patches: {}, manualCourses: [], flattenAll: false };
 }
 
-// ── LOAD ──
 async function loadOverrides() {
   try {
     const doc = await db.collection('app_data').doc('overrides').get();
     _overrides = doc.exists ? { ...defaultOverrides(), ...doc.data() } : defaultOverrides();
-  } catch (e) {
-    console.warn('loadOverrides:', e);
-    _overrides = defaultOverrides();
-  }
+  } catch (e) { console.warn('loadOverrides:', e); _overrides = defaultOverrides(); }
 }
 
-// ── SAVE ──
 async function saveOverrides(newState, skipUndo = false) {
   if (!skipUndo) pushUndo();
   _overrides = { ...newState };
   try {
-    const { updatedAt: _, ...toWrite } = _overrides; // Firestore sẽ ghi đè updatedAt
+    const { updatedAt: _, ...toWrite } = _overrides;
     await db.collection('app_data').doc('overrides').set({
       ...toWrite,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: currentUser?.email || ''
     });
-  } catch (e) {
-    console.error('saveOverrides:', e);
-    throw e;
-  }
+  } catch (e) { console.error('saveOverrides:', e); throw e; }
   _recomputeMerged();
 }
 
@@ -59,13 +50,11 @@ function pushUndo() {
   _undoStack.push(JSON.parse(JSON.stringify(_overrides)));
   if (_undoStack.length > MAX_UNDO) _undoStack.shift();
 }
-
 async function undoOverride() {
   if (!_undoStack.length) return false;
   await saveOverrides(_undoStack.pop(), true);
   return true;
 }
-
 const canUndo = () => _undoStack.length > 0;
 
 // ── FLATTEN ──
@@ -74,9 +63,7 @@ function collectLessons(node, prefix) {
   if (node.type === 'lesson') return [{ ...node, title }];
   return (node.children || []).flatMap(c => collectLessons(c, title));
 }
-
 function enforceMaxDepth(nodes) {
-  // Đảm bảo: chapter không có child là chapter (max depth = chapter → lesson)
   return nodes.map(node => {
     if (node.type === 'lesson') return node;
     const children = (node.children || []).flatMap(c =>
@@ -102,7 +89,6 @@ function applyPatch(node, patches, flattenAll) {
   if (p.title !== undefined) out.title = p.title;
   if (p.youtubeId !== undefined) out.youtubeId = p.youtubeId;
   if (p.extraDocs?.length) out.documents = [...(out.documents || []), ...p.extraDocs];
-
   if (out.children) {
     let ch = out.children
       .filter(c => !patches[c.id]?.hidden)
@@ -119,46 +105,44 @@ function getMergedCourses(rawCourses, overrides) {
   if (!overrides) return rawCourses;
   const { patches = {}, flattenAll = false, courseDisplayOrder = [], manualCourses = [] } = overrides;
 
-  let courses = rawCourses
-    .filter(c => !patches[c.id]?.hidden)
-    .map(c => {
-      const cp = patches[c.id] || {};
-      const out = { ...c };
-      if (cp.title !== undefined) out.title = cp.title;
+  // Không filter top-level — chỉ đánh dấu _hidden để renderHome quyết định
+  let courses = rawCourses.map(c => {
+    const cp = patches[c.id] || {};
+    const out = { ...c };
+    if (cp.title !== undefined) out.title = cp.title;
+    if (cp.hidden) out._hidden = true;
+    if (out.tree) {
+      let tree = out.tree
+        .filter(n => !patches[n.id]?.hidden)
+        .map(n => applyPatch(n, patches, flattenAll));
+      if (cp.childOrder?.length) tree = reorderByIds(tree, cp.childOrder);
+      if (flattenAll) tree = enforceMaxDepth(tree);
+      out.tree = tree;
+    }
+    return out;
+  });
 
-      if (out.tree) {
-        let tree = out.tree
-          .filter(n => !patches[n.id]?.hidden)
-          .map(n => applyPatch(n, patches, flattenAll));
-        if (cp.childOrder?.length) tree = reorderByIds(tree, cp.childOrder);
-        if (flattenAll) tree = enforceMaxDepth(tree);
-        out.tree = tree;
-      }
-      return out;
-    });
+  // Manual courses — cũng áp dụng patches (title override, hidden)
+  const patchedManual = manualCourses.map(c => {
+    const cp = patches[c.id] || {};
+    const out = { ...c };
+    if (cp.title !== undefined) out.title = cp.title;
+    if (cp.hidden) out._hidden = true;
+    return out;
+  });
 
-  courses = [...courses, ...manualCourses];
+  courses = [...courses, ...patchedManual];
   return reorderByIds(courses, courseDisplayOrder);
 }
 
 function _recomputeMerged() {
   if (!_rawAutoData || !appData) return;
   appData.courses = getMergedCourses(_rawAutoData, _overrides);
-
-  // Auto re-render trang hiện tại
   const activePage = document.querySelector('.page.active')?.id;
   if (activePage === 'page-home' && typeof renderHome === 'function') {
     renderHome();
   } else if (activePage === 'page-course' && currentCourseId && typeof renderCourse === 'function') {
     renderCourse(currentCourseId);
-  } else if (activePage === 'page-lesson') {
-    // Không gọi renderLesson (sẽ phá player), chỉ cập nhật title sidebar
-    const course = appData.courses?.find(c => c.id === currentCourseId);
-    if (course) {
-      const pct = typeof getCourseProgressPct === 'function' ? getCourseProgressPct(course) : 0;
-      const el = document.getElementById('sidebar-lesson-title');
-      if (el) el.textContent = `${course.title} - ${pct}%`;
-    }
   }
 }
 
@@ -170,14 +154,11 @@ function downloadBackup() {
     rawAutoData: _rawAutoData ?? [],
     overrides: _overrides ?? {}
   }, null, 2)], { type: 'application/json' });
-
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), {
     href: url,
     download: `hocmailea-backup-${new Date().toISOString().slice(0, 10)}.json`
   });
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
 }

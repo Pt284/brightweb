@@ -126,11 +126,26 @@
     }
 
     .course-card.drag-over {
-      outline: 2px dashed var(--accent, #37b1f8);
+      outline: 2px dashed var(--color-accent);
+      box-shadow: var(--shadow-glass-hover);
     }
 
     body.edit-mode .course-card {
       cursor: grab;
+    }
+
+    .course-card.is-hidden-course {
+      opacity: .4;
+    }
+
+    .hidden-badge {
+      font-size: .7rem;
+      color: var(--color-text-muted);
+      border: 1px solid var(--color-border);
+      padding: 2px 8px;
+      border-radius: 99px;
+      display: inline-block;
+      margin-top: 6px;
     }
   </style>
 
@@ -235,7 +250,7 @@
     onclick="closeEditModal()">
   </div>
   <div id="edit-modal" class="glass" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-           z-index:1001;padding:24px;min-width:300px;max-width:440px;
+           z-index:1001;padding:24px;min-width:320px;max-width:440px;
            max-height:80vh;overflow-y:auto;">
   </div>
 
@@ -285,8 +300,10 @@
     let _isAdmin = false;
     let _openTreeNodes = new Set();
     let plyrInstance = null;
+    // Phase 2
     let editMode = false;
     let _dragSrcIndex = null;
+    // Plyr speed (khai báo sớm tránh TDZ trong destroyPlyr)
     let _holdSpeedActive = false;
     let _prevSpeed = 1;
     let _spaceTimer = null;
@@ -605,7 +622,10 @@
       const grid = $('course-grid');
       grid.innerHTML = '';
 
-      appData.courses.forEach((course, index) => {
+      // Ẩn hidden khi không edit, hiện mờ khi edit
+      const visible = editMode ? appData.courses : appData.courses.filter(c => !c._hidden);
+
+      visible.forEach((course, index) => {
         const { done, total } = countProgress(course);
         const pct = getCourseProgressPct(course);
         const fill = el('div', { className: 'progress-fill', style: `width:${pct}%` });
@@ -613,10 +633,11 @@
         const label = el('div', { className: 'progress-label', textContent: `${done}/${total} bài · ${pct}%` });
         const title = el('h3', { textContent: course.title });
 
-        const card = el('div', { className: 'course-card glass' });
+        const card = el('div', { className: 'course-card glass' + (course._hidden ? ' is-hidden-course' : '') });
         card.appendChild(title);
         card.appendChild(bar);
         card.appendChild(label);
+        if (course._hidden) card.appendChild(el('span', { className: 'hidden-badge', textContent: '🚫 Đang ẩn' }));
 
         if (editMode) {
           card.style.position = 'relative';
@@ -625,7 +646,7 @@
           const editBtn = document.createElement('button');
           editBtn.className = 'btn-icon';
           editBtn.textContent = '✏️';
-          editBtn.style.cssText = 'position:absolute;top:6px;right:6px;font-size:14px;';
+          editBtn.style.cssText = 'position:absolute;top:6px;right:6px;font-size:14px;z-index:1;';
           editBtn.addEventListener('click', e => { e.stopPropagation(); openCourseModal(course.id); });
           card.appendChild(editBtn);
 
@@ -646,7 +667,7 @@
             e.preventDefault();
             card.classList.remove('drag-over');
             if (_dragSrcIndex === null || _dragSrcIndex === index) { _dragSrcIndex = null; return; }
-            const arr = [...appData.courses];
+            const arr = [...visible];
             arr.splice(index, 0, arr.splice(_dragSrcIndex, 1)[0]);
             _dragSrcIndex = null;
             await saveOverrides({ ..._overrides, courseDisplayOrder: arr.map(c => c.id) });
@@ -659,13 +680,12 @@
       });
 
       if (editMode) {
-        const addCard = el('div', {
+        grid.appendChild(el('div', {
           className: 'course-card glass',
-          style: 'display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:.6;cursor:pointer;',
+          style: 'display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:.5;cursor:pointer;border:2px dashed var(--color-border);',
           textContent: '＋',
           onclick: () => openCourseModal(null)
-        });
-        grid.appendChild(addCard);
+        }));
       }
     }
 
@@ -733,7 +753,7 @@
       return ul;
     }
 
-    // ── PHASE 2: Edit Mode Functions ──
+    // ── PHASE 2: Edit Mode ──
     function toggleEditMode() {
       editMode = !editMode;
       document.body.classList.toggle('edit-mode', editMode);
@@ -751,98 +771,111 @@
 
       const isManual = !!course?._isManual;
       const patch = _overrides.patches?.[courseId] || {};
-      const autoTitle = _rawAutoData?.find(c => c.id === courseId)?.title;
 
       const modal = $('edit-modal');
       modal.innerHTML = '';
-      modal.appendChild(el('h4', { textContent: isNew ? '➕ Thêm khóa học' : '✏️ Chỉnh sửa khóa học' }));
+      modal.style.cssText = `display:flex;flex-direction:column;gap:16px;
+        position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+        z-index:1001;padding:24px;min-width:320px;max-width:440px;
+        max-height:80vh;overflow-y:auto;`;
 
-      if (isNew) {
-        modal.appendChild(el('div', { className: 'section-label', textContent: 'Tên khóa học' }));
-        const inp = Object.assign(document.createElement('input'), { type: 'text', placeholder: 'Nhập tên...' });
-        inp.style.cssText = 'width:100%;margin:4px 0 10px;';
-        modal.appendChild(inp);
-        modal.appendChild(el('button', {
-          className: 'btn btn-primary btn-sm', textContent: '➕ Tạo',
-          onclick: async () => {
-            const t = inp.value.trim();
-            if (!t) { inp.focus(); return; }
-            const newCourse = { id: `manual-${Date.now()}`, title: t, order: 99, _isManual: true, tree: [] };
-            await saveOverrides({ ..._overrides, manualCourses: [...(_overrides.manualCourses || []), newCourse] });
-            closeEditModal();
-          }
-        }));
-      } else {
-        modal.appendChild(el('div', { className: 'section-label', textContent: 'Tên hiển thị' }));
-        const inp = Object.assign(document.createElement('input'), { type: 'text', value: course.title });
-        inp.style.cssText = 'width:100%;margin:4px 0 6px;';
-        modal.appendChild(inp);
+      modal.appendChild(el('h4', {
+        textContent: isNew ? '➕ Thêm khóa học' : '✏️ Chỉnh sửa khóa học',
+        style: 'margin:0;font-size:1.1rem;'
+      }));
 
-        const btnRow = el('div', { style: 'display:flex;gap:6px;margin-bottom:12px;' });
-        btnRow.appendChild(el('button', {
-          className: 'btn btn-primary btn-sm', textContent: 'Lưu',
+      // ── Tên ──
+      const nameGroup = el('div', { style: 'display:flex;flex-direction:column;gap:6px;' });
+      nameGroup.appendChild(el('div', { className: 'section-label', textContent: isNew ? 'Tên khóa học' : 'Tên hiển thị' }));
+      const inp = Object.assign(document.createElement('input'), {
+        type: 'text',
+        placeholder: isNew ? 'Nhập tên...' : '',
+        value: isNew ? '' : course.title
+      });
+      inp.style.cssText = 'width:100%;padding:8px 12px;box-sizing:border-box;';
+      nameGroup.appendChild(inp);
+      // Nút reset tên (chỉ auto course đã patch)
+      if (!isNew && !isManual && patch.title) {
+        nameGroup.appendChild(el('button', {
+          className: 'btn btn-outline btn-sm',
+          textContent: '↩ Reset về tên gốc',
+          style: 'align-self:flex-start;margin-top:4px;',
           onclick: async () => {
-            const t = inp.value.trim();
-            if (!t) { inp.focus(); return; }
-            await patchNode(courseId, { title: t });
-            closeEditModal();
-          }
-        }));
-        if (autoTitle) {
-          const resetBtn = el('button', {
-            className: 'btn btn-outline btn-sm', textContent: '↩ Auto',
-            onclick: async () => {
-              const patches = { ..._overrides.patches };
-              if (patches[courseId]) {
-                const { title: _, ...rest } = patches[courseId];
-                if (Object.keys(rest).length) patches[courseId] = rest;
-                else delete patches[courseId];
-              }
-              await saveOverrides({ ..._overrides, patches });
-              closeEditModal();
+            const patches = { ..._overrides.patches };
+            if (patches[courseId]) {
+              const { title: _, ...rest } = patches[courseId];
+              if (Object.keys(rest).length) patches[courseId] = rest;
+              else delete patches[courseId];
             }
-          });
-          resetBtn.disabled = !patch.title;
-          btnRow.appendChild(resetBtn);
-        }
-        modal.appendChild(btnRow);
+            await saveOverrides({ ..._overrides, patches });
+            closeEditModal();
+          }
+        }));
+      }
+      modal.appendChild(nameGroup);
 
-        modal.appendChild(document.createElement('hr'));
-        const hideLabel = Object.assign(document.createElement('label'), {
-          style: 'display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer;'
-        });
+      // ── Ẩn/hiện (chỉ khi edit) ──
+      if (!isNew) {
+        const hideBox = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:var(--radius-sm);' });
+        const hideLabel = Object.assign(document.createElement('label'), { style: 'display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;font-size:.9rem;' });
         const chk = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!patch.hidden });
         hideLabel.appendChild(chk);
         hideLabel.appendChild(el('span', { textContent: 'Ẩn khóa học này' }));
-        modal.appendChild(hideLabel);
-        modal.appendChild(el('button', {
-          className: 'btn btn-outline btn-sm', textContent: 'Áp dụng ẩn/hiện',
+        hideBox.appendChild(hideLabel);
+        hideBox.appendChild(el('button', {
+          className: 'btn btn-outline btn-sm', textContent: 'Áp dụng',
           onclick: async () => { await patchNode(courseId, { hidden: chk.checked }); closeEditModal(); }
         }));
-
-        if (isManual) {
-          modal.appendChild(document.createElement('hr'));
-          modal.appendChild(el('button', {
-            className: 'btn btn-sm',
-            style: 'background:var(--color-red,#c0392b);color:#fff;',
-            textContent: '🗑️ Xóa khóa học',
-            onclick: async () => {
-              if (!confirm(`Xóa khóa "${course.title}"?`)) return;
-              await saveOverrides({
-                ..._overrides,
-                manualCourses: (_overrides.manualCourses || []).filter(c => c.id !== courseId)
-              });
-              closeEditModal();
-            }
-          }));
-        }
+        modal.appendChild(hideBox);
       }
 
-      modal.appendChild(document.createElement('hr'));
-      modal.appendChild(el('button', { className: 'btn btn-outline btn-sm', textContent: 'Đóng', onclick: closeEditModal }));
+      // ── Actions ──
+      const actions = el('div', { style: 'display:flex;align-items:center;gap:8px;' });
+
+      if (!isNew && isManual) {
+        actions.appendChild(el('button', {
+          className: 'btn btn-sm',
+          style: 'background:var(--color-red);color:#fff;',
+          textContent: '🗑️ Xóa',
+          onclick: async () => {
+            if (!confirm(`Xóa khóa "${course.title}"?`)) return;
+            await saveOverrides({
+              ..._overrides,
+              manualCourses: (_overrides.manualCourses || []).filter(c => c.id !== courseId)
+            });
+            closeEditModal();
+          }
+        }));
+      }
+
+      const rightBtns = el('div', { style: 'display:flex;gap:8px;margin-left:auto;' });
+      rightBtns.appendChild(el('button', { className: 'btn btn-outline btn-sm', textContent: 'Đóng', onclick: closeEditModal }));
+      rightBtns.appendChild(el('button', {
+        className: 'btn btn-primary btn-sm',
+        textContent: isNew ? 'Tạo' : 'Lưu lại',
+        onclick: async () => {
+          const t = inp.value.trim();
+          if (!t) { inp.focus(); return; }
+          if (isNew) {
+            const newCourse = { id: `manual-${Date.now()}`, title: t, order: 99, _isManual: true, tree: [] };
+            await saveOverrides({ ..._overrides, manualCourses: [...(_overrides.manualCourses || []), newCourse] });
+          } else if (isManual) {
+            // Sửa title trực tiếp trong manualCourses
+            const manual = (_overrides.manualCourses || []).map(c =>
+              c.id === courseId ? { ...c, title: t } : c
+            );
+            await saveOverrides({ ..._overrides, manualCourses: manual });
+          } else {
+            await patchNode(courseId, { title: t });
+          }
+          closeEditModal();
+        }
+      }));
+      actions.appendChild(rightBtns);
+      modal.appendChild(actions);
 
       $('edit-overlay').style.display = 'block';
-      modal.style.display = 'block';
+      modal.style.display = 'flex';
     }
 
     function closeEditModal() {

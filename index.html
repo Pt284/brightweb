@@ -962,7 +962,39 @@
               await patchNode(nodeId, { hidden: !node._hidden });
             };
 
-            editActions.append(editBtn, cutBtn, copyBtn, hideBtn);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-icon';
+            deleteBtn.title = 'Xóa';
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.style.cssText = btnStyle;
+            deleteBtn.onclick = async (e) => {
+              e.stopPropagation();
+              if (!confirm('Xóa mục này?')) return;
+              if (node._isManual) {
+                const manualNodes = (_overrides.manualNodes || []).filter(n => n.id !== nodeId);
+                await saveOverrides({ ..._overrides, manualNodes });
+              } else {
+                await patchNode(nodeId, { hidden: true });
+              }
+            };
+
+            const resetTitleBtn = document.createElement('button');
+            resetTitleBtn.className = 'btn-icon';
+            resetTitleBtn.title = 'Reset tên gốc';
+            resetTitleBtn.textContent = '↺';
+            resetTitleBtn.style.cssText = btnStyle;
+            const hasCustomTitle = !node._isManual && !!_overrides.patches?.[nodeId]?.title;
+            if (!hasCustomTitle) {
+              resetTitleBtn.style.opacity = '0.3';
+              resetTitleBtn.style.cursor = 'not-allowed';
+            }
+            resetTitleBtn.onclick = async (e) => {
+              e.stopPropagation();
+              if (!hasCustomTitle) return;
+              await resetNodeTitle(nodeId);
+            };
+
+            editActions.append(editBtn, cutBtn, copyBtn, hideBtn, deleteBtn, resetTitleBtn);
             label.appendChild(editActions);
           } else {
             const pct = getLessonProgressPct(node.id);
@@ -1030,15 +1062,18 @@
 
             const editActions = document.createElement('div');
             editActions.className = 'tree-edit-actions';
-            editActions.style.cssText = 'display: grid; grid-template-columns: repeat(3, auto); gap: 3px; flex-shrink: 0; align-self: center;';
+            editActions.style.cssText = 'display: grid; grid-template-columns: repeat(4, auto); gap: 3px; flex-shrink: 0; align-self: center;';
 
             const flattenBtn = document.createElement('button');
             flattenBtn.className = 'btn-icon';
             flattenBtn.title = 'Làm phẳng';
             flattenBtn.textContent = '⚡';
             flattenBtn.style.cssText = btnStyle;
+            flattenBtn.disabled = !node.children?.length;
+            if (!node.children?.length) flattenBtn.style.opacity = '0.3';
             flattenBtn.onclick = async (e) => {
               e.stopPropagation();
+              if (flattenBtn.disabled) return;
               await patchNode(nodeId, { flattenChildren: true });
             };
 
@@ -1098,8 +1133,44 @@
               await patchNode(nodeId, { hidden: !node._hidden });
             };
 
-            if (node.children && node.children.length > 0) editActions.appendChild(flattenBtn);
-            editActions.append(editBtn, cutBtn, copyBtn, pasteBtn, hideBtn);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-icon';
+            deleteBtn.title = 'Xóa';
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.style.cssText = btnStyle;
+            deleteBtn.onclick = async (e) => {
+              e.stopPropagation();
+              const hasChildren = !!(node.children?.length);
+              if (hasChildren) {
+                openChapterModal(courseId, nodeId, parentId, node);
+              } else {
+                if (!confirm('Xóa mục này?')) return;
+                if (node._isManual) {
+                  const manualNodes = (_overrides.manualNodes || []).filter(n => n.id !== nodeId);
+                  await saveOverrides({ ..._overrides, manualNodes });
+                } else {
+                  await patchNode(nodeId, { hidden: true });
+                }
+              }
+            };
+
+            const resetTitleBtn = document.createElement('button');
+            resetTitleBtn.className = 'btn-icon';
+            resetTitleBtn.title = 'Reset tên gốc';
+            resetTitleBtn.textContent = '↺';
+            resetTitleBtn.style.cssText = btnStyle;
+            const hasCustomTitle = !node._isManual && !!_overrides.patches?.[nodeId]?.title;
+            if (!hasCustomTitle) {
+              resetTitleBtn.style.opacity = '0.3';
+              resetTitleBtn.style.cursor = 'not-allowed';
+            }
+            resetTitleBtn.onclick = async (e) => {
+              e.stopPropagation();
+              if (!hasCustomTitle) return;
+              await resetNodeTitle(nodeId);
+            };
+
+            editActions.append(flattenBtn, editBtn, cutBtn, copyBtn, pasteBtn, hideBtn, deleteBtn, resetTitleBtn);
             label.appendChild(editActions);
           } else {
             const icon = document.createElement('span'); icon.className = 'icon toggle-icon'; icon.textContent = isOpen ? '▼' : '▶';
@@ -1238,6 +1309,16 @@
       document.querySelectorAll('.is-cut').forEach(el => el.classList.remove('is-cut'));
       updateRealtimeProgressUI();
     }
+    async function resetNodeTitle(nodeId) {
+      const patches = { ..._overrides.patches };
+      if (patches[nodeId]) {
+        const { title: _, ...rest } = patches[nodeId];
+        if (Object.keys(rest).length) patches[nodeId] = rest;
+        else delete patches[nodeId];
+      }
+      await saveOverrides({ ..._overrides, patches });
+    }
+
     function openChapterModal(courseId, nodeId, parentId, nodeProps = {}) {
       const isNew = !nodeId;
       const isLesson = nodeProps?.type === 'lesson';
@@ -1427,13 +1508,32 @@
 
     function toggleEditMode() {
       editMode = !editMode;
+      if (!editMode) _selectedNodes.clear();
       document.body.classList.toggle('edit-mode', editMode);
       $('btn-edit').textContent = editMode ? '✅' : '✏️';
       $('btn-edit').title = editMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa';
       const active = document.querySelector('.page.active')?.id;
       if (active === 'page-home') renderHome();
       else if (active === 'page-course' && currentCourseId) renderCourse(currentCourseId);
-      else if (active === 'page-lesson' && currentCourseId && currentLessonId) renderLesson(currentCourseId, currentLessonId);
+      else if (active === 'page-lesson' && currentCourseId) {
+        _updateLessonSidebar();
+      }
+    }
+
+    function _updateLessonSidebar() {
+      if (!currentCourseId) return;
+      const course = appData.courses?.find(c => c.id === currentCourseId);
+      if (!course) return;
+      const pct = getCourseProgressPct(course);
+      const sidebarEl = $('sidebar-lesson-tree');
+      if (sidebarEl) {
+        sidebarEl.innerHTML = '';
+        sidebarEl.appendChild(
+          buildTree(course.tree, currentCourseId, 0, currentLessonId, currentCourseId)
+        );
+      }
+      const titleEl = $('sidebar-lesson-title');
+      if (titleEl) titleEl.textContent = `${course.title} - ${pct}%`;
     }
 
     function openCourseModal(courseId) {

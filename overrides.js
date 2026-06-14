@@ -190,8 +190,8 @@ function _recomputeMerged() {
     renderHome();
   } else if (activePage === 'page-course' && currentCourseId && typeof renderCourse === 'function') {
     renderCourse(currentCourseId);
-  } else if (activePage === 'page-lesson' && currentCourseId && typeof renderLesson === 'function') {
-    renderLesson(currentCourseId, currentLessonId);
+  } else if (activePage === 'page-lesson' && currentCourseId && typeof _updateLessonSidebar === 'function') {
+    _updateLessonSidebar();
   }
 }
 

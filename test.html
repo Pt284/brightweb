@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Tree Node Edit Mode</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="glass.css">
+  <link rel="stylesheet" href="color-settings.css">
+  <style>
+    body {
+      padding: 40px;
+      background: hsl(213, 78%, 4%);
+      color: #fff;
+    }
+    .container {
+      max-width: 320px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Giao diện Chỉnh sửa Khóa học (Mẫu và Thực tế)</h2>
+  <div class="container glass" style="padding: 16px; border-radius: 8px;">
+    
+    <!-- Rendered using the updated JS code -->
+    <div class="tree-list" data-parent-id="root">
+      
+      <!-- Chapter Node -->
+      <div class="tree-node" data-node-id="chap-1">
+        <div class="tree-label" style="padding-left: 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; position: relative;">
+          <div style="display: flex; align-items: center; gap: 6px; flex: 1 1 0%; min-width: 0;">
+            <span class="icon toggle-icon">▼</span>
+            <span style="font-weight: bold;">Tháng 2-2026</span>
+          </div>
+          
+          <div class="tree-edit-actions" style="display: grid; grid-template-columns: repeat(2, 12px); gap: 2px; flex-shrink: 0; align-self: flex-start;">
+            <button class="btn-icon" title="Làm phẳng" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">⚡</button>
+            <button class="btn-icon" title="Sửa" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✏️</button>
+            <button class="btn-icon" title="Cắt" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✂️</button>
+            <button class="btn-icon" title="Sao chép" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">📋</button>
+          </div>
+        </div>
+
+        <div class="tree-children open">
+          <div class="tree-list" data-parent-id="chap-1">
+            
+            <!-- Lesson Node 1 -->
+            <div class="tree-node" data-node-id="lesson-1">
+              <div class="tree-label active-lesson" style="padding-left: 28px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; position: relative;">
+                <div style="display: flex; align-items: flex-start; gap: 6px; flex: 1 1 0%; min-width: 0; padding-top: 2px;">
+                  <span class="icon" style="flex-shrink: 0;">📄</span>
+                  <span style="font-size: 0.95rem; line-height: 1.4; word-break: break-word;">Các dạng toán về giới hạn thường xuất hiện trong các đề thi - Xử đẹp giới hạn vô định 0-0</span>
+                </div>
+                
+                <div class="tree-edit-actions" style="display: grid; grid-template-columns: repeat(2, 12px); gap: 2px; flex-shrink: 0; align-self: flex-start;">
+                  <button class="btn-icon" title="Sửa" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✏️</button>
+                  <button class="btn-icon" title="Cắt" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✂️</button>
+                  <button class="btn-icon" title="Sao chép" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">📋</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lesson Node 2 -->
+            <div class="tree-node" data-node-id="lesson-2">
+              <div class="tree-label" style="padding-left: 28px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; position: relative;">
+                <div style="display: flex; align-items: flex-start; gap: 6px; flex: 1 1 0%; min-width: 0; padding-top: 2px;">
+                  <span class="icon" style="flex-shrink: 0;">📄</span>
+                  <span style="font-size: 0.95rem; line-height: 1.4; word-break: break-word;">Kĩ năng đọc hiểu thiết yếu trong bài thi môn Toán_Nguyễn Thanh Tùng</span>
+                </div>
+                
+                <div class="tree-edit-actions" style="display: grid; grid-template-columns: repeat(2, 12px); gap: 2px; flex-shrink: 0; align-self: flex-start;">
+                  <button class="btn-icon" title="Sửa" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✏️</button>
+                  <button class="btn-icon" title="Cắt" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✂️</button>
+                  <button class="btn-icon" title="Sao chép" style="width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">📋</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</body>
+</html>

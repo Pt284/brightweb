@@ -108,16 +108,17 @@ function reorderByIds(items, orderedIds) {
   ];
 }
 
-function applyPatch(node, patches, flattenAll) {
+function applyPatch(node, patches, flattenAll, includeHidden = false) {
   const p = patches[node.id] || {};
   const out = { ...node };
   if (p.title !== undefined) out.title = p.title;
   if (p.youtubeId !== undefined) out.youtubeId = p.youtubeId;
+  if (p.hidden && includeHidden) out._hidden = true;
   if (p.extraDocs?.length) out.documents = [...(out.documents || []), ...p.extraDocs.map((d, i) => ({ ...d, _isExtra: true, _extraIndex: i }))];
   if (out.children) {
     let ch = out.children
-      .filter(c => !patches[c.id]?.hidden)
-      .map(c => applyPatch(c, patches, flattenAll));
+      .filter(c => includeHidden || !patches[c.id]?.hidden)
+      .map(c => applyPatch(c, patches, flattenAll, includeHidden));
     if (p.childOrder?.length) ch = reorderByIds(ch, p.childOrder);
     if (flattenAll || p.flattenChildren) ch = enforceMaxDepth(ch);
     out.children = ch;
@@ -125,7 +126,7 @@ function applyPatch(node, patches, flattenAll) {
   return out;
 }
 
-function getMergedCourses(rawCourses, overrides) {
+function getMergedCourses(rawCourses, overrides, includeHidden = false) {
   if (!rawCourses) return [];
   if (!overrides) return rawCourses;
   const { patches = {}, flattenAll = false, courseDisplayOrder = [], manualCourses = [], manualNodes = [], reparent = {} } = overrides;
@@ -195,8 +196,8 @@ function getMergedCourses(rawCourses, overrides) {
     if (cp.hidden) out._hidden = true;
     if (out.tree) {
       let tree = out.tree
-        .filter(n => !patches[n.id]?.hidden)
-        .map(n => applyPatch(n, patches, flattenAll));
+        .filter(n => includeHidden || !patches[n.id]?.hidden)
+        .map(n => applyPatch(n, patches, flattenAll, includeHidden));
       if (cp.childOrder?.length) tree = reorderByIds(tree, cp.childOrder);
       if (flattenAll) tree = enforceMaxDepth(tree);
       out.tree = tree;
@@ -207,6 +208,25 @@ function getMergedCourses(rawCourses, overrides) {
   return reorderByIds(courses, courseDisplayOrder);
 }
 
+// Add a helper to get youtubeId from a lesson in appData.courses
+function _getLessonYoutubeId(courseId, lessonId) {
+  if (!appData || !appData.courses) return null;
+  const course = appData.courses.find(c => c.id === courseId);
+  if (!course) return null;
+  function findInTree(tree) {
+    if (!tree) return null;
+    for (const node of tree) {
+      if (node.id === lessonId && node.type === 'lesson') return node.youtubeId || null;
+      if (node.children || node.tree) {
+        const found = findInTree(node.children || node.tree);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return findInTree(course.tree);
+}
+
 function _recomputeMerged() {
   if (!_rawAutoData || !appData) return;
   const btnFlattenAll = document.getElementById('btn-flatten-all');
@@ -215,14 +235,28 @@ function _recomputeMerged() {
     btnFlattenAll.style.display = _overrides.flattenAll ? 'none' : '';
     btnUnflatten.style.display = _overrides.flattenAll ? '' : 'none';
   }
-  appData.courses = getMergedCourses(_rawAutoData, _overrides);
+  
+  const isEditMode = typeof editMode !== 'undefined' ? editMode : false;
+  
+  let oldYoutubeId = null;
   const activePage = document.querySelector('.page.active')?.id;
+  if (activePage === 'page-lesson' && typeof currentLessonId !== 'undefined' && typeof currentCourseId !== 'undefined') {
+     oldYoutubeId = _getLessonYoutubeId(currentCourseId, currentLessonId);
+  }
+
+  appData.courses = getMergedCourses(_rawAutoData, _overrides, isEditMode);
+  
   if (activePage === 'page-home' && typeof renderHome === 'function') {
     renderHome();
-  } else if (activePage === 'page-course' && currentCourseId && typeof renderCourse === 'function') {
+  } else if (activePage === 'page-course' && typeof currentCourseId !== 'undefined' && typeof renderCourse === 'function') {
     renderCourse(currentCourseId);
-  } else if (activePage === 'page-lesson' && currentCourseId && typeof _updateLessonSidebar === 'function') {
-    _updateLessonSidebar();
+  } else if (activePage === 'page-lesson' && typeof currentCourseId !== 'undefined' && typeof currentLessonId !== 'undefined') {
+    const newYoutubeId = _getLessonYoutubeId(currentCourseId, currentLessonId);
+    if (newYoutubeId !== oldYoutubeId && typeof renderLesson === 'function') {
+      renderLesson(currentCourseId, currentLessonId);
+    } else if (typeof _updateLessonSidebar === 'function') {
+      _updateLessonSidebar();
+    }
   }
 }
 

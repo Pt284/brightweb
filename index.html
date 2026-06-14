@@ -137,6 +137,7 @@
     .tree-node.dragging { opacity: 0.5; }
     .tree-node.drag-over-tree { border-top: 2px dashed var(--color-accent); margin-top:-2px; }
     .tree-node.is-cut > .tree-label { opacity: 0.35; border: 1px dashed var(--color-accent) !important; padding: 4px; border-radius: 6px; }
+    .tree-node.is-hidden > .tree-label { opacity: 0.45; filter: grayscale(80%); }
 
     .course-card.is-hidden-course {
       opacity: .4;
@@ -177,6 +178,7 @@
       <button id="btn-admin" class="btn-icon" title="Admin" style="display:none" onclick="toggleAdmin()">⚙️</button>
       <button id="btn-undo" class="btn-icon" title="Hoàn tác (Ctrl+Z)" style="display:none" onclick="doUndo()">↩</button>
       <button id="btn-redo" class="btn-icon" title="Làm lại" style="display:none" onclick="doRedo()">↪</button>
+      <button id="btn-reset-courses" class="btn-icon" title="Reset tất cả khóa học (Home)" style="display:none; color: var(--color-red);" onclick="resetAllCourses()">🔄</button>
       <button id="btn-edit" class="btn-icon" title="Chỉnh sửa" style="display:none"
         onclick="toggleEditMode()">✏️</button>
       <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
@@ -189,6 +191,8 @@
     <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
     <button class="btn btn-outline btn-sm" onclick="window.open('admin-check.html', '_blank')">🔍 Check Video</button>
     <button class="btn btn-outline btn-sm" onclick="downloadBackup()">⬇ Tải backup</button>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('backup-file-input').click()">⬆ Tải lên backup</button>
+    <input type="file" id="backup-file-input" style="display:none" accept=".json" onchange="loadBackupFromFile(event)">
     <div style="margin-top:12px; border-top:1px solid var(--color-border); padding-top:12px;">
       <div class="section-label">Cấu trúc khóa học</div>
       <button class="btn btn-outline btn-sm" id="btn-flatten-all" onclick="previewFlattenAll()">
@@ -559,14 +563,14 @@
       try { return JSON.parse(localStorage.getItem(`prog_${currentUser.uid}_${lessonId}`)); } catch (e) { return null; }
     }
 
-    function saveLocalProgress(lessonId, watchedTime, duration) {
+    function saveLocalProgress(lessonId, watchedTime, duration, ytId) {
       if (!currentUser) return;
       try {
         const old = getLocalProgress(lessonId) || {};
         const oldMax = old.watchedTime || 0;
         if (watchedTime - oldMax > 600) return;
         const maxTime = Math.max(oldMax, watchedTime);
-        const p = { ...old, watchedTime: maxTime, duration, updatedAt: Date.now() };
+        const p = { ...old, watchedTime: maxTime, duration, ytId, updatedAt: Date.now() };
         localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p));
         scheduleFirestoreSync(lessonId, currentCourseId, 30000);
       } catch (e) { }
@@ -591,11 +595,16 @@
     // ── TREE HELPERS ──
     const findCourse = id => appData.courses.find(c => c.id === id);
     function getAllLessons(node) {
+      if (node._hidden) return [];
       if (node.type === 'lesson') return [node];
       return (node.children || []).flatMap(getAllLessons);
     }
+    function getAllLessonsIncHidden(node) {
+      if (node.type === 'lesson') return [node];
+      return (node.children || []).flatMap(getAllLessonsIncHidden);
+    }
     function findLesson(course, lid) {
-      return course.tree.flatMap(getAllLessons).find(l => l.id === lid);
+      return course.tree.flatMap(getAllLessonsIncHidden).find(l => l.id === lid);
     }
     function countProgress(course) {
       const all = course.tree.flatMap(getAllLessons);
@@ -645,6 +654,9 @@
       showPage('home');
       const grid = $('course-grid');
       grid.innerHTML = '';
+      
+      const btnResetCourses = $('btn-reset-courses');
+      if (btnResetCourses) btnResetCourses.style.display = editMode ? '' : 'none';
 
       // Ẩn hidden khi không edit, hiện mờ khi edit
       const visible = editMode ? appData.courses : appData.courses.filter(c => !c._hidden);
@@ -1063,8 +1075,21 @@
             cb.checked = _selectedNodes.has(nodeId);
             cb.onclick = (e) => e.stopPropagation();
             cb.onchange = (e) => {
-              if (cb.checked) _selectedNodes.set(nodeId, { node, parentId });
-              else _selectedNodes.delete(nodeId);
+              if (cb.checked) {
+                _selectedNodes.set(nodeId, { node, parentId });
+                function checkAll(n, pId) {
+                  if (n.id) _selectedNodes.set(n.id, { node: n, parentId: pId });
+                  if (n.children) n.children.forEach(c => checkAll(c, n.id));
+                }
+                if (node.children) node.children.forEach(c => checkAll(c, nodeId));
+              } else {
+                _selectedNodes.delete(nodeId);
+                function uncheckAll(n) {
+                  if (n.id) _selectedNodes.delete(n.id);
+                  if (n.children) n.children.forEach(uncheckAll);
+                }
+                if (node.children) node.children.forEach(uncheckAll);
+              }
               updateRealtimeProgressUI();
             };
             wrapLeft.appendChild(cb);
@@ -1273,9 +1298,15 @@
           await patchNode(courseId, { childOrder: [] });
         };
         
+        const resetCourseBtn = document.createElement('button');
+        resetCourseBtn.className = 'btn btn-outline btn-sm';
+        resetCourseBtn.textContent = '🔄 Reset khóa học';
+        resetCourseBtn.style.cssText = 'flex: 1 1 0%; margin: 0; color: var(--color-red); border-color: var(--color-red);';
+        resetCourseBtn.onclick = () => resetCurrentCourse(courseId);
+        
         btnRow.appendChild(addBtn);
-        const clipboardHasChapter = _clipboard && _clipboard.nodes && _clipboard.nodes.some(n => n.node.type === 'chapter');
-        if (clipboardHasChapter) {
+        const clipboardHasItems = _clipboard && _clipboard.nodes && _clipboard.nodes.length > 0;
+        if (clipboardHasItems) {
           const pasteRootBtn = document.createElement('button');
           pasteRootBtn.className = 'btn btn-outline btn-sm';
           pasteRootBtn.textContent = '📌 Dán vào đây';
@@ -1284,6 +1315,7 @@
           btnRow.appendChild(pasteRootBtn);
         }
         btnRow.appendChild(resetBtn);
+        btnRow.appendChild(resetCourseBtn);
         
         ul.appendChild(btnRow);
       }
@@ -1295,20 +1327,10 @@
       if (!_clipboard || !_clipboard.nodes || _clipboard.nodes.length === 0) return;
       
       const destIsCourse = destParentId === courseId;
-      
-      for (const { node } of _clipboard.nodes) {
-        const nodeIsChapter = node.type === 'chapter';
-        if (nodeIsChapter && !destIsCourse) {
-          alert('❌ Chỉ có thể dán chương vào khóa học, không thể dán vào chương khác.');
-          return;
-        }
-        if (!nodeIsChapter && destIsCourse) {
-          alert('❌ Chỉ có thể dán bài học vào chương, không thể dán trực tiếp vào khóa học.');
-          return;
-        }
-      }
-
       const { action, nodes } = _clipboard;
+      
+      _clipboard = null;
+      document.querySelectorAll('.is-cut').forEach(el => el.classList.remove('is-cut'));
       
       let manualNodes = [...(_overrides.manualNodes || [])];
       let reparent = { ..._overrides.reparent };
@@ -1316,26 +1338,38 @@
 
       for (const item of nodes) {
         const { node, parentId: srcParentId } = item;
+        const nodeIsChapter = node.type === 'chapter';
         
+        if (nodeIsChapter && !destIsCourse) continue;
+        
+        let targetParentId = destParentId;
+        if (!nodeIsChapter && destIsCourse) {
+            const courseIds = appData.courses.map(c => c.id);
+            if (courseIds.includes(srcParentId)) {
+                targetParentId = destParentId;
+            } else {
+                continue;
+            }
+        }
+
         if (action === 'cut') {
-          if (srcParentId === destParentId) continue;
+          if (srcParentId === targetParentId) continue;
           if (node._isManual) {
             const idx = manualNodes.findIndex(n => n.id === node.id);
             if (idx >= 0) {
-              manualNodes[idx].parentId = destParentId;
+              manualNodes[idx].parentId = targetParentId;
               changed = true;
             }
           } else {
-            reparent[node.id] = destParentId;
+            reparent[node.id] = targetParentId;
             changed = true;
           }
         } else if (action === 'copy') {
           const newNode = JSON.parse(JSON.stringify(node));
-          newNode.id = `manual-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+          if (typeof assignNewIds === 'function') assignNewIds(newNode);
+          else newNode.id = `manual-${Date.now()}-${Math.floor(Math.random()*1000)}`;
           newNode._isManual = true;
-          newNode.parentId = destParentId;
-          if (newNode.children) newNode.children = [];
-          if (newNode.tree) newNode.tree = [];
+          newNode.parentId = targetParentId;
           manualNodes.push(newNode);
           changed = true;
         }
@@ -1343,10 +1377,9 @@
 
       if (changed) {
         await saveOverrides({ ..._overrides, manualNodes, reparent });
+      } else {
+        updateRealtimeProgressUI();
       }
-      _clipboard = null;
-      document.querySelectorAll('.is-cut').forEach(el => el.classList.remove('is-cut'));
-      updateRealtimeProgressUI();
     }
     async function resetNodeTitle(nodeId) {
       const patches = { ..._overrides.patches };
@@ -1531,7 +1564,10 @@
             const t = inp.value.trim();
             if (!t) { inp.focus(); return; }
             const newNode = { id: `manual-${Date.now()}`, title: t, type: isLesson ? 'lesson' : 'chapter', parentId, _isManual: true };
-            if (!isLesson) newNode.children = [];
+            if (!isLesson) {
+              newNode.children = [];
+              _openTreeNodes.add(newNode.id);
+            }
             await saveOverrides({ ..._overrides, manualNodes: [...(_overrides.manualNodes || []), newNode] });
             closeEditModal();
           }
@@ -1560,13 +1596,24 @@
 
     function toggleEditMode() {
       editMode = !editMode;
-      if (!editMode) _selectedNodes.clear();
+      if (!editMode) {
+        _selectedNodes.clear();
+        _clipboard = null;
+        document.querySelectorAll('.is-cut').forEach(el => el.classList.remove('is-cut'));
+      }
       document.body.classList.toggle('edit-mode', editMode);
       $('btn-edit').textContent = editMode ? '✅' : '✏️';
       $('btn-edit').title = editMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa';
       $('btn-undo').style.display = editMode ? '' : 'none';
       $('btn-redo').style.display = editMode ? '' : 'none';
+      
+      const btnResetCourses = $('btn-reset-courses');
+      if (btnResetCourses) btnResetCourses.style.display = editMode && document.querySelector('.page.active')?.id === 'page-home' ? '' : 'none';
+      
       refreshUndoRedoState();
+      
+      if (typeof _recomputeMerged === 'function') _recomputeMerged();
+      
       const active = document.querySelector('.page.active')?.id;
       if (active === 'page-home') renderHome();
       else if (active === 'page-course' && currentCourseId) renderCourse(currentCourseId);
@@ -1748,6 +1795,10 @@
     function renderCourse(courseId) {
       currentCourseId = courseId; showPage('course');
       const course = findCourse(courseId); if (!course) { navigate('home'); return; }
+      
+      const btnResetCourses = $('btn-reset-courses');
+      if (btnResetCourses) btnResetCourses.style.display = 'none';
+
       $('sidebar-title').textContent = `${course.title} - ${getCourseProgressPct(course)}%`;
       $('sidebar-tree').innerHTML = '';
       $('sidebar-tree').appendChild(buildTree(course.tree, courseId, 0, null, courseId));
@@ -1757,6 +1808,10 @@
     function renderLesson(courseId, lessonId) {
       currentCourseId = courseId; currentLessonId = lessonId; showPage('lesson');
       const course = findCourse(courseId); if (!course) { navigate('home'); return; }
+      
+      const btnResetCourses = $('btn-reset-courses');
+      if (btnResetCourses) btnResetCourses.style.display = 'none';
+
       $('sidebar-lesson-title').textContent = `${course.title} - ${getCourseProgressPct(course)}%`;
       $('sidebar-lesson-tree').innerHTML = '';
       $('sidebar-lesson-tree').appendChild(buildTree(course.tree, courseId, 0, lessonId, courseId));
@@ -1835,8 +1890,10 @@
           }
           const saved = getLocalProgress(currentLessonId);
           if (saved && saved.watchedTime > 0 && !hasAutoSeeked) {
-            hasAutoSeeked = true;
-            try { plyrInstance.currentTime = saved.watchedTime; } catch (e) { }
+            if (!saved.ytId || saved.ytId === lesson.youtubeId) {
+              hasAutoSeeked = true;
+              try { plyrInstance.currentTime = saved.watchedTime; } catch (e) { }
+            }
           }
         });
 
@@ -1847,7 +1904,7 @@
           const d = plyrInstance.duration;
           if (Math.abs(t - lastSavedTime) >= 5) {
             lastSavedTime = t;
-            saveLocalProgress(currentLessonId, t, d);
+            saveLocalProgress(currentLessonId, t, d, lesson.youtubeId);
             updateRealtimeProgressUI();
           }
         });
@@ -2334,6 +2391,135 @@
     });
 
     window.addEventListener('hashchange', handleHash);
+
+    // ── Phase 2: Additions ──
+    function assignNewIds(node) {
+      node.id = `manual-${Date.now()}-${Math.floor(Math.random()*100000)}`;
+      if (node.children) {
+        node.children.forEach(assignNewIds);
+      }
+      if (node.tree) {
+        node.tree.forEach(assignNewIds);
+      }
+    }
+
+    async function resetAllCourses() {
+      if (!confirm("⚠️ Nguy hiểm: Khôi phục tất cả khóa học về trạng thái gốc!\n\n- Thứ tự khóa học sẽ bị reset.\n- Các khóa bị ẩn sẽ hiện lại.\n- Khóa đổi tên sẽ về tên gốc.\n- Các khóa bạn TỰ THÊM sẽ bị ẩn và đẩy xuống cuối.\n\nBạn có chắc chắn?")) return;
+      
+      const patches = { ..._overrides.patches };
+      const rawCourseIds = _rawAutoData.map(c => c.id);
+      
+      for (const id of rawCourseIds) {
+        if (patches[id]) {
+          delete patches[id].hidden;
+          delete patches[id].title;
+          if (Object.keys(patches[id]).length === 0) {
+            delete patches[id];
+          }
+        }
+      }
+      
+      const manualCourses = [...(_overrides.manualCourses || [])];
+      manualCourses.forEach(c => {
+        c._hidden = true;
+      });
+      
+      await saveOverrides({
+        ..._overrides,
+        courseDisplayOrder: [],
+        patches,
+        manualCourses
+      });
+    }
+
+    async function resetCurrentCourse(courseId) {
+      if (!confirm("⚠️ Nguy hiểm: Khôi phục khóa học này về gốc!\n\n- Tên chương, cấu trúc sẽ về nguyên bản.\n- Các mục bị sửa/thêm thủ công sẽ được gom lại dưới cùng khóa học (với tên 'modified_...').\n\nBạn có tiếp tục?")) return;
+      
+      const course = appData.courses.find(c => c.id === courseId);
+      if (!course) return;
+
+      const patches = { ..._overrides.patches };
+      let manualNodes = [...(_overrides.manualNodes || [])];
+      let reparent = { ..._overrides.reparent };
+      
+      const courseNodeIds = new Set();
+      function collectIds(node) {
+        courseNodeIds.add(node.id);
+        if (node.children) node.children.forEach(collectIds);
+        if (node.tree) node.tree.forEach(collectIds);
+      }
+      
+      const rawCourse = _rawAutoData.find(c => c.id === courseId);
+      if (rawCourse) {
+        rawCourse.tree.forEach(collectIds);
+      }
+      
+      const backups = [];
+      
+      if (rawCourse) {
+        rawCourse.tree.forEach(chapter => {
+          const p = patches[chapter.id];
+          if (p && (p.title !== undefined || p.childOrder || p.flattenChildren)) {
+            const mergedChapter = course.tree.find(c => c.id === chapter.id);
+            if (mergedChapter && !mergedChapter._hidden) {
+              const backup = JSON.parse(JSON.stringify(mergedChapter));
+              assignNewIds(backup);
+              backup.title = "modified_" + (backup.title || chapter.title);
+              backup._isManual = true;
+              backup.parentId = courseId;
+              backups.push(backup);
+            }
+          }
+        });
+      }
+      
+      const isManualTopInCourse = n => n.parentId === courseId && n._isManual;
+      const isManualNestedInRawChapter = n => courseNodeIds.has(n.parentId) && n._isManual;
+      
+      manualNodes = manualNodes.filter(n => {
+        if (isManualTopInCourse(n)) {
+          const backup = JSON.parse(JSON.stringify(n));
+          assignNewIds(backup);
+          backup.title = "modified_" + backup.title;
+          backup.parentId = courseId;
+          backups.push(backup);
+          return false;
+        }
+        if (isManualNestedInRawChapter(n)) return false;
+        return true;
+      });
+      
+      courseNodeIds.forEach(id => {
+        delete patches[id];
+        delete reparent[id];
+      });
+      
+      manualNodes.push(...backups);
+      
+      await saveOverrides({ ..._overrides, patches, manualNodes, reparent });
+    }
+
+    function loadBackupFromFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.overrides) {
+            if (!confirm("Tải lên bản backup sẽ ghi đè toàn bộ dữ liệu hiện tại. Bạn có chắc chắn?")) return;
+            await saveOverrides(data.overrides);
+            alert("✅ Tải backup thành công!");
+          } else {
+            alert("❌ File không hợp lệ");
+          }
+        } catch (err) {
+          alert("❌ Lỗi đọc file JSON: " + err.message);
+        }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    }
 
     // ── MOCK DATA ──
     function getMockData() {

@@ -45,16 +45,41 @@ async function resetNodePatch(nodeId) {
   await saveOverrides({ ..._overrides, patches });
 }
 
-// ── UNDO ──
+// ── UNDO / REDO ──
+const _redoStack = [];
+
 function pushUndo() {
   _undoStack.push(JSON.parse(JSON.stringify(_overrides)));
   if (_undoStack.length > MAX_UNDO) _undoStack.shift();
+  _redoStack.length = 0; // clear redo on new action
+  refreshUndoRedoState();
 }
-async function undoOverride() {
+
+async function doUndo() {
   if (!_undoStack.length) return false;
+  _redoStack.push(JSON.parse(JSON.stringify(_overrides)));
   await saveOverrides(_undoStack.pop(), true);
+  refreshUndoRedoState();
   return true;
 }
+
+async function doRedo() {
+  if (!_redoStack.length) return false;
+  _undoStack.push(JSON.parse(JSON.stringify(_overrides)));
+  await saveOverrides(_redoStack.pop(), true);
+  refreshUndoRedoState();
+  return true;
+}
+
+function refreshUndoRedoState() {
+  const u = document.getElementById('btn-undo');
+  const r = document.getElementById('btn-redo');
+  if (u) u.disabled = !_undoStack.length;
+  if (r) r.disabled = !_redoStack.length;
+}
+
+// backward compat
+async function undoOverride() { return doUndo(); }
 const canUndo = () => _undoStack.length > 0;
 
 // ── FLATTEN ──
@@ -88,7 +113,7 @@ function applyPatch(node, patches, flattenAll) {
   const out = { ...node };
   if (p.title !== undefined) out.title = p.title;
   if (p.youtubeId !== undefined) out.youtubeId = p.youtubeId;
-  if (p.extraDocs?.length) out.documents = [...(out.documents || []), ...p.extraDocs];
+  if (p.extraDocs?.length) out.documents = [...(out.documents || []), ...p.extraDocs.map((d, i) => ({ ...d, _isExtra: true, _extraIndex: i }))];
   if (out.children) {
     let ch = out.children
       .filter(c => !patches[c.id]?.hidden)
@@ -184,6 +209,12 @@ function getMergedCourses(rawCourses, overrides) {
 
 function _recomputeMerged() {
   if (!_rawAutoData || !appData) return;
+  const btnFlattenAll = document.getElementById('btn-flatten-all');
+  const btnUnflatten = document.getElementById('btn-unflatten');
+  if (btnFlattenAll && btnUnflatten) {
+    btnFlattenAll.style.display = _overrides.flattenAll ? 'none' : '';
+    btnUnflatten.style.display = _overrides.flattenAll ? '' : 'none';
+  }
   appData.courses = getMergedCourses(_rawAutoData, _overrides);
   const activePage = document.querySelector('.page.active')?.id;
   if (activePage === 'page-home' && typeof renderHome === 'function') {

@@ -175,6 +175,8 @@
     <div class="header-right">
       <span id="user-info"></span>
       <button id="btn-admin" class="btn-icon" title="Admin" style="display:none" onclick="toggleAdmin()">⚙️</button>
+      <button id="btn-undo" class="btn-icon" title="Hoàn tác (Ctrl+Z)" style="display:none" onclick="doUndo()">↩</button>
+      <button id="btn-redo" class="btn-icon" title="Làm lại" style="display:none" onclick="doRedo()">↪</button>
       <button id="btn-edit" class="btn-icon" title="Chỉnh sửa" style="display:none"
         onclick="toggleEditMode()">✏️</button>
       <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
@@ -187,6 +189,16 @@
     <button class="btn btn-primary btn-sm" onclick="triggerSync(event)">🔄 Sync ngay</button>
     <button class="btn btn-outline btn-sm" onclick="window.open('admin-check.html', '_blank')">🔍 Check Video</button>
     <button class="btn btn-outline btn-sm" onclick="downloadBackup()">⬇ Tải backup</button>
+    <div style="margin-top:12px; border-top:1px solid var(--color-border); padding-top:12px;">
+      <div class="section-label">Cấu trúc khóa học</div>
+      <button class="btn btn-outline btn-sm" id="btn-flatten-all" onclick="previewFlattenAll()">
+        ⚡ Làm phẳng toàn bộ
+      </button>
+      <button class="btn btn-outline btn-sm" id="btn-unflatten"
+        style="display:none" onclick="disableFlattenAll()">
+        ↩ Hoàn tác làm phẳng
+      </button>
+    </div>
     <hr>
     <div class="section-label">Whitelist</div>
     <div class="admin-row">
@@ -246,6 +258,7 @@
         <h3>Tài liệu</h3>
         <div class="doc-list" id="doc-list"></div>
       </div>
+      <div id="lesson-edit-panel" style="display:none; flex-direction:column; gap:12px; margin-top:8px;"></div>
     </div>
   </div>
 
@@ -478,6 +491,13 @@
         await loadOverrides();
         _rawAutoData = JSON.parse(JSON.stringify(appData.courses));
         appData.courses = getMergedCourses(_rawAutoData, _overrides);
+
+        const btnFlattenAll = document.getElementById('btn-flatten-all');
+        const btnUnflatten = document.getElementById('btn-unflatten');
+        if (btnFlattenAll && btnUnflatten) {
+          btnFlattenAll.style.display = _overrides.flattenAll ? 'none' : '';
+          btnUnflatten.style.display = _overrides.flattenAll ? '' : 'none';
+        }
       } catch (e) { console.warn(e); appData = getMockData(); }
     }
 
@@ -735,7 +755,9 @@
           alert('Vui lòng chọn vị trí "📑 Dán" tương ứng trong giao diện.');
         }
       } else if (e.ctrlKey && e.key === 'z') {
-        if (typeof undoOverride === 'function') undoOverride();
+        doUndo();
+      } else if (e.ctrlKey && e.key === 'y') {
+        doRedo();
       }
     });
 
@@ -1118,7 +1140,8 @@
               e.stopPropagation();
               if (_clipboard && _clipboard.nodes && _clipboard.nodes.length > 0) handlePaste(courseId, nodeId);
             };
-            if (!_clipboard || !_clipboard.nodes || !_clipboard.nodes.length) {
+            const clipboardHasLesson = _clipboard && _clipboard.nodes && _clipboard.nodes.some(n => n.node.type !== 'chapter');
+            if (!clipboardHasLesson) {
               pasteBtn.style.opacity = '0.3';
               pasteBtn.style.cursor = 'not-allowed';
             }
@@ -1251,7 +1274,8 @@
         };
         
         btnRow.appendChild(addBtn);
-        if (_clipboard && _clipboard.nodes && _clipboard.nodes.length > 0) {
+        const clipboardHasChapter = _clipboard && _clipboard.nodes && _clipboard.nodes.some(n => n.node.type === 'chapter');
+        if (clipboardHasChapter) {
           const pasteRootBtn = document.createElement('button');
           pasteRootBtn.className = 'btn btn-outline btn-sm';
           pasteRootBtn.textContent = '📌 Dán vào đây';
@@ -1269,6 +1293,21 @@
 
     async function handlePaste(courseId, destParentId) {
       if (!_clipboard || !_clipboard.nodes || _clipboard.nodes.length === 0) return;
+      
+      const destIsCourse = destParentId === courseId;
+      
+      for (const { node } of _clipboard.nodes) {
+        const nodeIsChapter = node.type === 'chapter';
+        if (nodeIsChapter && !destIsCourse) {
+          alert('❌ Chỉ có thể dán chương vào khóa học, không thể dán vào chương khác.');
+          return;
+        }
+        if (!nodeIsChapter && destIsCourse) {
+          alert('❌ Chỉ có thể dán bài học vào chương, không thể dán trực tiếp vào khóa học.');
+          return;
+        }
+      }
+
       const { action, nodes } = _clipboard;
       
       let manualNodes = [...(_overrides.manualNodes || [])];
@@ -1500,6 +1539,19 @@
         modal.appendChild(bottomRow);
       }
 
+      if (!isNew && !isManual) {
+        modal.appendChild(el('button', {
+          className: 'btn btn-outline btn-sm',
+          textContent: '🔄 Đồng bộ lại từ Drive',
+          style: 'margin-top: 8px; font-size: 0.8rem; color: var(--color-text-muted);',
+          onclick: async () => {
+            if (!confirm('Xóa toàn bộ chỉnh sửa thủ công của mục này và về dữ liệu gốc?')) return;
+            await resetNodePatch(nodeId);
+            closeEditModal();
+          }
+        }));
+      }
+
       $('edit-overlay').style.display = 'block';
       modal.style.display = 'flex';
     }
@@ -1512,6 +1564,9 @@
       document.body.classList.toggle('edit-mode', editMode);
       $('btn-edit').textContent = editMode ? '✅' : '✏️';
       $('btn-edit').title = editMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa';
+      $('btn-undo').style.display = editMode ? '' : 'none';
+      $('btn-redo').style.display = editMode ? '' : 'none';
+      refreshUndoRedoState();
       const active = document.querySelector('.page.active')?.id;
       if (active === 'page-home') renderHome();
       else if (active === 'page-course' && currentCourseId) renderCourse(currentCourseId);
@@ -1534,6 +1589,40 @@
       }
       const titleEl = $('sidebar-lesson-title');
       if (titleEl) titleEl.textContent = `${course.title} - ${pct}%`;
+      // Bug 5: Update lesson title in main content
+      const lesson = findLesson(course, currentLessonId);
+      if (lesson) {
+        const titleH2 = $('lesson-title');
+        if (titleH2) titleH2.textContent = lesson.title;
+      }
+
+      // Bug 3b: Call unconditionally to hide panel if lesson is hidden
+      _renderLessonEditPanel(lesson);
+
+      // Bug 4: Rebuild doc-list
+      const dl = $('doc-list');
+      if (dl && lesson) {
+        dl.innerHTML = '';
+        if (lesson.documents?.length) {
+          lesson.documents.forEach((doc) => {
+            const link = el('a', { href: safeUrl(doc.url), target: '_blank', rel: 'noopener noreferrer',
+              className: 'btn btn-outline btn-sm', textContent: 'Mở' });
+            const icon = el('span', { textContent: '📎 ' + doc.title });
+            const card = el('div', { className: 'doc-card' }, icon, link);
+            if (editMode && doc._isExtra) {
+              const delBtn = el('button', {
+                className: 'btn-icon', textContent: '✕', title: 'Xóa tài liệu này',
+                style: 'margin-left:4px; color:var(--color-red, #e74c3c);',
+                onclick: () => deleteExtraDoc(doc._extraIndex)
+              });
+              card.appendChild(delBtn);
+            }
+            dl.appendChild(card);
+          });
+        } else {
+          dl.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted)">Không có tài liệu</p>';
+        }
+      }
     }
 
     function openCourseModal(courseId) {
@@ -1797,7 +1886,7 @@
       updateWatchBtn();
       const dl = $('doc-list'); dl.innerHTML = '';
       if (lesson.documents?.length) {
-        lesson.documents.forEach(doc => {
+        lesson.documents.forEach((doc, idx) => {
           const link = el('a', {
             href: safeUrl(doc.url), target: '_blank',
             rel: 'noopener noreferrer',
@@ -1805,9 +1894,152 @@
           });
           const icon = el('span', { textContent: '📎 ' + doc.title });
           const card = el('div', { className: 'doc-card' }, icon, link);
+          if (editMode && doc._isExtra) {
+            const delBtn = el('button', {
+              className: 'btn-icon', textContent: '✕', title: 'Xóa tài liệu này',
+              style: 'margin-left:4px; color:var(--color-red, #e74c3c);',
+              onclick: () => deleteExtraDoc(doc._extraIndex)
+            });
+            card.appendChild(delBtn);
+          }
           dl.appendChild(card);
         });
       } else { dl.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted)">Không có tài liệu</p>'; }
+
+      // Phase 4: Lesson edit panel
+      _renderLessonEditPanel(lesson);
+    }
+
+
+    // ── Phase 4: Lesson Edit Helpers ──
+
+    function extractYoutubeId(raw) {
+      const patterns = [
+        /youtu\.be\/([A-Za-z0-9_-]{11})/,
+        /[?&]v=([A-Za-z0-9_-]{11})/,
+        /\/embed\/([A-Za-z0-9_-]{11})/,
+        /^([A-Za-z0-9_-]{11})$/
+      ];
+      for (const p of patterns) {
+        const m = raw.match(p);
+        if (m) return m[1];
+      }
+      return null;
+    }
+
+    async function saveLessonYoutube() {
+      const inp = $('lesson-yt-input');
+      const id = extractYoutubeId(inp.value.trim());
+      if (!id) { alert('URL YouTube không hợp lệ'); return; }
+      await patchNode(currentLessonId, { youtubeId: id });
+      inp.value = '';
+      renderLesson(currentCourseId, currentLessonId);
+    }
+
+    async function resetLessonYoutube() {
+      const patches = { ..._overrides.patches };
+      if (patches[currentLessonId]) {
+        const { youtubeId: _, ...rest } = patches[currentLessonId];
+        if (Object.keys(rest).length) patches[currentLessonId] = rest;
+        else delete patches[currentLessonId];
+      }
+      await saveOverrides({ ..._overrides, patches });
+      renderLesson(currentCourseId, currentLessonId);
+    }
+
+    async function addExtraDoc() {
+      const titleEl = $('doc-title-input');
+      const urlEl = $('doc-url-input');
+      const title = titleEl.value.trim();
+      const url = urlEl.value.trim();
+      if (!title || !url) { alert('Vui lòng điền đủ tên và URL'); return; }
+      if (!url.includes('drive.google.com')) { alert('Chỉ chấp nhận Google Drive URL'); return; }
+      const normalizedUrl = url.replace(/\/edit.*$/, '/view').replace(/\/preview.*$/, '/view');
+      const existing = _overrides.patches?.[currentLessonId]?.extraDocs || [];
+      await patchNode(currentLessonId, { extraDocs: [...existing, { title, url: normalizedUrl }] });
+      titleEl.value = ''; urlEl.value = '';
+    }
+
+    async function deleteExtraDoc(index) {
+      const extraDocs = (_overrides.patches?.[currentLessonId]?.extraDocs || [])
+        .filter((_, i) => i !== index);
+      await patchNode(currentLessonId, { extraDocs });
+    }
+
+    function _renderLessonEditPanel(lesson) {
+      const panel = $('lesson-edit-panel');
+      if (!panel) return;
+      if (!editMode || !lesson) { panel.style.display = 'none'; return; }
+      panel.style.display = 'flex';
+      panel.innerHTML = '';
+
+      // Section: YouTube
+      const hasYtPatch = !!_overrides.patches?.[currentLessonId]?.youtubeId;
+
+      const ytSection = document.createElement('div');
+      ytSection.className = 'glass';
+      ytSection.style.cssText = 'padding:16px; display:flex; flex-direction:column; gap:10px;';
+
+      const ytLabel = el('div', { className: 'section-label', textContent: '🔗 Video YouTube' });
+
+      const ytRow = document.createElement('div');
+      ytRow.style.cssText = 'display:flex; gap:8px; align-items:center;';
+
+      const ytInput = el('input', { id: 'lesson-yt-input', type: 'text', placeholder: 'YouTube URL hoặc Video ID...' });
+      if (lesson?.youtubeId) ytInput.value = lesson.youtubeId;
+      ytInput.style.cssText = 'flex:1; padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.1); color:inherit;';
+
+      const ytSaveBtn = el('button', { className: 'btn btn-primary btn-sm', textContent: 'Đổi', onclick: saveLessonYoutube });
+      ytRow.append(ytInput, ytSaveBtn);
+
+      if (hasYtPatch) {
+        const ytResetBtn = el('button', { className: 'btn btn-outline btn-sm', textContent: '↩ Reset', onclick: resetLessonYoutube });
+        ytRow.appendChild(ytResetBtn);
+      }
+
+      ytSection.append(ytLabel, ytRow);
+
+      if (hasYtPatch) {
+        const badge = el('span', {
+          textContent: '⚠ Đang dùng link YouTube thủ công',
+          style: 'font-size:0.8rem; color:var(--color-warning, #f5a623); padding:4px 8px; background:rgba(245,166,35,0.12); border-radius:4px; display:inline-block;'
+        });
+        ytSection.appendChild(badge);
+      }
+
+      panel.appendChild(ytSection);
+
+      // Section: Add doc
+      const docSection = document.createElement('div');
+      docSection.className = 'glass';
+      docSection.style.cssText = 'padding:16px; display:flex; flex-direction:column; gap:10px;';
+
+      docSection.appendChild(el('div', { className: 'section-label', textContent: '📎 Thêm tài liệu (Google Drive)' }));
+
+      const docTitleInp = el('input', { id: 'doc-title-input', type: 'text', placeholder: 'Tên hiển thị...' });
+      docTitleInp.style.cssText = 'padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.1); color:inherit;';
+
+      const docUrlInp = el('input', { id: 'doc-url-input', type: 'text', placeholder: 'Google Drive URL...' });
+      docUrlInp.style.cssText = 'padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.1); color:inherit;';
+
+      const docAddBtn = el('button', { className: 'btn btn-primary btn-sm', textContent: 'Thêm', style: 'align-self:flex-start;', onclick: addExtraDoc });
+
+      docSection.append(docTitleInp, docUrlInp, docAddBtn);
+      panel.appendChild(docSection);
+
+      if (!lesson._isManual) {
+        const syncResetBtn = el('button', {
+          className: 'btn btn-outline btn-sm',
+          textContent: '🔄 Đồng bộ lại từ Drive',
+          style: 'margin-top: 8px; font-size: 0.8rem; color: var(--color-text-muted); align-self: flex-start;',
+          onclick: async () => {
+            if (!confirm('Xóa toàn bộ chỉnh sửa thủ công của mục này và về dữ liệu gốc?')) return;
+            await resetNodePatch(currentLessonId);
+            _renderLessonEditPanel(findLesson(findCourse(currentCourseId), currentLessonId));
+          }
+        });
+        panel.appendChild(syncResetBtn);
+      }
     }
 
     function updateWatchBtn() {
@@ -1831,6 +2063,17 @@
       updateWatchBtn();
       await saveProgress(currentLessonId, currentCourseId, v);
       updateRealtimeProgressUI();
+    }
+
+    // ── Phase 6: Flatten All ──
+    async function previewFlattenAll() {
+      const count = appData.courses.flatMap(c => (c.tree || []).flatMap(getAllLessons)).length;
+      if (!confirm(`⚡ Làm phẳng toàn bộ ${count} bài học?\nTên bài sẽ được prefix tên chương cha.`)) return;
+      await saveOverrides({ ..._overrides, flattenAll: true });
+    }
+    
+    async function disableFlattenAll() {
+      await saveOverrides({ ..._overrides, flattenAll: false });
     }
 
     // ── ADMIN ──

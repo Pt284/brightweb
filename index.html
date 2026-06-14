@@ -769,29 +769,63 @@
           });
         }
 
-        const editActions = el('div', { className: 'tree-edit-actions', style: 'display:none; gap:4px; margin-left:8px;' });
+        const editActions = el('div', { className: 'tree-edit-actions' });
         if (editMode) {
-          editActions.style.display = 'flex';
+          editActions.style.display = 'grid';
+          editActions.style.gridTemplateColumns = 'repeat(2, 12px)';
+          editActions.style.gap = '2px';
+          editActions.style.flexShrink = '0';
+          editActions.style.alignSelf = 'flex-start';
+
           const editBtn = el('button', { className: 'btn-icon', title: 'Sửa', textContent: '✏️', onclick: (e) => { e.stopPropagation(); openChapterModal(courseId, nodeId, parentId, node); }});
           const cutBtn = el('button', { className: 'btn-icon', title: 'Cắt', textContent: '✂️', onclick: (e) => { e.stopPropagation(); _clipboard = { action: 'cut', node, parentId }; updateRealtimeProgressUI(); }});
           const copyBtn = el('button', { className: 'btn-icon', title: 'Sao chép', textContent: '📋', onclick: (e) => { e.stopPropagation(); _clipboard = { action: 'copy', node }; updateRealtimeProgressUI(); }});
+
+          const btnStyle = 'width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;';
+          editBtn.style.cssText = btnStyle;
+          cutBtn.style.cssText = btnStyle;
+          copyBtn.style.cssText = btnStyle;
+
           editActions.append(editBtn, cutBtn, copyBtn);
+        } else {
+          editActions.style.display = 'none';
         }
 
         if (node.type === 'lesson') {
-          const pct = getLessonProgressPct(node.id);
-          const isDone = pct === 100;
+          if (editMode) {
+            label.style.display = 'flex';
+            label.style.alignItems = 'flex-start';
+            label.style.justifyContent = 'space-between';
+            label.style.gap = '12px';
+            label.style.position = 'relative';
 
-          const barTrack = el('div', { className: 'bar-track' });
-          const barFill = el('div', { className: 'bar-fill ' + (isDone ? 'done' : pct > 0 ? '' : 'low'), style: `width:${pct}%` });
-          barTrack.appendChild(barFill);
-          const barBadge = el('span', { className: 'bar-badge' }, barTrack, el('span', { textContent: pct + '%' }));
+            const wrapLeft = el('div', { style: 'display: flex; align-items: flex-start; gap: 6px; flex: 1 1 0%; min-width: 0; padding-top: 2px;' });
+            const icon = el('span', { className: 'icon', style: 'flex-shrink: 0;', textContent: '📄' });
+            
+            let titleText = node.title;
+            if (node._hidden) titleText += ' (Đang ẩn)';
+            const title = el('span', { style: 'font-size: 0.95rem; line-height: 1.4; word-break: break-word;', textContent: titleText });
+            
+            wrapLeft.appendChild(icon);
+            wrapLeft.appendChild(title);
+            label.appendChild(wrapLeft);
+            label.appendChild(editActions);
+          } else {
+            const pct = getLessonProgressPct(node.id);
+            const isDone = pct === 100;
 
-          const icon = el('span', { className: 'icon', textContent: '📄' });
-          const title = el('span', { style: 'flex:1', textContent: node.title });
-          if (node._hidden) title.textContent += ' (Đang ẩn)';
+            const barTrack = el('div', { className: 'bar-track' });
+            const barFill = el('div', { className: 'bar-fill ' + (isDone ? 'done' : pct > 0 ? '' : 'low'), style: `width:${pct}%` });
+            barTrack.appendChild(barFill);
+            const barBadge = el('span', { className: 'bar-badge' }, barTrack, el('span', { textContent: pct + '%' }));
 
-          label.appendChild(icon); label.appendChild(title); label.appendChild(barBadge); label.appendChild(editActions);
+            const icon = el('span', { className: 'icon', textContent: '📄' });
+            const title = el('span', { style: 'flex:1', textContent: node.title });
+            if (node._hidden) title.textContent += ' (Đang ẩn)';
+
+            label.appendChild(icon); label.appendChild(title); label.appendChild(barBadge);
+          }
+
           if (node.id === activeId) label.classList.add('active-lesson');
           label.addEventListener('click', (e) => {
             if (e.target.closest('.btn-icon')) return;
@@ -803,33 +837,54 @@
           const isOpen = _openTreeNodes.has(nodeId);
           if (isOpen) ch.classList.add('open');
 
-          const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
-          const title = el('span', { style: 'flex:1', textContent: node.title });
-          if (node._hidden) title.textContent += ' (Đang ẩn)';
+          if (editMode) {
+            label.style.display = 'flex';
+            label.style.alignItems = 'flex-start';
+            label.style.justifyContent = 'space-between';
+            label.style.gap = '12px';
+            label.style.position = 'relative';
 
-          if (editMode && node.children && node.children.length > 0) {
-            const flattenBtn = el('button', { className: 'btn-icon', textContent: '⚡', title: 'Làm phẳng', onclick: async (e) => {
-              e.stopPropagation();
-              await patchNode(nodeId, { flattenChildren: true });
-            }});
-            editActions.prepend(flattenBtn);
+            const wrapLeft = el('div', { style: 'display: flex; align-items: center; gap: 6px; flex: 1 1 0%; min-width: 0;' });
+            const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
+            
+            let titleText = node.title;
+            if (node._hidden) titleText += ' (Đang ẩn)';
+            const title = el('span', { style: 'font-weight: bold;', textContent: titleText });
+
+            if (node.children && node.children.length > 0) {
+              const flattenBtn = el('button', { className: 'btn-icon', textContent: '⚡', title: 'Làm phẳng', onclick: async (e) => {
+                e.stopPropagation();
+                await patchNode(nodeId, { flattenChildren: true });
+              }});
+              flattenBtn.style.cssText = 'width: 12px; height: 12px; padding: 0; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;';
+              editActions.prepend(flattenBtn);
+            }
+
+            wrapLeft.appendChild(icon);
+            wrapLeft.appendChild(title);
+            label.appendChild(wrapLeft);
+            label.appendChild(editActions);
+          } else {
+            const icon = el('span', { className: 'icon toggle-icon', textContent: isOpen ? '▼' : '▶' });
+            const title = el('span', { style: 'flex:1', textContent: node.title });
+            if (node._hidden) title.textContent += ' (Đang ẩn)';
+
+            const pct = getChapterProgressPct(node);
+            const color = pct === 100 ? 'var(--progress-done)' : pct >= 50 ? 'var(--progress-fill)' : 'var(--progress-low)';
+            const dash = (pct * 87.96) / 100;
+
+            const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
+            arcWrap.innerHTML = `
+              <svg width="24" height="24" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-track)" stroke-width="4"/>
+                <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4"
+                  stroke-dasharray="${dash} 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"/>
+              </svg>
+              <span class="arc-label" style="font-size:8px; color:${color}; font-weight:bold;">${pct}%</span>
+            `;
+
+            label.appendChild(icon); label.appendChild(title); label.appendChild(arcWrap);
           }
-
-          const pct = getChapterProgressPct(node);
-          const color = pct === 100 ? 'var(--progress-done)' : pct >= 50 ? 'var(--progress-fill)' : 'var(--progress-low)';
-          const dash = (pct * 87.96) / 100;
-
-          const arcWrap = el('div', { className: 'arc-wrap', 'aria-label': pct + '%' });
-          arcWrap.innerHTML = `
-            <svg width="24" height="24" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-track)" stroke-width="4"/>
-              <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4"
-                stroke-dasharray="${dash} 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"/>
-            </svg>
-            <span class="arc-label" style="font-size:8px; color:${color}; font-weight:bold;">${pct}%</span>
-          `;
-
-          label.appendChild(icon); label.appendChild(title); label.appendChild(arcWrap); label.appendChild(editActions);
 
           label.addEventListener('click', (e) => {
             if (e.target.closest('.btn-icon')) return;

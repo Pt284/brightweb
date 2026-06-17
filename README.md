@@ -196,41 +196,41 @@ Video YouTube đặt tên `010301 ~ Tên video` → tự động ghép vào đú
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Google Drive                              │
-│   01 ~ Khóa A/                                               │
-│     01 ~ Chương 1/                                            │
-│       01 ~ Bài 1/  ──────────────────────────────────────┐   │
+│                    Google Drive                             │
+│   01 ~ Khóa A/                                              │
+│     01 ~ Chương 1/                                          │
+│       01 ~ Bài 1/  ──────────────────────────────────────┐  │
 └──────────────────────────────────────────────────────────│──┘
                                                            │
                            prefix: "010101"                │
                                                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│               GitHub Actions (mỗi 6h)                        │
-│  sync_drive.py                                               │
-│    read_drive() → build_drive_tree_fast()                    │
+│               GitHub Actions (mỗi 6h)                       │
+│  sync_drive.py                                              │
+│    read_drive() → build_drive_tree_fast()                   │
 │    read_youtube() → fetch_playlist_items() ──────────────┐  │
 │    assign_videos(prefix match) ◄─────────────────────────┘  │
-│    build_output() → push_to_firestore()                      │
-└──────────────────────────────────────────────────────────────┘
+│    build_output() → push_to_firestore()                     │
+└─────────────────────────────────────────────────────────────┘
                               │
                     Firestore: app_data/courses
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
-│                   index.html (Browser)                        │
-│                                                               │
-│  Firebase Auth ──► checkAccess (whitelist + admins)          │
-│                                                               │
-│  loadData()                                                   │
-│    ├── Firestore: app_data/courses  (rawAutoData)             │
-│    └── Firestore: app_data/overrides (_overrides)             │
-│                              │                               │
-│              getMergedCourses(rawAutoData, overrides)         │
-│                              │                               │
-│              appData.courses  ──►  renderHome/Course/Lesson   │
-│                                                               │
-│  Admin Edit ──► patchNode() ──► saveOverrides()              │
-│              ──► _recomputeMerged() ──► re-render             │
-└──────────────────────────────────────────────────────────────┘
+│                   index.html (Browser)                      │
+│                                                             │
+│  Firebase Auth ──► checkAccess (whitelist + admins)         │
+│                                                             │
+│  loadData()                                                 │
+│    ├── Firestore: app_data/courses  (rawAutoData)           │
+│    └── Firestore: app_data/overrides (_overrides)           │
+│                              │                              │
+│              getMergedCourses(rawAutoData, overrides)       │
+│                              │                              │
+│              appData.courses  ──►  renderHome/Course/Lesson │
+│                                                             │
+│  Admin Edit ──► patchNode() ──► saveOverrides()             │
+│              ──► _recomputeMerged() ──► re-render           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---

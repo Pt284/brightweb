@@ -352,3 +352,152 @@ brightweb/
 - **Plyr iframe `pointer-events: none`**: overlay div trong suốt nhận keyboard event, iframe YouTube không nhận — tránh YouTube steal focus
 - **Progress flush nhiều cơ chế**: `pause`, `ended`, `visibilitychange`, `pagehide` — đảm bảo không mất dữ liệu ngay cả khi đóng tab đột ngột
 - **Undo stack serialize toàn bộ `_overrides`**: đơn giản nhưng hiệu quả — JSON.stringify/parse đủ nhanh cho object kích thước này
+
+---
+
+## 📝 Lịch sử cập nhật
+
+### v2.0 — Major Rewrite
+
+So với **v1.0** (bản gốc), v2.0 là một rewrite lớn trên toàn bộ stack. Dưới đây là tất cả những gì đã thay đổi:
+
+---
+
+#### 🔐 Bảo mật — Vá lỗ hổng nghiêm trọng
+
+| Vấn đề v1 | Giải pháp v2 |
+|---|---|
+| `ADMIN_EMAIL = "mcdg5444@gmail.com"` hardcode trong JS client — ai cũng đọc được | Admin check qua Firestore collection `admins` — server-side |
+| `SYNC_SECRET` (chuỗi 300+ ký tự) hardcode trong `index.html` — lộ hoàn toàn | Sync trigger xác thực bằng **Firebase ID Token** qua Cloudflare Worker |
+| `renderTable()` dùng `tr.innerHTML = ...` với dữ liệu từ Firestore → **XSS** | Toàn bộ render chuyển sang DOM API (`createElement`, `textContent`) |
+| `loadAdminData()` trong index.html dùng `innerHTML` với email/timestamp | DOM API, không có HTML injection |
+| Không có Content Security Policy | CSP header nghiêm ngặt trên cả `index.html` và `admin-check.html` |
+| `safeUrl()` không tồn tại — URL từ Firestore gắn thẳng vào `href` | Hàm `safeUrl()` validate protocol `https:`/`http:` trước khi render |
+
+---
+
+#### 🎬 Video Player — Thay thế hoàn toàn
+
+**v1:** Plain `<iframe>` YouTube nhúng thẳng, không kiểm soát được gì.
+
+**v2:** Tích hợp **Plyr.js** với toàn bộ custom layer bên trên:
+- Ẩn UI YouTube gốc (`pointer-events: none` trên iframe, `youtube-nocookie.com`)
+- **Custom poster** với thumbnail HD — fade out khi video phát (trigger `playing`, không phải `play` để tránh flash)
+- **oEmbed title fetch** — hiện tên thật của video trước khi play, không cần API key
+- **Auto-resume** — tự seek về vị trí xem dở lần trước
+- **14 keyboard shortcuts** YouTube-style (Space/K, J/L, arrows, M, F, 0–9, </>)
+- **Giữ Space** để tạm thời 2x speed, thả về tốc độ cũ
+- Frame-by-frame bằng `,` / `.` khi pause
+- Toast overlay hiện phản hồi mỗi lần nhấn phím
+
+---
+
+#### 📊 Progress Tracking — Từ không có gì thành dual-storage
+
+**v1:** Chỉ có "Đánh dấu đã xem" (boolean), lưu Firestore mỗi lần bấm nút.
+
+**v2:**
+- Lưu `watchedTime` + `duration` vào **localStorage** sau mỗi 5 giây phát
+- Debounce sync lên **Firestore** 30 giây sau lần ghi cuối
+- Flush ngay khi: `pause`, `ended`, chuyển bài, đóng tab (`visibilitychange` / `pagehide`)
+- Khi load lại: so sánh timestamp localStorage vs Firestore, lấy cái mới hơn
+- Hiển thị % xem dở (0–99%) trên từng bài học trong sidebar
+- **Arc tròn SVG** cho % tiến độ theo chương
+- **Minibar** cho % tiến độ theo từng bài
+- Auto-mark done khi video kết thúc (nếu `duration - watchedTime ≤ 600s`)
+
+---
+
+#### ✏️ Override System — File mới hoàn toàn (`overrides.js`)
+
+**v1:** Không có. Dữ liệu Drive là duy nhất, không sửa được gì ngoài code.
+
+**v2:** Toàn bộ file `overrides.js` (~350 dòng) mới, bao gồm:
+- Lưu override riêng trong `app_data/overrides` — không đụng data gốc
+- 9 loại patch: `title`, `hidden`, `youtubeId`, `extraDocs`, `childOrder`, `flattenChildren`, `reparent`, `manualNodes`, `manualCourses`
+- **Undo/Redo** 20 bước (Ctrl+Z / Ctrl+Y)
+- **Merge engine** 7 bước chạy tại runtime
+- **Backup/Restore** — xuất JSON đầy đủ, restore bằng upload file
+- `_recomputeMerged()` tự động re-render sau mỗi thao tác save
+
+---
+
+#### 🖱️ Edit Mode — Toàn bộ mới
+
+**v1:** Không có edit mode.
+
+**v2:**
+- Toggle edit mode bằng nút ✏️ trong header
+- **Drag & drop thứ tự khóa học** trên trang Home
+- **Drag & drop thứ tự bài/chương** trong sidebar (cùng cấp)
+- **Cut / Copy / Paste** node qua toolbar hoặc Ctrl+X/C/V
+- **Checkbox multi-select** — chọn nhiều node để cắt/copy/ẩn
+- Phím tắt: `Del` ẩn node được chọn, `Esc` hủy selection
+- **Modal sửa bài học**: đổi tên, ẩn/hiện, xóa, đẩy bài lên cấp cha, xóa chương giữ bài
+- **Modal sửa khóa học**: đổi tên, ẩn/hiện, xóa khóa thủ công
+- **Lesson edit panel**: đổi YouTube ID, thêm tài liệu Google Drive bổ sung
+- Nút "⚡ Làm phẳng" từng chương hoặc toàn bộ
+- Nút "🔄 Reset khóa học" — backup chỉnh sửa thành node `modified_*` rồi restore gốc
+- Nút "🔄 Reset tất cả khóa học" — xóa toàn bộ patch course
+
+---
+
+#### 🔐 Admin Check — Nâng cấp bảo mật
+
+**v1:** `if (user.email !== ADMIN_EMAIL)` — hardcode, một email duy nhất.
+
+**v2:**
+- Check Firestore collection `admins` — thêm/xóa admin không cần deploy
+- Render table dùng DOM API thay `innerHTML` — không còn XSS từ tên bài học
+
+---
+
+#### 🎨 Theme System — File mới (`color-settings.js` + `color-settings.css`)
+
+**v1:** Không có. Màu hardcode trong `style.css`.
+
+**v2:**
+- **Hue slider** thay đổi toàn bộ 17+ CSS token theo HSL
+- **Blob color picker** chọn màu nền động riêng
+- **Per-token override** trong tab "Nâng cao" — chỉnh từng màu CSS variable
+- Bật/tắt animation + speed slider cho blob
+- Bật/tắt glassmorphism (`no-glass` class)
+- Lưu toàn bộ vào `localStorage`, restore khi load lại
+- Design token chuyển từ màu hex cứng sang **HSL dynamic** (17 biến)
+
+---
+
+#### 🌊 Blob Background — Nâng cấp `bg.js`
+
+**v1:** Animation đơn giản, không có API ngoài, màu fix cứng.
+
+**v2:**
+- **`BlobController`** public API: `setPalette(hue)`, `setPaletteFromHsl(h,s,l)`, `setSpeed(mul)`, `toggle(bool)`, `setBgColor(color)`
+- Palette 8 màu sinh động từ HSL người dùng chọn
+- **Speed multiplier** — scale cả velocity và noise force
+- **Toggle** dừng RAF loop hoàn toàn khi tắt — không tốn CPU
+- Màu nền canvas đồng bộ với `--color-bg` token khi đổi theme
+
+---
+
+#### 🏗️ Design System — Refactor `style.css`
+
+**v1:** ~15 biến CSS, màu hex cứng (`#17274D`, `#0091EA`...).
+
+**v2:**
+- 40+ design token phân nhóm rõ ràng: Backgrounds, Surfaces, Borders, Accents, Semantic, Text, Progress, Dimensions
+- Toàn bộ chuyển sang **HSL** để color-settings.js có thể điều chỉnh động
+- Thêm token cho Plyr.js (tooltip, menu, badge, controls)
+- `btn` component dùng CSS custom properties (`--btn-bg`, `--btn-border`, `--btn-text`) thay vì override trực tiếp
+- Glass hover states tách thành token riêng (`--color-border-glass-hover`)
+- `el()` DOM helper thay thế `innerHTML` string concatenation
+
+---
+
+#### 🗂️ Files mới thêm trong v2
+
+| File | Mô tả |
+|---|---|
+| `overrides.js` | Toàn bộ override engine (merge, patch, undo/redo, backup) |
+| `color-settings.js` | Theme editor logic + BlobController bridge |
+| `color-settings.css` | UI cho theme editor popup |

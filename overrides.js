@@ -236,7 +236,7 @@ function _recomputeMerged() {
     btnUnflatten.style.display = _overrides.flattenAll ? '' : 'none';
   }
   
-  const isEditMode = typeof editMode !== 'undefined' ? editMode : false;
+  const isEditMode = (typeof editMode !== 'undefined' && editMode && typeof _isAdmin !== 'undefined' && _isAdmin) ? true : false;
   
   let oldYoutubeId = null;
   const activePage = document.querySelector('.page.active')?.id;

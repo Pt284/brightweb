@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /progress/{docId} {
+      allow read, delete: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.userId
+        && request.auth.uid == request.resource.data.userId;
+    }
+
+    match /whitelist/{email} {
+      // Tách get và list: User thường chỉ cần đọc doc của chính mình
+      allow get: if request.auth != null
+        && request.auth.token.email == email;
+      
+      // Chỉ admin mới được phép list (xem toàn bộ danh sách)
+      allow list: if request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      
+      // Kiểm tra quyền ghi thông qua collection admins thay vì hardcode email
+      allow write: if request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // Thêm quy tắc cho collection admins để kiểm tra phân quyền động
+    match /admins/{email} {
+      allow read: if request.auth != null
+        && request.auth.token.email == email;
+      allow write: if false;
+    }
+
+    match /security_logs/{id} {
+      // Fix 1: yêu cầu auth + email phải khớp với token (không tự khai)
+      // Fix L2: validate kiểu dữ liệu ua (string) và time (timestamp)
+      allow create: if request.auth != null
+        && request.auth.token.email == request.resource.data.email
+        && request.resource.data.keys().hasAll(['email', 'time', 'ua'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() < 200
+        && request.resource.data.ua is string
+        && request.resource.data.ua.size() < 500
+        && request.resource.data.time is timestamp;
+        
+      // Chỉ cho phép admin đọc log bảo mật
+      allow read: if request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // [UPDATED] Phân quyền cho app_data hỗ trợ tính năng Overrides của Admin
+    match /app_data/{doc} {
+      allow read: if request.auth != null;  // Chỉ user đã login mới đọc được
+      
+      // overrides: Chỉ admin có trong danh sách dynamic collection 'admins' mới được ghi đè dữ liệu công khai
+      allow write: if doc == 'overrides'
+        && request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+  }
+}

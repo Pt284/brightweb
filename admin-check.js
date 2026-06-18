@@ -333,3 +333,14 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     renderTable(e.target.dataset.filter);
   });
 });
+
+// ── BUTTON BINDINGS (thay onclick= inline đã xóa để tuân thủ CSP no-unsafe-inline) ──
+(function bindEvents() {
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  on('btn-back-home', () => { window.location.href = 'index.html'; });
+  on('btn-settings',  () => { window.location.href = 'index.html'; });
+  on('btn-goto-home', () => { window.location.href = 'index.html'; });
+  on('btn-signout',   () => signOut());
+  on('btn-run-check', () => runCheck());
+  on('btn-copy-delete', () => copyDeleteCmd());
+})();

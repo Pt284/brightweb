@@ -6,7 +6,7 @@
 <!-- Content Security Policy: giới hạn script/style chỉ từ domain tin cậy — giảm nhẹ XSS -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
-  script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com 'unsafe-inline';
+  script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' https://fonts.gstatic.com data:;
@@ -25,13 +25,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="bg.js" defer></script>
-<script>
-  function signOut() {
-    firebase.auth().signOut().then(() => {
-      window.location.href = 'index.html';
-    });
-  }
-</script>
+
     <link rel="stylesheet" href="color-settings.css">
 </head>
 <body>
@@ -39,11 +33,11 @@
 <div id="loading">Đang tải...</div>
 
 <div id="header" class="glass" style="display:none">
-  <span class="logo" onclick="window.location.href='index.html'">🏠 QUAY LẠI TRANG CHỦ</span>
+  <span class="logo" id="btn-back-home">🏠 QUAY LẠI TRANG CHỦ</span>
   <div class="header-right">
     <span id="user-info"></span>
-    <button class="btn-icon" title="Cài đặt" onclick="window.location.href='index.html'" style="margin-right: 10px;">⚙</button>
-    <button class="btn btn-outline btn-sm" onclick="signOut()">Đăng xuất</button>
+    <button class="btn-icon" title="Cài đặt" id="btn-settings" style="margin-right: 10px;">⚙</button>
+    <button class="btn btn-outline btn-sm" id="btn-signout">Đăng xuất</button>
   </div>
 </div>
 
@@ -71,7 +65,7 @@
     </div>
 
     <div class="action-bar">
-      <button class="btn btn-primary btn-check" onclick="runCheck()">🔍 Bắt đầu kiểm tra</button>
+      <button class="btn btn-primary btn-check" id="btn-run-check">🔍 Bắt đầu kiểm tra</button>
     </div>
 
     <div id="report-section" style="display:none;">
@@ -99,7 +93,7 @@
       </div>
 
       <div id="delete-cmd-bar" style="display:none; text-align:right; margin: 10px 0;">
-        <button class="btn btn-outline" onclick="copyDeleteCmd()">📋 Copy lệnh xóa (PowerShell)</button>
+        <button class="btn btn-outline" id="btn-copy-delete">📋 Copy lệnh xóa (PowerShell)</button>
       </div>
 
       <div class="table-container glass">
@@ -125,7 +119,7 @@
 <div id="unauthorized-msg" style="display:none; text-align: center; margin-top: 100px; color: var(--red);">
   <h2>⛔ TRUY CẬP BỊ TỪ CHỐI</h2>
   <p>Bạn không có quyền truy cập trang này. Vui lòng đăng nhập bằng tài khoản Admin.</p>
-  <button class="btn btn-primary" onclick="window.location.href='index.html'" style="margin-top: 20px;">Về trang chủ</button>
+  <button class="btn btn-primary" id="btn-goto-home" style="margin-top: 20px;">Về trang chủ</button>
 </div>
 
 <script src="admin-check.js"></script>

@@ -1330,7 +1330,6 @@ function toggleEditMode() {
   editMode = !editMode;
   if (!editMode) {
     _selectedNodes.clear();
-    _clipboard = null;
     document.querySelectorAll('.is-cut').forEach(el => el.classList.remove('is-cut'));
   }
   document.body.classList.toggle('edit-mode', editMode);

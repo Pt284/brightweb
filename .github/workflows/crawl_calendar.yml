@@ -1,0 +1,69 @@
+name: Crawl HocMai Calendar
+
+on:
+  # Full crawl: mỗi ngày lúc 3h sáng VN (20:00 UTC)
+  schedule:
+    - cron: "0 20 * * *"
+  # Full crawl: mỗi 6 tiếng để cập nhật nếu lịch thay đổi
+  # - cron: "0 */6 * * *"
+
+  # Chạy tay từ GitHub UI
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Chế độ: full | watch"
+        required: false
+        default: "full"
+      months:
+        description: "Số tháng crawl (chỉ dùng khi mode=full)"
+        required: false
+        default: "6"
+
+jobs:
+  crawl:
+    name: Crawl & Push to Firestore
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # 3. Cài dependencies Python
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # 4. Cài Playwright và Chromium
+      - name: Install Playwright & Chromium
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps chromium
+
+      # 5. Chạy script crawl
+      - name: Run crawl_calendar.py
+        run: python crawl_calendar.py
+        env:
+          # Tài khoản (ẩn trong secrets)
+          HM_USERNAME:             ${{ secrets.HM_USERNAME }}
+          HM_PASSWORD:             ${{ secrets.HM_PASSWORD }}
+          # URL (ẩn trong secrets, không có trong mã nguồn)
+          HM_BASE_URL:             ${{ secrets.HM_BASE_URL }}
+          HM_CAL_PATH:             ${{ secrets.HM_CAL_PATH }}
+          HM_LOGIN_PATH:           ${{ secrets.HM_LOGIN_PATH }}
+          HM_LOGOUT_V2_PATH:       ${{ secrets.HM_LOGOUT_V2_PATH }}
+          HM_LOGOUT_FINAL_PATH:    ${{ secrets.HM_LOGOUT_FINAL_PATH }}
+          # Firebase
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
+          # Tham số chạy
+          CRAWL_MODE:              ${{ github.event.inputs.mode || 'full' }}
+          MONTHS_TO_CRAWL:         ${{ github.event.inputs.months || '6' }}
+          HEADLESS:                "true"

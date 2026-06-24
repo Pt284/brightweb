@@ -43,6 +43,28 @@ let currentCourseId = null, currentLessonId = null;
 let _isAdmin = false;
 let _openTreeNodes = new Set();
 let plyrInstance = null;
+
+// Calendar State
+let _calEvents = null;
+let _calEventsLoadedAt = 0;
+let _calViewDate = new Date();
+let _calViewMode = 'month';
+let _calLiveBannerTimer = null;
+let _liveModalPlyr = null;
+let _liveModalHls = null;
+let _liveElapsedTimer = null;
+const CAL_CACHE_TTL = 3 * 60 * 1000; // 3 phút
+
+const SUBJECT_COURSE_ORDER = {
+  "Toán": 3,
+  "Tư duy toán": 3,
+  "Đọc hiểu": 5,
+  "Ngữ văn": 5,
+  "Sinh học": 4,
+  "Vật lí": 4,
+  "Hóa học": 4,
+  "Khoa học": 4,
+};
 // Phase 2
 // Fix 5: ngăn set editMode từ DevTools console
 let _editModeInternal = false;
@@ -151,6 +173,7 @@ function handleHash() {
   const h = window.location.hash;
   if (!h || h === '#home') { navigate('home'); return; }
   const p = h.replace('#', '').split('/');
+  if (p[0] === 'calendar') { renderCalendar(); return; }
   if (p[0] === 'course' && p[1]) { renderCourse(p[1]); return; }
   if (p[0] === 'lesson' && p[1] && p[2]) { renderLesson(p[1], p[2]); return; }
   navigate('home');
@@ -185,6 +208,21 @@ auth.onAuthStateChanged(async user => {
     await loadProgress();
     hideLoad();
     handleHash();
+
+    updateLiveBanner();
+    if (_calLiveBannerTimer) clearInterval(_calLiveBannerTimer);
+    _calLiveBannerTimer = setInterval(updateLiveBanner, 60 * 1000);
+
+    // Auto open live
+    loadCalendarData().then(events => {
+      const todayStr = getTodayStr();
+      const liveEvent = events.find(e => e.date === todayStr && e.m3u8 && e.status === 'live');
+      if (!liveEvent) return;
+      const sessionKey = `live_opened_${liveEvent.date}_${liveEvent.time}`;
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, '1');
+      openLiveModal(liveEvent);
+    });
   } else {
     editMode = false;
     _isAdmin = false;
@@ -1555,6 +1593,32 @@ function renderLesson(courseId, lessonId) {
     localStorage.setItem(`last_lesson_${courseId}_${currentUser.uid}`, lessonId);
   }
 
+  // Live in lesson
+  loadCalendarData().then(events => {
+    const todayStr = getTodayStr();
+    const todayEvents = events.filter(e => e.date === todayStr && e.m3u8);
+    for (const ev of todayEvents) {
+      const expectedOrder = SUBJECT_COURSE_ORDER[ev.subject];
+      if (course.order !== expectedOrder) continue;
+      const score = jaccardSim(normalizeTitle(ev.title), normalizeTitle(lesson.title));
+      if (score < 0.35) continue;
+      const lessonMain = document.querySelector('.lesson-main');
+      if (!lessonMain) continue;
+      const existing = lessonMain.querySelector('.live-in-lesson-banner');
+      if (existing) existing.remove();
+      const banner = document.createElement('div');
+      banner.className = 'live-in-lesson-banner';
+      banner.innerHTML = `
+        <span class="live-pulse-dot"></span>
+        <span>🔴 ĐANG LIVE — <strong>${ev.title}</strong></span>
+        <button id="btn-open-live-in-lesson" class="btn btn-sm" style="margin-left:auto">▶ Xem ngay</button>
+      `;
+      lessonMain.insertBefore(banner, lessonMain.firstChild);
+      document.getElementById('btn-open-live-in-lesson').onclick = () => openLiveModal(ev);
+      break;
+    }
+  });
+
   if (typeof destroyPlyr === 'function') destroyPlyr();
   const vw = $('video-wrap');
   const nv = $('no-video');
@@ -1869,7 +1933,10 @@ async function disableFlattenAll() {
 // ── ADMIN ──
 function toggleAdmin() {
   $('admin-panel').classList.toggle('open');
-  if ($('admin-panel').classList.contains('open')) loadAdminData();
+  if ($('admin-panel').classList.contains('open')) {
+    loadAdminData();
+    initGoLivePanel();
+  }
 }
 
 async function loadAdminData() {
@@ -2275,6 +2342,559 @@ function getMockData() {
 // EVENT BINDINGS — thay thế onclick= trong HTML
 // Thêm vào CUỐI app.js sau tất cả function declarations
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// CALENDAR MODULE
+// ─────────────────────────────────────────────
+
+async function loadCalendarData() {
+  if (_calEvents && Date.now() - _calEventsLoadedAt < CAL_CACHE_TTL) {
+    return _calEvents;
+  }
+  try {
+    const doc = await db.collection('app_data').doc('schedule').get();
+    if (!doc.exists) { _calEvents = []; return []; }
+    const raw = doc.data().json;
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    _calEvents = parsed.events || [];
+    _calEventsLoadedAt = Date.now();
+    return _calEvents;
+  } catch (e) {
+    console.warn('loadCalendarData error:', e);
+    _calEvents = [];
+    return [];
+  }
+}
+
+function invalidateCalendarCache() {
+  _calEvents = null;
+  _calEventsLoadedAt = 0;
+}
+
+function _calDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function _calFirstDayOfWeek(year, month) {
+  // 0=Sun ... 6=Sat → chuyển sang T2-CN (0=Mon ... 6=Sun)
+  const d = new Date(year, month, 1).getDay();
+  return (d + 6) % 7;
+}
+
+function _fmtMonthTitle(date) {
+  return `Tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+}
+
+function _fmtDateVN(dateStr) {
+  // '2026-06-15' → 'Thứ Hai, 15/06/2026'
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function _eventsForMonth(events, year, month) {
+  const prefix = `${year}-${String(month+1).padStart(2,'0')}-`;
+  return events.filter(e => e.date && e.date.startsWith(prefix));
+}
+
+function _eventsForDate(events, dateStr) {
+  return events.filter(e => e.date === dateStr);
+}
+
+// Parse color string ra CSS usable
+function _parseColor(colorStr) {
+  if (!colorStr) return '#4096ee';
+  // rgba(...) or #hex or rgb(...)
+  return colorStr.trim();
+}
+
+function renderCalendarMonthView(events) {
+  const year  = _calViewDate.getFullYear();
+  const month = _calViewDate.getMonth();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  const firstDow = _calFirstDayOfWeek(year, month);
+  const daysInMonth = _calDaysInMonth(year, month);
+  const prevDays = _calDaysInMonth(year, month - 1);
+
+  // Update subtitle
+  const monthEvents = _eventsForMonth(events, year, month);
+  const upcoming = monthEvents.filter(e => e.status !== 'past').length;
+  const total    = monthEvents.length;
+  const subtitleEl = document.getElementById('cal-subtitle');
+  if (subtitleEl) {
+    subtitleEl.innerHTML = total > 0
+      ? `Bạn có <span>${total} buổi học LIVE</span> trong tháng này`
+      : 'Không có buổi học nào trong tháng này';
+  }
+
+  const WEEKDAYS = ['THU 2', 'THU 3', 'THU 4', 'THU 5', 'THU 6', 'THU 7', 'CN'];
+  const WEEKDAYS_FULL = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+
+  let html = `<div class="cal-grid-wrap">
+    <div class="cal-week-header">
+      ${WEEKDAYS.map(d => `<div class="cal-week-header-cell">${d}</div>`).join('')}
+    </div>
+    <div class="cal-body">`;
+
+  // Cells truoc thang (thang truoc)
+  for (let i = 0; i < firstDow; i++) {
+    const day = prevDays - firstDow + 1 + i;
+    const mo = month === 0 ? 12 : month;
+    const yr = month === 0 ? year - 1 : year;
+    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    html += renderCalDay(day, dateStr, events, todayStr, true);
+  }
+
+  // Cells trong thang
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    html += renderCalDay(day, dateStr, events, todayStr, false);
+  }
+
+  // Cells sau thang (thang sau) — lấp chện
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  const afterCells = totalCells - firstDow - daysInMonth;
+  for (let i = 1; i <= afterCells; i++) {
+    const mo = month === 11 ? 1 : month + 2;
+    const yr = month === 11 ? year + 1 : year;
+    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+    html += renderCalDay(i, dateStr, events, todayStr, true);
+  }
+
+  html += `</div></div>`;
+  return html;
+}
+
+function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
+  const isToday = dateStr === todayStr;
+  const cls = ['cal-day', isOther ? 'other-month' : '', isToday ? 'today' : ''].filter(Boolean).join(' ');
+  const dayEvents = _eventsForDate(events, dateStr);
+
+  const numHtml = isToday
+    ? `<div class="cal-day-number"><span class="today-dot">${dayNum}</span></div>`
+    : `<div class="cal-day-number">${dayNum}</div>`;
+
+  const evHtml = dayEvents.map(ev => {
+    const color = _parseColor(ev.color);
+    const isPast = ev.status === 'past';
+    const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
+    const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
+    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="border-left-color:${color};color:${color}" title="${ev.subject} — ${ev.title}" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}>
+      <div class="cal-event-time">${ev.time || ''}</div>
+      <div class="cal-event-subject">${ev.subject || ''}</div>
+      <div class="cal-event-title">${ev.title || ''}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="${cls}" data-date="${dateStr}">${numHtml}${evHtml}</div>`;
+}
+
+function renderCalendarListView(events) {
+  const year  = _calViewDate.getFullYear();
+  const month = _calViewDate.getMonth();
+
+  // Nhóm theo ngày, chỉ lấy sự kiện của tháng đang xem
+  const monthEvents = _eventsForMonth(events, year, month);
+  if (!monthEvents.length) {
+    return `<div class="cal-empty">📅 Không có buổi học nào trong tháng này.</div>`;
+  }
+
+  // Group by date
+  const groups = {};
+  monthEvents.forEach(ev => {
+    if (!groups[ev.date]) groups[ev.date] = [];
+    groups[ev.date].push(ev);
+  });
+
+  // Update subtitle
+  const subtitleEl = document.getElementById('cal-subtitle');
+  if (subtitleEl) {
+    subtitleEl.innerHTML = `Bạn có <span>${monthEvents.length} buổi học LIVE</span> trong tháng này`;
+  }
+
+  let html = '<div class="cal-list-wrap">';
+  Object.keys(groups).sort().forEach(dateStr => {
+    const label = _fmtDateVN(dateStr);
+    const dayNum = parseInt(dateStr.split('-')[2]);
+    html += `<div class="cal-list-group">
+      <div class="cal-list-date-header">
+        <span class="date-badge">${dayNum}</span>
+        <span>${label}</span>
+      </div>`;
+    groups[dateStr].forEach(ev => {
+      const color = _parseColor(ev.color);
+      const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
+      const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
+      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr} style="cursor:pointer">
+        <div class="cal-list-dot" style="background:${color}"></div>
+        <div class="cal-list-info">
+          <div class="cal-list-subject">${ev.subject || ''}</div>
+          <div class="cal-list-title">${ev.title || ''}</div>
+        </div>
+        <div class="cal-list-time">${ev.time || ''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+async function renderCalendar() {
+  showPage('calendar');
+  window.location.hash = '#calendar';
+  if (typeof destroyPlyr === 'function') destroyPlyr();
+
+  const titleEl   = document.getElementById('cal-month-title');
+  const contentEl = document.getElementById('cal-content');
+  if (!contentEl) return;
+
+  if (titleEl) titleEl.textContent = _fmtMonthTitle(_calViewDate);
+  contentEl.innerHTML = '<div class="cal-loading">Đang tải lịch học...</div>';
+
+  const events = await loadCalendarData();
+
+  if (titleEl) titleEl.textContent = _fmtMonthTitle(_calViewDate);
+
+  if (_calViewMode === 'month') {
+    contentEl.innerHTML = renderCalendarMonthView(events);
+  } else {
+    contentEl.innerHTML = renderCalendarListView(events);
+  }
+
+  attachCalendarEventListeners();
+
+  // Sync active button
+  document.querySelectorAll('.cal-view-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.calview === _calViewMode);
+  });
+}
+
+function attachCalendarEventListeners() {
+  const content = document.getElementById('cal-content');
+  const fresh = content.cloneNode(true);
+  content.parentNode.replaceChild(fresh, content);
+  
+  document.getElementById('cal-content').addEventListener('click', function(e) {
+    const ev = e.target.closest('[data-date][data-subject]');
+    if (!ev) return;
+    handleCalendarEventClick({
+      date: ev.dataset.date,
+      subject: ev.dataset.subject,
+      title: ev.dataset.title,
+      m3u8: ev.dataset.m3u8 || null,
+      liveStartEpoch: ev.dataset.livestart ? parseInt(ev.dataset.livestart) : null
+    });
+  });
+}
+
+function handleCalendarEventClick(ev) {
+  if (ev.m3u8) {
+    openLiveModal(ev);
+  } else {
+    navigateToMappedLesson(ev);
+  }
+}
+
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function normalizeTitle(str) {
+  str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  str = str.replace(/[^a-zA-Z0-9\s]/g, " ");
+  const tokens = str.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  const stop = new Set(["va", "cac", "mot", "cua", "trong", "la", "de", "co", "len", "bai", "chuong"]);
+  return tokens.filter(w => !stop.has(w));
+}
+
+function jaccardSim(a, b) {
+  const sa = new Set(a), sb = new Set(b);
+  const inter = [...sa].filter(x => sb.has(x)).length;
+  const union = new Set([...sa, ...sb]).size;
+  return union === 0 ? 0 : inter / union;
+}
+
+function navigateToMappedLesson(calEvent) {
+  const order = SUBJECT_COURSE_ORDER[calEvent.subject];
+  if (order === undefined) { navigate('home'); return; }
+  
+  const course = appData.courses.find(c => c.order === order);
+  if (!course) { navigate('home'); return; }
+  
+  const lessons = getAllLessons(course.tree);
+  const calTokens = normalizeTitle(calEvent.title);
+  
+  let bestLesson = null;
+  let bestScore = 0;
+  
+  for (const l of lessons) {
+    const score = jaccardSim(calTokens, normalizeTitle(l.title));
+    if (score > bestScore) {
+      bestScore = score;
+      bestLesson = l;
+    }
+  }
+  
+  if (bestScore >= 0.35 && bestLesson) {
+    navigate('lesson', course.id, bestLesson.id);
+  } else {
+    navigate('course', course.id);
+  }
+}
+
+async function updateLiveBanner() {
+  const banner = document.getElementById('live-banner');
+  if (!banner) return;
+  const events = await loadCalendarData();
+  const todayStr = getTodayStr();
+  const todayEvents = events.filter(e => e.date === todayStr);
+  
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  
+  let activeEvent = null;
+  
+  // Ưu tiên 1: Đang live
+  activeEvent = todayEvents.find(e => e.m3u8);
+  
+  // Ưu tiên 2: Sắp live
+  if (!activeEvent) {
+    activeEvent = todayEvents.find(e => {
+      const parts = (e.time || '00:00').split(':');
+      const evMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      const diff = evMin - nowMin;
+      return diff <= 60 && diff >= -30;
+    });
+  }
+  
+  if (!activeEvent) {
+    banner.style.display = 'none';
+    return;
+  }
+  
+  banner.style.display = 'flex';
+  banner.className = activeEvent.m3u8 ? 'live-active' : 'live-upcoming';
+  
+  const icon = document.getElementById('live-banner-dot');
+  const text = document.getElementById('live-banner-text');
+  const cd   = document.getElementById('live-banner-countdown');
+  
+  banner.onclick = () => handleCalendarEventClick(activeEvent);
+  
+  if (activeEvent.m3u8) {
+    text.textContent = `ĐANG LIVE: ${activeEvent.subject} — ${activeEvent.title}`;
+    cd.textContent = '';
+  } else {
+    text.textContent = `${activeEvent.time} — ${activeEvent.subject} — ${activeEvent.title}`;
+    const parts = (activeEvent.time || '00:00').split(':');
+    const evMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    const diff = evMin - nowMin;
+    cd.textContent = diff > 0 ? `Còn ${diff} phút` : 'Đang bắt đầu';
+  }
+}
+
+function openLiveModal(ev) {
+  if (!ev.m3u8) {
+    navigateToMappedLesson(ev);
+    return;
+  }
+  
+  const modal = document.getElementById('live-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  
+  document.getElementById('live-modal-subject').textContent = ev.subject;
+  document.getElementById('live-modal-title-text').textContent = ev.title;
+  
+  const elapsedEl = document.getElementById('live-modal-elapsed');
+  if (ev.liveStartEpoch) {
+    _liveElapsedTimer = setInterval(() => {
+      const diff = Math.floor((Date.now() - ev.liveStartEpoch) / 1000);
+      if (diff < 0) return;
+      const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+      const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+      const s = String(diff % 60).padStart(2, '0');
+      elapsedEl.textContent = `Đã phát: ${h}:${m}:${s}`;
+    }, 1000);
+  } else {
+    elapsedEl.textContent = '';
+  }
+  
+  const videoEl = document.getElementById('live-video');
+  if (window.Hls && Hls.isSupported()) {
+    _liveModalHls = new Hls({ enableWorker: true });
+    _liveModalHls.loadSource(ev.m3u8);
+    _liveModalHls.attachMedia(videoEl);
+    _liveModalHls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play());
+  } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    videoEl.src = ev.m3u8;
+    videoEl.addEventListener('loadedmetadata', () => videoEl.play());
+  }
+  
+  _liveModalPlyr = new Plyr(videoEl, {
+    controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen', 'settings'],
+    settings: ['speed'],
+  });
+  
+  document.getElementById('live-goto-lesson').onclick = () => {
+    closeLiveModal();
+    navigateToMappedLesson(ev);
+  };
+  
+  const closeBtn = document.getElementById('live-modal-close');
+  closeBtn.onclick = closeLiveModal;
+  
+  modal.onclick = (e) => {
+    if (e.target === modal) closeLiveModal();
+  };
+}
+
+function closeLiveModal() {
+  const modal = document.getElementById('live-modal');
+  if (modal) modal.style.display = 'none';
+  if (_liveElapsedTimer) clearInterval(_liveElapsedTimer);
+  if (_liveModalPlyr) { _liveModalPlyr.destroy(); _liveModalPlyr = null; }
+  if (_liveModalHls) { _liveModalHls.destroy(); _liveModalHls = null; }
+  const videoEl = document.getElementById('live-video');
+  if (videoEl) videoEl.src = '';
+}
+
+async function setLiveModeOnEvent(eventToFind, m3u8Url) {
+  const docRef = db.collection('app_data').doc('schedule');
+  const doc = await docRef.get();
+  if (!doc.exists) return;
+  const raw = doc.data().json;
+  const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const events = parsed.events || [];
+  
+  let found = false;
+  for (const e of events) {
+    if (e.date === eventToFind.date && e.time === eventToFind.time && e.title === eventToFind.title) {
+      e.m3u8 = m3u8Url;
+      e.status = m3u8Url ? 'live' : 'past';
+      if (m3u8Url && !e.liveStartEpoch) e.liveStartEpoch = Date.now();
+      if (!m3u8Url) e.liveStartEpoch = null;
+      found = true;
+      break;
+    }
+  }
+  
+  if (found) {
+    parsed.lastUpdated = new Date().toISOString();
+    await docRef.set({ json: JSON.stringify(parsed), updatedAt: parsed.lastUpdated });
+    invalidateCalendarCache();
+    updateLiveBanner();
+  }
+}
+
+async function initGoLivePanel() {
+  const dateSel = document.getElementById('go-live-date');
+  const lessonSel = document.getElementById('go-live-lesson');
+  const m3u8Input = document.getElementById('go-live-m3u8');
+  const statusEl = document.getElementById('go-live-status');
+  if (!dateSel || !lessonSel) return;
+  
+  const events = await loadCalendarData();
+  const todayStr = getTodayStr();
+  
+  // Các ngày từ hôm nay + 7 ngày
+  const groups = {};
+  for (const ev of events) {
+    if (ev.date >= todayStr) {
+      if (!groups[ev.date]) groups[ev.date] = [];
+      groups[ev.date].push(ev);
+    }
+  }
+  
+  dateSel.innerHTML = '';
+  const sortedDates = Object.keys(groups).sort();
+  for (const d of sortedDates) {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = _fmtDateVN(d);
+    dateSel.appendChild(opt);
+  }
+  
+  function populateLessons() {
+    lessonSel.innerHTML = '';
+    const d = dateSel.value;
+    if (!groups[d]) return;
+    for (const ev of groups[d]) {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({date: ev.date, time: ev.time, title: ev.title, subject: ev.subject});
+      opt.textContent = `[${ev.time}] ${ev.subject} — ${ev.title}`;
+      lessonSel.appendChild(opt);
+    }
+  }
+  
+  dateSel.onchange = populateLessons;
+  if (sortedDates.length > 0) {
+    dateSel.value = todayStr;
+    if (!groups[todayStr]) dateSel.value = sortedDates[0];
+    populateLessons();
+  }
+  
+  document.getElementById('btn-go-live').onclick = async () => {
+    if (!lessonSel.value || !m3u8Input.value) {
+      statusEl.textContent = '❌ Vui lòng chọn bài và nhập m3u8';
+      return;
+    }
+    const ev = JSON.parse(lessonSel.value);
+    statusEl.textContent = 'Đang đẩy lên server...';
+    await setLiveModeOnEvent(ev, m3u8Input.value);
+    statusEl.textContent = '✅ Đã Go Live!';
+    m3u8Input.value = '';
+  };
+  
+  document.getElementById('btn-stop-live').onclick = async () => {
+    const todayEvents = groups[todayStr] || [];
+    const liveEv = todayEvents.find(e => e.m3u8);
+    if (!liveEv) {
+      statusEl.textContent = '⚠️ Không có bài nào đang live hôm nay';
+      return;
+    }
+    statusEl.textContent = 'Đang dừng...';
+    await setLiveModeOnEvent({date: liveEv.date, time: liveEv.time, title: liveEv.title}, null);
+    closeLiveModal();
+    statusEl.textContent = '■ Đã dừng live';
+  };
+}
+function _initCalendarButtons() {
+  const on = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  };
+  on('cal-today-btn', async () => { 
+    _calViewDate = new Date(); 
+    await renderCalendar(); 
+    const todayCell = document.querySelector('.cal-day.today');
+    if (todayCell) {
+      todayCell.classList.remove('flash-today');
+      void todayCell.offsetWidth;
+      todayCell.classList.add('flash-today');
+      setTimeout(() => todayCell.classList.remove('flash-today'), 1600);
+    }
+    if (_calViewMode === 'list') {
+      const todayDate = getTodayStr();
+      const headers = document.querySelectorAll('.cal-list-date-header');
+      for (const h of headers) {
+        if (h.dataset.date === todayDate) {
+          h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          break;
+        }
+      }
+    }
+  });
+  on('cal-prev-btn',  () => { _calViewDate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() - 1, 1); renderCalendar(); });
+  on('cal-next-btn',  () => { _calViewDate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() + 1, 1); renderCalendar(); });
+  on('cal-view-month', () => { _calViewMode = 'month'; renderCalendar(); });
+  on('cal-view-list',  () => { _calViewMode = 'list';  renderCalendar(); });
+}
+_initCalendarButtons();
+
+// ─────────────────────────────────────────────
 (function bindEvents() {
   function on(id, evt, fn) {
     const el = document.getElementById(id);
@@ -2283,6 +2903,7 @@ function getMockData() {
 
   // Header
   on('btn-home-logo', 'click', () => navigate('home'));
+  on('btn-calendar', 'click', renderCalendar);
   on('btn-signout', 'click', signOut);
   on('btn-admin', 'click', toggleAdmin);
   on('btn-undo', 'click', doUndo);

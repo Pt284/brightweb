@@ -164,6 +164,7 @@
   <script src="container.js"></script>
   <script src="button.js"></script>
   <script src="overrides.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
   <link rel="stylesheet" href="color-settings.css">
 </head>
 
@@ -175,11 +176,17 @@
     <span class="logo" id="btn-home-logo">🏠 GO TO HOME 😈</span>
     <div class="header-right">
       <span id="user-info"></span>
+      <div id="live-banner" style="display:none" tabindex="0" role="button" aria-live="polite">
+        <span id="live-banner-dot"></span>
+        <span id="live-banner-text"></span>
+        <span id="live-banner-countdown"></span>
+      </div>
       <button id="btn-admin" class="btn-icon" title="Admin" style="display:none">⚙️</button>
       <button id="btn-undo" class="btn-icon" title="Hoàn tác (Ctrl+Z)" style="display:none">↩</button>
       <button id="btn-redo" class="btn-icon" title="Làm lại" style="display:none">↪</button>
       <button id="btn-reset-courses" class="btn-icon" title="Reset tất cả khóa học (Home)" style="display:none; color: var(--color-red);">🔄</button>
       <button id="btn-edit" class="btn-icon" title="Chỉnh sửa" style="display:none">✏️</button>
+      <button class="btn btn-outline btn-sm" id="btn-calendar" title="Lịch học">📅 Lịch</button>
       <button class="btn btn-outline btn-sm" id="btn-signout">Đăng xuất</button>
     </div>
   </div>
@@ -213,6 +220,19 @@
     <div class="section-label">Truy cập trái phép</div>
     <div id="security-logs"></div>
     <button class="btn-reload" id="btn-reload-admin">🔄 Tải lại</button>
+
+    <hr>
+    <div class="section-label">🔴 Go Live (Thủ công)</div>
+    <div class="admin-row" style="flex-direction:column; gap:8px; align-items:flex-start;">
+      <select id="go-live-date" class="admin-input" style="width:100%"></select>
+      <select id="go-live-lesson" class="admin-input" style="width:100%"></select>
+      <input id="go-live-m3u8" class="admin-input" placeholder="Dán link m3u8..." style="width:100%" />
+      <div style="display:flex;gap:6px">
+        <button id="btn-go-live" class="btn btn-primary btn-sm">▶ Go Live</button>
+        <button id="btn-stop-live" class="btn btn-sm" style="border-color:var(--color-red);color:var(--color-red)">■ Stop</button>
+      </div>
+      <div id="go-live-status" style="font-size:.75rem;color:var(--color-text-muted)"></div>
+    </div>
   </div>
 
   <div id="page-landing" class="page">
@@ -240,6 +260,27 @@
     </div>
     <div class="course-main">
       <p>Chọn một bài học từ menu bên trái.</p>
+    </div>
+  </div>
+
+  <div id="page-calendar" class="page">
+    <div class="cal-toolbar">
+      <div class="cal-toolbar-left">
+        <button id="cal-today-btn" class="cal-nav-btn">Hôm nay</button>
+        <button id="cal-prev-btn" class="cal-nav-btn">‹</button>
+        <button id="cal-next-btn" class="cal-nav-btn">›</button>
+        <div class="cal-title-block">
+          <div class="cal-month" id="cal-month-title">—</div>
+          <div class="cal-subtitle" id="cal-subtitle"></div>
+        </div>
+      </div>
+      <div class="cal-toolbar-right">
+        <button class="cal-view-btn active" id="cal-view-month" data-calview="month">Tháng</button>
+        <button class="cal-view-btn" id="cal-view-list" data-calview="list">Danh sách</button>
+      </div>
+    </div>
+    <div id="cal-content">
+      <div class="cal-loading">Đang tải lịch học...</div>
     </div>
   </div>
 
@@ -271,6 +312,25 @@
   <div id="edit-modal" class="glass" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
            z-index:1001;padding:24px;min-width:320px;max-width:440px;
            max-height:80vh;overflow-y:auto;">
+  </div>
+
+  <div id="live-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="live-modal-title">
+    <div id="live-modal-inner">
+      <div id="live-modal-header">
+        <div id="live-modal-meta">
+          <div id="live-modal-subject"></div>
+          <div id="live-modal-title-text"></div>
+          <div id="live-modal-elapsed"></div>
+        </div>
+        <button id="live-modal-close" aria-label="Đóng live">✕</button>
+      </div>
+      <div id="live-modal-video-wrap">
+        <video id="live-video" playsinline></video>
+      </div>
+      <div id="live-modal-footer">
+        <button id="live-goto-lesson" class="btn btn-primary btn-sm">Xem trong bài học →</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

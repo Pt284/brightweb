@@ -153,19 +153,22 @@ def normalize_time(raw: str) -> str:
 # ── PLAYWRIGHT HELPERS ───────────────────────────────────────────────────────
 def check_logged_in(page) -> bool:
     """
-    Kiểm tra đã đăng nhập chưa.
-    Sau login thành công, HocMai redirect đến /study (hoặc /study/calendar).
-    Nếu URL chứa 'login' hoặc 'loginv2' thì chưa login.
+    Kiểm tra đã đăng nhập chưa bằng cách xem có MoodleSession không
+    và kiểm tra xem có lấy được calendar-wrapper không.
     """
     try:
+        # Check cookie first
+        cookies = page.context.cookies()
+        if not any(c.get("name") == "MoodleSession" for c in cookies):
+            return False
+
         page.wait_for_load_state("domcontentloaded", timeout=15000)
         current = page.url.lower()
         if "loginv2" in current or "/login" in current:
             return False
-        # Kiểm tra có phần tử đặc trưng sau login không
-        # (.calendar-wrapper trên trang calendar, hoặc body không có form login)
-        has_login_form = page.query_selector('#sso-form, form[action*="loginv2"]')
-        return has_login_form is None
+            
+        # Kiểm tra có phần tử đặc trưng của trang lịch không
+        return page.query_selector(".calendar-wrapper") is not None
     except Exception:
         return False
 
@@ -200,21 +203,18 @@ def do_login(page):
     page.fill(password_sel, HM_PASSWORD)
     time.sleep(0.2)
 
-    # Submit form (type=submit trong form sso-form)
-    page.click('input[type="submit"][value], button[type="submit"]')
+    # Dùng press("Enter") trên password thay vì click để tránh nhầm form tìm kiếm
+    page.locator(password_sel).press("Enter")
 
-    # Chờ redirect đến /study
-    try:
-        page.wait_for_url("**/study**", timeout=20000)
-    except Exception:
-        # Fallback: chờ networkidle
-        page.wait_for_load_state("networkidle", timeout=20000)
-        time.sleep(2)
+    # Chờ redirect hoàn tất
+    page.wait_for_load_state("networkidle", timeout=20000)
+    time.sleep(2)
 
-    current = page.url.lower()
-    if "loginv2" in current or "/login" in current:
-        raise RuntimeError("❌ Đăng nhập thất bại — kiểm tra lại tài khoản/mật khẩu.")
-    print(f"  ✓ Đăng nhập thành công! URL: {page.url}")
+    # Xác nhận qua cookie thay vì URL (vì có thể bị redirect linh tinh)
+    cookies = page.context.cookies()
+    if not any(c.get("name") == "MoodleSession" for c in cookies):
+        raise RuntimeError("❌ Đăng nhập thất bại — Không tìm thấy MoodleSession cookie.")
+    print("  ✓ Đăng nhập thành công (đã lấy được session cookie)!")
 
 
 def do_logout(page):

@@ -407,7 +407,7 @@ def main():
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
+                "Chrome/149.0.0.0 Safari/537.36"
             ),
             locale="vi-VN",
             timezone_id="Asia/Ho_Chi_Minh"

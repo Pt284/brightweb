@@ -173,44 +173,44 @@ def check_logged_in(page) -> bool:
         return False
 
 
-def _resolve_real_input(page, name_attr: str, real_id: str | None = None):
+def _first_visible_input(page, *selectors: str):
     """
-    Trang login có field 'bẫy' (honeypot) trùng name với field thật, ví dụ:
-      - input#password   (bẫy — class "input-icon icon-shield")
-      - input#realpass   (field thật — class "edit-login")
-    Cả 2 đều khớp input[name="password"] nên locator bị strict-mode violation.
-    Hàm này luôn trả về field THẬT:
-      1. Nếu biết sẵn id thật (real_id) và nó tồn tại trên trang → dùng luôn.
-      2. Nếu không, lấy tất cả input[name=...]; nếu có nhiều hơn 1 (có bẫy),
-         field thật luôn là field cuối cùng trong DOM (bẫy được chèn trước) →
-         dùng .last. Nếu chỉ có 1 → dùng luôn field đó.
-    """
-    if real_id:
-        cand = page.locator(f"#{real_id}")
-        if cand.count() > 0:
-            return cand.first
+    Đăng nhập kiểu đơn giản (giống video.py): trả về input ĐẦU TIÊN đang
+    HIỂN THỊ khớp 1 trong các selector truyền vào.
 
-    loc = page.locator(f'input[name="{name_attr}"]')
-    count = loc.count()
-    if count == 0:
-        raise RuntimeError(f"❌ Không tìm thấy field input[name=\"{name_attr}\"]")
-    if count > 1:
-        print(f"  ⚠ Phát hiện {count} field input[name=\"{name_attr}\"] "
-              f"(có thể có honeypot chống bot) → dùng field cuối cùng trong DOM.")
-        return loc.last
-    return loc.first
+    Bản cũ (_resolve_real_input) đoán field thật luôn là field CUỐI cùng
+    trong DOM khi có honeypot trùng name — giả định này sai khi trang đổi
+    cấu trúc (honeypot lại nằm sau), dẫn tới fill() nhầm field bị ẩn rồi
+    timeout. Hàm này không đoán vị trí nữa — chỉ quét tất cả field khớp
+    từng selector và lấy field đầu tiên có is_visible() == True, vì honeypot
+    luôn bị ẩn bằng CSS (display:none/visibility:hidden) bất kể nó nằm ở
+    đâu trong DOM.
+    """
+    for sel in selectors:
+        loc = page.locator(sel)
+        for i in range(loc.count()):
+            el = loc.nth(i)
+            try:
+                if el.is_visible():
+                    return el
+            except Exception:
+                continue
+    return None
 
 
 def do_login(page):
     """
-    Đăng nhập theo đúng flow trong login.har:
+    Đăng nhập bằng tài khoản/mật khẩu — phiên bản đơn giản hoá theo video.py.
+
+    Flow login (login.har):
     - URL: POST /loginv2/index.php
     - Fields: a (rỗng), username, password
     - Content-Type: multipart/form-data
     - Success: redirect 302 → /study
 
-    Lưu ý: trang login có field honeypot trùng name="password" (đôi khi cả
-    "username") để bẫy bot — xem _resolve_real_input().
+    Trang login có thể có field honeypot trùng name="username"/"password"
+    để bẫy bot — xem _first_visible_input() (chọn theo trạng thái hiển thị,
+    không đoán vị trí DOM).
     """
     if not HM_USERNAME or not HM_PASSWORD:
         raise RuntimeError("❌ Thiếu HM_USERNAME hoặc HM_PASSWORD.")
@@ -220,15 +220,23 @@ def do_login(page):
     # Mở trang login trước để lấy cookie phiên
     page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_load_state("networkidle", timeout=20000)
+    time.sleep(1)
 
-    # Resolve field THẬT, bỏ qua field bẫy (xem docstring _resolve_real_input)
-    username_field = _resolve_real_input(page, "username", real_id="realuser")
-    password_field = _resolve_real_input(page, "password", real_id="realpass")
+    username_field = _first_visible_input(page, 'input[name="username"]', 'input[type="text"]')
+    password_field = _first_visible_input(page, 'input[name="password"]', 'input[type="password"]')
 
+    if not username_field:
+        raise RuntimeError("❌ Không tìm thấy ô tài khoản (username) đang hiển thị trên trang login.")
+    if not password_field:
+        raise RuntimeError("❌ Không tìm thấy ô mật khẩu (password) đang hiển thị trên trang login.")
+
+    username_field.click()
     username_field.fill(HM_USERNAME)
-    time.sleep(0.2)
+    time.sleep(0.3)
+
+    password_field.click()
     password_field.fill(HM_PASSWORD)
-    time.sleep(0.2)
+    time.sleep(0.3)
 
     # Dùng press("Enter") trên password thay vì click để tránh nhầm form tìm kiếm
     password_field.press("Enter")

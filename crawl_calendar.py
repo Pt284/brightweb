@@ -173,6 +173,34 @@ def check_logged_in(page) -> bool:
         return False
 
 
+def _resolve_real_input(page, name_attr: str, real_id: str | None = None):
+    """
+    Trang login có field 'bẫy' (honeypot) trùng name với field thật, ví dụ:
+      - input#password   (bẫy — class "input-icon icon-shield")
+      - input#realpass   (field thật — class "edit-login")
+    Cả 2 đều khớp input[name="password"] nên locator bị strict-mode violation.
+    Hàm này luôn trả về field THẬT:
+      1. Nếu biết sẵn id thật (real_id) và nó tồn tại trên trang → dùng luôn.
+      2. Nếu không, lấy tất cả input[name=...]; nếu có nhiều hơn 1 (có bẫy),
+         field thật luôn là field cuối cùng trong DOM (bẫy được chèn trước) →
+         dùng .last. Nếu chỉ có 1 → dùng luôn field đó.
+    """
+    if real_id:
+        cand = page.locator(f"#{real_id}")
+        if cand.count() > 0:
+            return cand.first
+
+    loc = page.locator(f'input[name="{name_attr}"]')
+    count = loc.count()
+    if count == 0:
+        raise RuntimeError(f"❌ Không tìm thấy field input[name=\"{name_attr}\"]")
+    if count > 1:
+        print(f"  ⚠ Phát hiện {count} field input[name=\"{name_attr}\"] "
+              f"(có thể có honeypot chống bot) → dùng field cuối cùng trong DOM.")
+        return loc.last
+    return loc.first
+
+
 def do_login(page):
     """
     Đăng nhập theo đúng flow trong login.har:
@@ -180,6 +208,9 @@ def do_login(page):
     - Fields: a (rỗng), username, password
     - Content-Type: multipart/form-data
     - Success: redirect 302 → /study
+
+    Lưu ý: trang login có field honeypot trùng name="password" (đôi khi cả
+    "username") để bẫy bot — xem _resolve_real_input().
     """
     if not HM_USERNAME or not HM_PASSWORD:
         raise RuntimeError("❌ Thiếu HM_USERNAME hoặc HM_PASSWORD.")
@@ -190,21 +221,17 @@ def do_login(page):
     page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_load_state("networkidle", timeout=20000)
 
-    # Điền form: field name chính xác từ HAR là 'username' và 'password'
-    # (form id là sso-form, action là /loginv2/index.php)
-    username_sel = 'input[name="username"]'
-    password_sel = 'input[name="password"]'
+    # Resolve field THẬT, bỏ qua field bẫy (xem docstring _resolve_real_input)
+    username_field = _resolve_real_input(page, "username", real_id="realuser")
+    password_field = _resolve_real_input(page, "password", real_id="realpass")
 
-    if not page.query_selector(username_sel):
-        raise RuntimeError(f"❌ Không tìm thấy field username trên {login_url}")
-
-    page.fill(username_sel, HM_USERNAME)
+    username_field.fill(HM_USERNAME)
     time.sleep(0.2)
-    page.fill(password_sel, HM_PASSWORD)
+    password_field.fill(HM_PASSWORD)
     time.sleep(0.2)
 
     # Dùng press("Enter") trên password thay vì click để tránh nhầm form tìm kiếm
-    page.locator(password_sel).press("Enter")
+    password_field.press("Enter")
 
     # Chờ redirect hoàn tất
     page.wait_for_load_state("networkidle", timeout=20000)

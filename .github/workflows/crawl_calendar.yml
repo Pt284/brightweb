@@ -1,4 +1,4 @@
-name: Crawl HocMai Calendar
+name: Crawl HMCalendar
 
 on:
   # Full crawl: mỗi ngày lúc 3h sáng VN (20:00 UTC)

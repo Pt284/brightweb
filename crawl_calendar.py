@@ -14,9 +14,12 @@ from datetime import datetime, timezone
 # ── CONFIG (100% từ env, không hardcode URL) ─────────────────────────────────
 HM_BASE            = os.environ.get("HM_BASE_URL", "")
 HM_CAL_PATH        = os.environ.get("HM_CAL_PATH", "")
-HM_LOGIN_PATH      = os.environ.get("HM_LOGIN_PATH", "")
-HM_LOGOUT_V2_PATH  = os.environ.get("HM_LOGOUT_V2_PATH", "")
-HM_LOGOUT_FINAL    = os.environ.get("HM_LOGOUT_FINAL_PATH", "")
+# Login: POST multipart/form-data đến /loginv2/index.php
+HM_LOGIN_PATH      = os.environ.get("HM_LOGIN_PATH", "")   # e.g. /loginv2/index.php
+# Logout bước 1: mở trang này để lấy sesskey
+HM_LOGOUT_V2_PATH  = os.environ.get("HM_LOGOUT_V2_PATH", "")  # e.g. /loginv2/logout.php
+# Logout bước 2: moodle logout endpoint (action của form trong trang logout.php)
+HM_LOGOUT_FINAL    = os.environ.get("HM_LOGOUT_FINAL_PATH", "")  # e.g. /login/logout.php
 
 HM_USERNAME  = os.environ.get("HM_USERNAME", "")
 HM_PASSWORD  = os.environ.get("HM_PASSWORD", "")
@@ -39,9 +42,6 @@ def check_config():
 # ── URL HELPERS ───────────────────────────────────────────────────────────────
 def url(path: str) -> str:
     return HM_BASE.rstrip("/") + "/" + path.lstrip("/")
-
-
-CALENDAR_URL = property(lambda self: url(HM_CAL_PATH))
 
 
 # ── FIRESTORE HELPERS ────────────────────────────────────────────────────────
@@ -152,83 +152,119 @@ def normalize_time(raw: str) -> str:
 
 # ── PLAYWRIGHT HELPERS ───────────────────────────────────────────────────────
 def check_logged_in(page) -> bool:
+    """
+    Kiểm tra đã đăng nhập chưa.
+    Sau login thành công, HocMai redirect đến /study (hoặc /study/calendar).
+    Nếu URL chứa 'login' hoặc 'loginv2' thì chưa login.
+    """
     try:
-        page.wait_for_load_state("networkidle", timeout=15000)
-        if "login" in page.url.lower():
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+        current = page.url.lower()
+        if "loginv2" in current or "/login" in current:
             return False
-        return page.query_selector(".calendar-wrapper") is not None
+        # Kiểm tra có phần tử đặc trưng sau login không
+        # (.calendar-wrapper trên trang calendar, hoặc body không có form login)
+        has_login_form = page.query_selector('#sso-form, form[action*="loginv2"]')
+        return has_login_form is None
     except Exception:
         return False
 
 
 def do_login(page):
+    """
+    Đăng nhập theo đúng flow trong login.har:
+    - URL: POST /loginv2/index.php
+    - Fields: a (rỗng), username, password
+    - Content-Type: multipart/form-data
+    - Success: redirect 302 → /study
+    """
     if not HM_USERNAME or not HM_PASSWORD:
         raise RuntimeError("❌ Thiếu HM_USERNAME hoặc HM_PASSWORD.")
     print("  → Đăng nhập bằng tài khoản/mật khẩu...")
-    login_url = url(HM_LOGIN_PATH)
+    login_url = url(HM_LOGIN_PATH)  # /loginv2/index.php
+
+    # Mở trang login trước để lấy cookie phiên
     page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_load_state("networkidle", timeout=20000)
 
-    # Điền username — thử nhiều selector phổ biến
-    for sel in ['input[name="UserLogin[username]"]', '#UserLoginForm_username', 'input[name="username"]']:
-        if page.query_selector(sel):
-            page.fill(sel, HM_USERNAME)
-            break
+    # Điền form: field name chính xác từ HAR là 'username' và 'password'
+    # (form id là sso-form, action là /loginv2/index.php)
+    username_sel = 'input[name="username"]'
+    password_sel = 'input[name="password"]'
 
-    time.sleep(0.3)
+    if not page.query_selector(username_sel):
+        raise RuntimeError(f"❌ Không tìm thấy field username trên {login_url}")
 
-    # Điền password
-    for sel in ['input[name="UserLogin[password]"]', '#UserLoginForm_password', 'input[name="password"]']:
-        if page.query_selector(sel):
-            page.fill(sel, HM_PASSWORD)
-            break
+    page.fill(username_sel, HM_USERNAME)
+    time.sleep(0.2)
+    page.fill(password_sel, HM_PASSWORD)
+    time.sleep(0.2)
 
-    time.sleep(0.3)
-    page.click('button[type="submit"], input[type="submit"]')
-    page.wait_for_load_state("networkidle", timeout=30000)
-    time.sleep(2)
+    # Submit form (type=submit trong form sso-form)
+    page.click('input[type="submit"][value], button[type="submit"]')
 
-    if "login" in page.url.lower():
+    # Chờ redirect đến /study
+    try:
+        page.wait_for_url("**/study**", timeout=20000)
+    except Exception:
+        # Fallback: chờ networkidle
+        page.wait_for_load_state("networkidle", timeout=20000)
+        time.sleep(2)
+
+    current = page.url.lower()
+    if "loginv2" in current or "/login" in current:
         raise RuntimeError("❌ Đăng nhập thất bại — kiểm tra lại tài khoản/mật khẩu.")
-    print("  ✓ Đăng nhập thành công!")
+    print(f"  ✓ Đăng nhập thành công! URL: {page.url}")
 
 
 def do_logout(page):
     """
     Logout đúng flow theo LOGOUT.HAR:
-    1. Vào /loginv2/logout.php → lấy sesskey
-    2. GET /login/logout.php?sesskey=XXX → hoàn tất
+    Bước 1: GET /loginv2/logout.php → trang hỏi 'Bạn có thực sự muốn đăng xuất?'
+    Bước 2: Click nút 'Có' (submit form với sesskey)
+            hoặc lấy sesskey rồi GET /login/logout.php?sesskey=XXX
     """
-    if not HM_LOGOUT_V2_PATH or not HM_LOGOUT_FINAL:
-        print("  ⚠ Thiếu HM_LOGOUT_V2_PATH hoặc HM_LOGOUT_FINAL_PATH — bỏ qua đăng xuất.")
+    if not HM_LOGOUT_V2_PATH:
+        print("  ⚠ Thiếu HM_LOGOUT_V2_PATH — bỏ qua đăng xuất.")
         return
     try:
-        logout_v2 = url(HM_LOGOUT_V2_PATH)
-        logout_final = url(HM_LOGOUT_FINAL)
+        logout_v2 = url(HM_LOGOUT_V2_PATH)  # /loginv2/logout.php
 
         page.goto(logout_v2, wait_until="domcontentloaded", timeout=15000)
         page.wait_for_load_state("networkidle", timeout=10000)
 
-        # Lấy sesskey từ hidden input
+        # Cách 1: Click nút 'Có' trong trang confirmation
+        yes_btn = page.query_selector('input[type="submit"][value="Có"]')
+        if yes_btn:
+            yes_btn.click()
+            page.wait_for_load_state("networkidle", timeout=10000)
+            print("  ✓ Đã đăng xuất thành công (click Có).")
+            return
+
+        # Cách 2: Lấy sesskey và GET /login/logout.php?sesskey=XXX
+        if not HM_LOGOUT_FINAL:
+            print("  ⚠ Không tìm thấy nút Có và thiếu HM_LOGOUT_FINAL_PATH.")
+            return
+
         sesskey = None
         el = page.query_selector('input[name="sesskey"]')
         if el:
             sesskey = el.get_attribute("value")
         else:
-            # Fallback: regex trong page source
             content = page.content()
-            m = re.search(r'sesskey=([A-Za-z0-9]+)', content)
-            if m:
-                sesskey = m.group(1)
+            m_key = re.search(r'sesskey[=:]\s*["\']?([A-Za-z0-9]+)', content)
+            if m_key:
+                sesskey = m_key.group(1)
 
         if not sesskey:
             print("  ⚠ Không tìm được sesskey — bỏ qua đăng xuất.")
             return
 
+        logout_final = url(HM_LOGOUT_FINAL)  # /login/logout.php
         page.goto(f"{logout_final}?sesskey={sesskey}",
                   wait_until="domcontentloaded", timeout=15000)
         page.wait_for_load_state("networkidle", timeout=10000)
-        print("  ✓ Đã đăng xuất thành công.")
+        print("  ✓ Đã đăng xuất thành công (sesskey GET).")
     except Exception as e:
         print(f"  ⚠ Đăng xuất lỗi (bỏ qua): {e}")
 

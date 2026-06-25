@@ -55,6 +55,11 @@ let _liveModalHls = null;
 let _liveElapsedTimer = null;
 const CAL_CACHE_TTL = 3 * 60 * 1000; // 3 phút
 
+// Phase 8: chỉ cho xem lịch trong khoảng 6/2026 → 5/2027
+const CAL_MIN_DATE = new Date(2026, 5, 1);                 // Tháng 6/2026 (0-indexed)
+const CAL_MAX_DATE = new Date(2027, 4, 1);                 // Tháng 5/2027
+const CAL_MAX_DATE_END = new Date(2027, 4, 31, 23, 59, 59); // mốc cuối tháng 5/2027 — dùng để lọc event
+
 const SUBJECT_COURSE_ORDER = {
   "Toán": 3,
   "Tư duy toán": 3,
@@ -65,6 +70,22 @@ const SUBJECT_COURSE_ORDER = {
   "Hóa học": 4,
   "Khoa học": 4,
 };
+// Phase 1 fix: prefix tiền tố chapter id gốc theo môn học.
+// id của chương không thay đổi khi reparent → dùng làm "chìa khóa ổn định"
+// để tìm đúng bài TSA live dù chương đã bị chuyển sang khóa manual-...
+const TSA_CHAPTER_PREFIX = {
+  "Toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
+  "Tư duy toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
+  "Sinh học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Vật lí": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Hóa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Khoa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Đọc hiểu": "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
+  "Ngữ văn": "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
+};
+// Phase 3: caption watchdog interval handle
+let _captionWatchdogInterval = null;
+
 // Phase 2
 // Fix 5: ngăn set editMode từ DevTools console
 let _editModeInternal = false;
@@ -293,6 +314,8 @@ async function loadProgress() {
         if (!local || fsTimestamp > localTimestamp) {
           localStorage.setItem(localKey, JSON.stringify({
             watchedTime: d.watchedTime || 0,
+            // Phase 2: đọc lastPosition từ Firestore, fallback về watchedTime cho data cũ
+            lastPosition: d.lastPosition ?? d.watchedTime ?? 0,
             duration: d.duration || 0,
             watched: d.watched || false,
             updatedAt: fsTimestamp
@@ -321,6 +344,8 @@ async function flushProgressToFirestore(lessonId, courseId) {
       courseId: courseId || currentCourseId || '',
       watched: !!progress[lessonId],
       watchedTime: local.watchedTime || 0,
+      // Phase 2: ghi lastPosition — fallback về watchedTime cho data cũ
+      lastPosition: local.lastPosition ?? local.watchedTime ?? 0,
       duration: local.duration || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
@@ -332,14 +357,18 @@ function getLocalProgress(lessonId) {
   try { return JSON.parse(localStorage.getItem(`prog_${currentUser.uid}_${lessonId}`)); } catch (e) { return null; }
 }
 
-function saveLocalProgress(lessonId, watchedTime, duration, ytId) {
+// Phase 2: thêm tham số lastPosition — vị trí phát lại gần nhất (không chặn giảm)
+// watchedTime vẫn là max — dùng để tính % hoàn thành
+function saveLocalProgress(lessonId, watchedTime, duration, ytId, lastPosition) {
   if (!currentUser) return;
   try {
     const old = getLocalProgress(lessonId) || {};
     const oldMax = old.watchedTime || 0;
     if (watchedTime - oldMax > 600) return;
     const maxTime = Math.max(oldMax, watchedTime);
-    const p = { ...old, watchedTime: maxTime, duration, ytId, updatedAt: Date.now() };
+    // lastPosition là vị trí gần nhất — nếu không truyền, fallback vào watchedTime
+    const pos = (lastPosition !== undefined) ? lastPosition : watchedTime;
+    const p = { ...old, watchedTime: maxTime, lastPosition: pos, duration, ytId, updatedAt: Date.now() };
     localStorage.setItem(`prog_${currentUser.uid}_${lessonId}`, JSON.stringify(p));
     scheduleFirestoreSync(lessonId, currentCourseId, 30000);
   } catch (e) { }
@@ -1593,15 +1622,14 @@ function renderLesson(courseId, lessonId) {
     localStorage.setItem(`last_lesson_${courseId}_${currentUser.uid}`, lessonId);
   }
 
-  // Live in lesson
+  // Live in lesson — dùng cùng resolveLiveCalendarEvent để nhất quán với navigate
   loadCalendarData().then(events => {
     const todayStr = getTodayStr();
     const todayEvents = events.filter(e => e.date === todayStr && e.m3u8);
     for (const ev of todayEvents) {
-      const expectedOrder = SUBJECT_COURSE_ORDER[ev.subject];
-      if (course.order !== expectedOrder) continue;
-      const score = jaccardSim(normalizeTitle(ev.title), normalizeTitle(lesson.title));
-      if (score < 0.35) continue;
+      // Dùng sequence resolver thay vì Jaccard+order — hoạt động đúng sau reparent
+      const resolved = resolveLiveCalendarEvent(ev, events);
+      if (!resolved || resolved.lesson.id !== lesson.id) continue;
       const lessonMain = document.querySelector('.lesson-main');
       if (!lessonMain) continue;
       const existing = lessonMain.querySelector('.live-in-lesson-banner');
@@ -1676,7 +1704,9 @@ function renderLesson(courseId, lessonId) {
         speed: 'Tốc độ', normal: 'Bình thường',
         fullscreen: 'Toàn màn hình', exitFullscreen: 'Thoát toàn màn hình',
         duration: 'Thời lượng', captions: 'Phụ đề', disableCaptions: 'Tắt phụ đề', enableCaptions: 'Bật phụ đề'
-      }
+      },
+      // Phase 4: tách storage key riêng — tránh rò trạng thái muted từ modal live
+      storage: { enabled: true, key: 'plyr_lesson' },
     });
 
     let hasAutoSeeked = false;
@@ -1685,29 +1715,64 @@ function renderLesson(courseId, lessonId) {
         plyrInstance.embed.unloadModule('captions');
         plyrInstance._ytCaptionsOn = false;
       }
+      // Phase 4: ép unmute — phòng trường hợp bị kẹt muted do autoplay policy
+      // Bổ sung: muted=false không đủ nếu volume tự kẹt ở 0 (đã xác nhận muted:false
+      // vẫn câm tiếng) — ép luôn volume nếu phát hiện bị kẹt ở mức gần 0.
+      try {
+        plyrInstance.muted = false;
+        if (!plyrInstance.volume || plyrInstance.volume <= 0.02) plyrInstance.volume = 1;
+      } catch (e) { }
+
+      // Phase 2: seek theo lastPosition (vị trí gần nhất), không phải watchedTime (max)
       const saved = getLocalProgress(currentLessonId);
-      if (saved && saved.watchedTime > 0 && !hasAutoSeeked) {
+      if (saved && !hasAutoSeeked) {
         if (!saved.ytId || saved.ytId === lesson.youtubeId) {
           hasAutoSeeked = true;
-          try { plyrInstance.currentTime = saved.watchedTime; } catch (e) { }
+          const dur = plyrInstance.duration;
+          // lastPosition — fallback về watchedTime cho data cũ chưa có field này
+          let seekTo = saved.lastPosition ?? saved.watchedTime ?? 0;
+          // Nếu đã xem hết (lastPosition ở cuối), resume từ đầu — tránh kẹt tại 0%
+          if (dur > 0 && seekTo >= dur - 5) seekTo = 0;
+          try { if (seekTo > 0) plyrInstance.currentTime = seekTo; } catch (e) { }
         }
       }
+
+      // Phase 3: caption watchdog — enforce trạng thái sau mỗi event player
+      function _enforceCaptionState() {
+        if (!plyrInstance || plyrInstance._ytCaptionsOn !== false) return;
+        if (plyrInstance.embed && typeof plyrInstance.embed.unloadModule === 'function') {
+          try { plyrInstance.embed.unloadModule('captions'); } catch (e) { }
+        }
+      }
+      ['volumechange', 'pause', 'playing', 'seeked'].forEach(evt => {
+        plyrInstance.on(evt, _enforceCaptionState);
+      });
+      if (_captionWatchdogInterval) clearInterval(_captionWatchdogInterval);
+      _captionWatchdogInterval = setInterval(_enforceCaptionState, 1500);
     });
 
     let lastSavedTime = 0;
+    // Phase 2: lastKnownPosition — cập nhật mọi frame, dùng để flush khi pause
+    let lastKnownPosition = 0;
     plyrInstance.on('timeupdate', () => {
       if (!plyrInstance) return;
       const t = plyrInstance.currentTime;
       const d = plyrInstance.duration;
+      lastKnownPosition = t; // luôn cập nhật
       if (Math.abs(t - lastSavedTime) >= 5) {
         lastSavedTime = t;
-        saveLocalProgress(currentLessonId, t, d, lesson.youtubeId);
+        saveLocalProgress(currentLessonId, t, d, lesson.youtubeId, t);
         updateRealtimeProgressUI();
       }
     });
 
     plyrInstance.on('pause', () => {
-      if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
+      if (currentLessonId) {
+        // Phase 2: flush với vị trí hiện tại — giữ lastPosition đúng dù dừng giữa chừng
+        const d = plyrInstance.duration;
+        saveLocalProgress(currentLessonId, plyrInstance.currentTime, d, lesson.youtubeId, lastKnownPosition);
+        flushProgressToFirestore(currentLessonId, currentCourseId);
+      }
     });
 
     plyrInstance.on('ended', () => {
@@ -1731,6 +1796,12 @@ function renderLesson(courseId, lessonId) {
         p.style.pointerEvents = 'none';
         setTimeout(() => p.remove(), 300);
       }
+      // Phase 4 (bổ sung): re-assert audio ngay khi video thực sự chạy — lúc này
+      // embed YouTube chắc chắn đã sẵn sàng nhận lệnh audio hơn lúc 'ready'
+      try {
+        plyrInstance.muted = false;
+        if (!plyrInstance.volume || plyrInstance.volume <= 0.02) plyrInstance.volume = 1;
+      } catch (e) { }
     });
 
   } else {
@@ -2009,6 +2080,8 @@ async function triggerSync(e) {
 // ── PLYR ──
 function destroyPlyr() {
   if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
+  // Phase 3: clear caption watchdog khi rời trang bài học
+  if (_captionWatchdogInterval) { clearInterval(_captionWatchdogInterval); _captionWatchdogInterval = null; }
   if (plyrInstance) {
     try { plyrInstance.stop(); plyrInstance.destroy(); } catch (e) { }
     plyrInstance = null;
@@ -2027,10 +2100,14 @@ function destroyPlyr() {
   _holdSpeedActive = false;
 }
 
+// Phase 9: toast dùng plyrInstance.elements.container — nằm trong subtree fullscreen
 function showToast(msg) {
-  const container = document.querySelector('.video-container');
+  const container = (plyrInstance && plyrInstance.elements && plyrInstance.elements.container)
+    ? plyrInstance.elements.container
+    : document.querySelector('.video-container');
   if (!container) return;
-  let toast = document.getElementById('player-toast');
+  // Tìm hoặc tạo toast bên trong container Plyr
+  let toast = container.querySelector('#player-toast');
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'player-toast';
@@ -2355,7 +2432,13 @@ async function loadCalendarData() {
     if (!doc.exists) { _calEvents = []; return []; }
     const raw = doc.data().json;
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    _calEvents = parsed.events || [];
+    // Phase 8: chỉ giữ event trong khoảng 6/2026 → 5/2027, phòng trường hợp
+    // crawler lấy dư dữ liệu ngoài chương trình live hiện tại
+    _calEvents = (parsed.events || []).filter(e => {
+      if (!e.date) return false;
+      const d = new Date(e.date + 'T00:00:00');
+      return d >= CAL_MIN_DATE && d <= CAL_MAX_DATE_END;
+    });
     _calEventsLoadedAt = Date.now();
     return _calEvents;
   } catch (e) {
@@ -2388,11 +2471,11 @@ function _fmtDateVN(dateStr) {
   // '2026-06-15' → 'Thứ Hai, 15/06/2026'
   const d = new Date(dateStr + 'T00:00:00');
   const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-  return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 function _eventsForMonth(events, year, month) {
-  const prefix = `${year}-${String(month+1).padStart(2,'0')}-`;
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   return events.filter(e => e.date && e.date.startsWith(prefix));
 }
 
@@ -2408,10 +2491,10 @@ function _parseColor(colorStr) {
 }
 
 function renderCalendarMonthView(events) {
-  const year  = _calViewDate.getFullYear();
+  const year = _calViewDate.getFullYear();
   const month = _calViewDate.getMonth();
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const firstDow = _calFirstDayOfWeek(year, month);
   const daysInMonth = _calDaysInMonth(year, month);
@@ -2420,7 +2503,7 @@ function renderCalendarMonthView(events) {
   // Update subtitle
   const monthEvents = _eventsForMonth(events, year, month);
   const upcoming = monthEvents.filter(e => e.status !== 'past').length;
-  const total    = monthEvents.length;
+  const total = monthEvents.length;
   const subtitleEl = document.getElementById('cal-subtitle');
   if (subtitleEl) {
     subtitleEl.innerHTML = total > 0
@@ -2442,13 +2525,13 @@ function renderCalendarMonthView(events) {
     const day = prevDays - firstDow + 1 + i;
     const mo = month === 0 ? 12 : month;
     const yr = month === 0 ? year - 1 : year;
-    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     html += renderCalDay(day, dateStr, events, todayStr, true);
   }
 
   // Cells trong thang
   for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     html += renderCalDay(day, dateStr, events, todayStr, false);
   }
 
@@ -2458,7 +2541,7 @@ function renderCalendarMonthView(events) {
   for (let i = 1; i <= afterCells; i++) {
     const mo = month === 11 ? 1 : month + 2;
     const yr = month === 11 ? year + 1 : year;
-    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+    const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
     html += renderCalDay(i, dateStr, events, todayStr, true);
   }
 
@@ -2480,7 +2563,8 @@ function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
     const isPast = ev.status === 'past';
     const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
     const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
-    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="border-left-color:${color};color:${color}" title="${ev.subject} — ${ev.title}" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}>
+    const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
+    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="border-left-color:${color};color:${color}" title="${ev.subject} — ${ev.title}" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}${statusAttr}>
       <div class="cal-event-time">${ev.time || ''}</div>
       <div class="cal-event-subject">${ev.subject || ''}</div>
       <div class="cal-event-title">${ev.title || ''}</div>
@@ -2491,7 +2575,7 @@ function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
 }
 
 function renderCalendarListView(events) {
-  const year  = _calViewDate.getFullYear();
+  const year = _calViewDate.getFullYear();
   const month = _calViewDate.getMonth();
 
   // Nhóm theo ngày, chỉ lấy sự kiện của tháng đang xem
@@ -2518,7 +2602,7 @@ function renderCalendarListView(events) {
     const label = _fmtDateVN(dateStr);
     const dayNum = parseInt(dateStr.split('-')[2]);
     html += `<div class="cal-list-group">
-      <div class="cal-list-date-header">
+      <div class="cal-list-date-header" data-date="${dateStr}">
         <span class="date-badge">${dayNum}</span>
         <span>${label}</span>
       </div>`;
@@ -2526,7 +2610,8 @@ function renderCalendarListView(events) {
       const color = _parseColor(ev.color);
       const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
       const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
-      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr} style="cursor:pointer">
+      const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
+      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}${statusAttr} style="cursor:pointer">
         <div class="cal-list-dot" style="background:${color}"></div>
         <div class="cal-list-info">
           <div class="cal-list-subject">${ev.subject || ''}</div>
@@ -2541,12 +2626,24 @@ function renderCalendarListView(events) {
   return html;
 }
 
+// Phase 8: disable nút prev/next khi đụng biên 6/2026 — 5/2027
+function _updateCalNavButtons() {
+  const prevBtn = document.getElementById('cal-prev-btn');
+  const nextBtn = document.getElementById('cal-next-btn');
+  const curMonthStart = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth(), 1);
+  if (prevBtn) prevBtn.disabled = curMonthStart <= CAL_MIN_DATE;
+  if (nextBtn) {
+    const nextMonthStart = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() + 1, 1);
+    nextBtn.disabled = nextMonthStart > CAL_MAX_DATE;
+  }
+}
+
 async function renderCalendar() {
   showPage('calendar');
   window.location.hash = '#calendar';
   if (typeof destroyPlyr === 'function') destroyPlyr();
 
-  const titleEl   = document.getElementById('cal-month-title');
+  const titleEl = document.getElementById('cal-month-title');
   const contentEl = document.getElementById('cal-content');
   if (!contentEl) return;
 
@@ -2569,20 +2666,23 @@ async function renderCalendar() {
   document.querySelectorAll('.cal-view-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.calview === _calViewMode);
   });
+
+  _updateCalNavButtons();
 }
 
 function attachCalendarEventListeners() {
   const content = document.getElementById('cal-content');
   const fresh = content.cloneNode(true);
   content.parentNode.replaceChild(fresh, content);
-  
-  document.getElementById('cal-content').addEventListener('click', function(e) {
+
+  document.getElementById('cal-content').addEventListener('click', function (e) {
     const ev = e.target.closest('[data-date][data-subject]');
     if (!ev) return;
     handleCalendarEventClick({
       date: ev.dataset.date,
       subject: ev.dataset.subject,
       title: ev.dataset.title,
+      status: ev.dataset.status || null,
       m3u8: ev.dataset.m3u8 || null,
       liveStartEpoch: ev.dataset.livestart ? parseInt(ev.dataset.livestart) : null
     });
@@ -2593,8 +2693,51 @@ function handleCalendarEventClick(ev) {
   if (ev.m3u8) {
     openLiveModal(ev);
   } else {
-    navigateToMappedLesson(ev);
+    showCalendarEventPopup(ev);
   }
+}
+
+// ─────────────────────────────────────────────
+// Phase 5: Calendar Event Popup
+// ─────────────────────────────────────────────
+function showCalendarEventPopup(calEvent) {
+  const popup = document.getElementById('cal-event-popup');
+  // Không có popup trong DOM (vd index.html cũ) → fallback hành vi cũ
+  if (!popup) { navigateToMappedLesson(calEvent); return; }
+
+  const isEnded = calEvent.status === 'past' || calEvent.date < getTodayStr();
+  const resolved = resolveLiveCalendarEvent(calEvent, _calEvents || []);
+  const lessonTitle = resolved ? resolved.lesson.title : null;
+
+  const statusEl = document.getElementById('cal-popup-status');
+  if (statusEl) statusEl.textContent = isEnded ? 'Buổi học đã kết thúc' : 'Buổi học sắp tới';
+
+  const subjectEl = document.getElementById('cal-popup-subject');
+  if (subjectEl) subjectEl.textContent = calEvent.subject || '';
+
+  const lessonEl = document.getElementById('cal-popup-lesson-title');
+  if (lessonEl) lessonEl.textContent = lessonTitle || '(Đang cập nhật...)';
+
+  const gotoBtn = document.getElementById('cal-popup-goto');
+  if (gotoBtn) {
+    gotoBtn.onclick = () => {
+      closeCalendarEventPopup();
+      navigateToMappedLesson(calEvent);
+    };
+  }
+
+  const closeBtn = document.getElementById('cal-popup-close');
+  if (closeBtn) closeBtn.onclick = closeCalendarEventPopup;
+
+  // Bấm ra ngoài overlay để đóng — cùng pattern với #live-modal
+  popup.onclick = (e) => { if (e.target === popup) closeCalendarEventPopup(); };
+
+  popup.style.display = 'flex';
+}
+
+function closeCalendarEventPopup() {
+  const popup = document.getElementById('cal-event-popup');
+  if (popup) popup.style.display = 'none';
 }
 
 function getTodayStr() {
@@ -2617,32 +2760,85 @@ function jaccardSim(a, b) {
   return union === 0 ? 0 : inter / union;
 }
 
-function navigateToMappedLesson(calEvent) {
+// ── Phase 1: Sequence-based lesson resolver ──
+// Trích số tháng từ tên chương ("Tháng 6", "Tháng 10", ...)
+function extractMonthNum(title) {
+  const m = title.match(/[Tt]h[áa]ng\s*0*(\d{1,2})/);
+  return m ? parseInt(m[1]) : 999;
+}
+
+// Lấy danh sách bài học (kể cả ẩn) từ các chương "Tháng N" thuộc prefix,
+// sắp xếp theo thứ tự tháng — stable dù chương đã bị reparent
+function getLiveLessonSequence(prefix) {
+  const chapters = appData.courses
+    .flatMap(c => c.tree)
+    .filter(n =>
+      n.id && n.id.startsWith(prefix) &&
+      /[Tt]h[áa]ng\s*0*\d{1,2}/.test(n.title)
+    );
+  chapters.sort((a, b) => extractMonthNum(a.title) - extractMonthNum(b.title));
+  return chapters.flatMap(getAllLessonsIncHidden);
+}
+
+// Resolve event lịch → { course, lesson } bằng cách đếm vị trí trong sequence
+// Trả về null nếu subject không thuộc TSA hoặc vượt quá số bài đã soạn
+function resolveLiveCalendarEvent(calEvent, allEvents) {
+  const prefix = TSA_CHAPTER_PREFIX[calEvent.subject];
+  if (!prefix) return null;
+
+  const sequence = getLiveLessonSequence(prefix);
+  if (!sequence.length) return null;
+
+  // Lấy tất cả events cùng nhóm môn (cùng prefix), sắp xếp theo ngày+giờ
+  const pool = (allEvents && allEvents.length ? allEvents : (_calEvents || []));
+  const sameSubject = pool
+    .filter(e => TSA_CHAPTER_PREFIX[e.subject] === prefix)
+    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+
+  const idx = sameSubject.findIndex(e =>
+    e.date === calEvent.date &&
+    e.time === calEvent.time &&
+    e.title === calEvent.title
+  );
+
+  if (idx < 0 || idx >= sequence.length) return null;
+
+  const lesson = sequence[idx];
+  // Tìm khóa học chứa lesson này (có thể là manual-... sau khi reparent)
+  const course = appData.courses.find(c =>
+    c.tree.some(ch => getAllLessonsIncHidden(ch).some(l => l.id === lesson.id))
+  );
+  return course ? { course, lesson } : null;
+}
+
+function navigateToMappedLesson(calEvent, allEvents) {
+  // Ưu tiên: dùng sequence đếm theo vị trí cho bài TSA live
+  // Hoạt động đúng dù chương "Tháng N" đã bị reparent sang khóa manual-...
+  if (TSA_CHAPTER_PREFIX[calEvent.subject]) {
+    const resolved = resolveLiveCalendarEvent(calEvent, allEvents || _calEvents || []);
+    if (resolved) {
+      navigate('lesson', resolved.course.id, resolved.lesson.id);
+      return;
+    }
+    // Không resolve được (vượt quá số bài đã soạn) → về home
+    navigate('home');
+    return;
+  }
+
+  // Fallback Jaccard cho các môn khác không thuộc TSA live
   const order = SUBJECT_COURSE_ORDER[calEvent.subject];
   if (order === undefined) { navigate('home'); return; }
-  
   const course = appData.courses.find(c => c.order === order);
   if (!course) { navigate('home'); return; }
-  
-  const lessons = getAllLessons(course.tree);
+  const lessons = course.tree.flatMap(getAllLessons);
   const calTokens = normalizeTitle(calEvent.title);
-  
-  let bestLesson = null;
-  let bestScore = 0;
-  
+  let bestLesson = null, bestScore = 0;
   for (const l of lessons) {
     const score = jaccardSim(calTokens, normalizeTitle(l.title));
-    if (score > bestScore) {
-      bestScore = score;
-      bestLesson = l;
-    }
+    if (score > bestScore) { bestScore = score; bestLesson = l; }
   }
-  
-  if (bestScore >= 0.35 && bestLesson) {
-    navigate('lesson', course.id, bestLesson.id);
-  } else {
-    navigate('course', course.id);
-  }
+  if (bestScore >= 0.35 && bestLesson) navigate('lesson', course.id, bestLesson.id);
+  else navigate('course', course.id);
 }
 
 async function updateLiveBanner() {
@@ -2651,15 +2847,15 @@ async function updateLiveBanner() {
   const events = await loadCalendarData();
   const todayStr = getTodayStr();
   const todayEvents = events.filter(e => e.date === todayStr);
-  
+
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  
+
   let activeEvent = null;
-  
+
   // Ưu tiên 1: Đang live
   activeEvent = todayEvents.find(e => e.m3u8);
-  
+
   // Ưu tiên 2: Sắp live
   if (!activeEvent) {
     activeEvent = todayEvents.find(e => {
@@ -2669,21 +2865,21 @@ async function updateLiveBanner() {
       return diff <= 60 && diff >= -30;
     });
   }
-  
+
   if (!activeEvent) {
     banner.style.display = 'none';
     return;
   }
-  
+
   banner.style.display = 'flex';
   banner.className = activeEvent.m3u8 ? 'live-active' : 'live-upcoming';
-  
+
   const icon = document.getElementById('live-banner-dot');
   const text = document.getElementById('live-banner-text');
-  const cd   = document.getElementById('live-banner-countdown');
-  
+  const cd = document.getElementById('live-banner-countdown');
+
   banner.onclick = () => handleCalendarEventClick(activeEvent);
-  
+
   if (activeEvent.m3u8) {
     text.textContent = `ĐANG LIVE: ${activeEvent.subject} — ${activeEvent.title}`;
     cd.textContent = '';
@@ -2701,14 +2897,14 @@ function openLiveModal(ev) {
     navigateToMappedLesson(ev);
     return;
   }
-  
+
   const modal = document.getElementById('live-modal');
   if (!modal) return;
   modal.style.display = 'flex';
-  
+
   document.getElementById('live-modal-subject').textContent = ev.subject;
   document.getElementById('live-modal-title-text').textContent = ev.title;
-  
+
   const elapsedEl = document.getElementById('live-modal-elapsed');
   if (ev.liveStartEpoch) {
     _liveElapsedTimer = setInterval(() => {
@@ -2722,7 +2918,7 @@ function openLiveModal(ev) {
   } else {
     elapsedEl.textContent = '';
   }
-  
+
   const videoEl = document.getElementById('live-video');
   if (window.Hls && Hls.isSupported()) {
     _liveModalHls = new Hls({ enableWorker: true });
@@ -2733,20 +2929,22 @@ function openLiveModal(ev) {
     videoEl.src = ev.m3u8;
     videoEl.addEventListener('loadedmetadata', () => videoEl.play());
   }
-  
+
   _liveModalPlyr = new Plyr(videoEl, {
     controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen', 'settings'],
     settings: ['speed'],
+    // Phase 4: không cần nhớ giữa các lần mở, tránh rò muted sang player bài học
+    storage: { enabled: false },
   });
-  
+
   document.getElementById('live-goto-lesson').onclick = () => {
     closeLiveModal();
     navigateToMappedLesson(ev);
   };
-  
+
   const closeBtn = document.getElementById('live-modal-close');
   closeBtn.onclick = closeLiveModal;
-  
+
   modal.onclick = (e) => {
     if (e.target === modal) closeLiveModal();
   };
@@ -2769,7 +2967,7 @@ async function setLiveModeOnEvent(eventToFind, m3u8Url) {
   const raw = doc.data().json;
   const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const events = parsed.events || [];
-  
+
   let found = false;
   for (const e of events) {
     if (e.date === eventToFind.date && e.time === eventToFind.time && e.title === eventToFind.title) {
@@ -2781,7 +2979,7 @@ async function setLiveModeOnEvent(eventToFind, m3u8Url) {
       break;
     }
   }
-  
+
   if (found) {
     parsed.lastUpdated = new Date().toISOString();
     await docRef.set({ json: JSON.stringify(parsed), updatedAt: parsed.lastUpdated });
@@ -2796,10 +2994,10 @@ async function initGoLivePanel() {
   const m3u8Input = document.getElementById('go-live-m3u8');
   const statusEl = document.getElementById('go-live-status');
   if (!dateSel || !lessonSel) return;
-  
+
   const events = await loadCalendarData();
   const todayStr = getTodayStr();
-  
+
   // Các ngày từ hôm nay + 7 ngày
   const groups = {};
   for (const ev of events) {
@@ -2808,7 +3006,7 @@ async function initGoLivePanel() {
       groups[ev.date].push(ev);
     }
   }
-  
+
   dateSel.innerHTML = '';
   const sortedDates = Object.keys(groups).sort();
   for (const d of sortedDates) {
@@ -2816,26 +3014,26 @@ async function initGoLivePanel() {
     opt.value = d; opt.textContent = _fmtDateVN(d);
     dateSel.appendChild(opt);
   }
-  
+
   function populateLessons() {
     lessonSel.innerHTML = '';
     const d = dateSel.value;
     if (!groups[d]) return;
     for (const ev of groups[d]) {
       const opt = document.createElement('option');
-      opt.value = JSON.stringify({date: ev.date, time: ev.time, title: ev.title, subject: ev.subject});
+      opt.value = JSON.stringify({ date: ev.date, time: ev.time, title: ev.title, subject: ev.subject });
       opt.textContent = `[${ev.time}] ${ev.subject} — ${ev.title}`;
       lessonSel.appendChild(opt);
     }
   }
-  
+
   dateSel.onchange = populateLessons;
   if (sortedDates.length > 0) {
     dateSel.value = todayStr;
     if (!groups[todayStr]) dateSel.value = sortedDates[0];
     populateLessons();
   }
-  
+
   document.getElementById('btn-go-live').onclick = async () => {
     if (!lessonSel.value || !m3u8Input.value) {
       statusEl.textContent = '❌ Vui lòng chọn bài và nhập m3u8';
@@ -2847,7 +3045,7 @@ async function initGoLivePanel() {
     statusEl.textContent = '✅ Đã Go Live!';
     m3u8Input.value = '';
   };
-  
+
   document.getElementById('btn-stop-live').onclick = async () => {
     const todayEvents = groups[todayStr] || [];
     const liveEv = todayEvents.find(e => e.m3u8);
@@ -2856,7 +3054,7 @@ async function initGoLivePanel() {
       return;
     }
     statusEl.textContent = 'Đang dừng...';
-    await setLiveModeOnEvent({date: liveEv.date, time: liveEv.time, title: liveEv.title}, null);
+    await setLiveModeOnEvent({ date: liveEv.date, time: liveEv.time, title: liveEv.title }, null);
     closeLiveModal();
     statusEl.textContent = '■ Đã dừng live';
   };
@@ -2866,9 +3064,9 @@ function _initCalendarButtons() {
     const el = document.getElementById(id);
     if (el) el.addEventListener('click', fn);
   };
-  on('cal-today-btn', async () => { 
-    _calViewDate = new Date(); 
-    await renderCalendar(); 
+  on('cal-today-btn', async () => {
+    _calViewDate = new Date();
+    await renderCalendar();
     const todayCell = document.querySelector('.cal-day.today');
     if (todayCell) {
       todayCell.classList.remove('flash-today');
@@ -2882,15 +3080,32 @@ function _initCalendarButtons() {
       for (const h of headers) {
         if (h.dataset.date === todayDate) {
           h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Phase 7: nhấp nháy viền giống month-view
+          h.classList.remove('flash-today');
+          void h.offsetWidth;
+          h.classList.add('flash-today');
+          setTimeout(() => h.classList.remove('flash-today'), 1600);
           break;
         }
       }
     }
   });
-  on('cal-prev-btn',  () => { _calViewDate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() - 1, 1); renderCalendar(); });
-  on('cal-next-btn',  () => { _calViewDate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() + 1, 1); renderCalendar(); });
+  on('cal-prev-btn', () => {
+    // Phase 8: chặn vượt biên dưới (trước 6/2026)
+    const candidate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() - 1, 1);
+    if (candidate < CAL_MIN_DATE) return;
+    _calViewDate = candidate;
+    renderCalendar();
+  });
+  on('cal-next-btn', () => {
+    // Phase 8: chặn vượt biên trên (sau 5/2027)
+    const candidate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() + 1, 1);
+    if (candidate > CAL_MAX_DATE) return;
+    _calViewDate = candidate;
+    renderCalendar();
+  });
   on('cal-view-month', () => { _calViewMode = 'month'; renderCalendar(); });
-  on('cal-view-list',  () => { _calViewMode = 'list';  renderCalendar(); });
+  on('cal-view-list', () => { _calViewMode = 'list'; renderCalendar(); });
 }
 _initCalendarButtons();
 

@@ -333,6 +333,29 @@
     </div>
   </div>
 
+  <!-- Phase 5: Calendar Event Popup -->
+  <div id="cal-event-popup" style="display:none" role="dialog" aria-modal="true" aria-labelledby="cal-popup-status">
+    <div id="cal-event-popup-inner" class="glass">
+      <div id="cal-popup-header">
+        <div id="cal-popup-status" class="cal-popup-status-text"></div>
+        <button id="cal-popup-close" class="btn-icon" aria-label="Đóng">✕</button>
+      </div>
+      <div id="cal-popup-body">
+        <div class="cal-popup-row">
+          <span class="cal-popup-label">Môn học</span>
+          <span id="cal-popup-subject" class="cal-popup-value"></span>
+        </div>
+        <div class="cal-popup-row">
+          <span class="cal-popup-label">Nội dung</span>
+          <span id="cal-popup-lesson-title" class="cal-popup-value cal-popup-lesson"></span>
+        </div>
+      </div>
+      <div id="cal-popup-footer">
+        <button id="cal-popup-goto" class="btn btn-primary">▶ Xem video và tài liệu</button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
   <script src="color-settings.js"></script>
 

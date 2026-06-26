@@ -1,11 +1,16 @@
 name: Crawl HMCalendar
 
 on:
-  # Full crawl: mỗi ngày lúc 3h sáng VN (20:00 UTC)
   schedule:
+    # Full crawl: mỗi ngày lúc 3h sáng VN (20:00 UTC) — crawl đủ MONTHS_TO_CRAWL tháng
     - cron: "0 20 * * *"
-  # Full crawl: mỗi 6 tiếng để cập nhật nếu lịch thay đổi
-  # - cron: "0 */6 * * *"
+    # Watch mode: mỗi 5 phút trong khung giờ live (~17h VN hôm trước → 2h VN hôm sau
+    # = 10h-19h UTC cùng ngày) — chỉ crawl tháng hiện tại, phát hiện lùi lịch kịp thời.
+    # Lưu ý: GitHub Actions không đảm bảo chạy đúng "mỗi 3 phút" như cron khai báo —
+    # docs của GitHub khuyến cáo không nên trông cậy vào độ chính xác dưới 5 phút,
+    # và lịch có thể bị trễ khi hệ thống đông tải. Đây là mức tần suất khả thi nhất
+    # trên GitHub-hosted runner.
+    - cron: "*/5 10-19 * * *"
 
   # Chạy tay từ GitHub UI
   workflow_dispatch:
@@ -64,6 +69,8 @@ jobs:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
           # Tham số chạy
-          CRAWL_MODE:              ${{ github.event.inputs.mode || 'full' }}
+          # Tự chọn watch mode khi đúng cron watch-mode kích hoạt; còn lại (full crawl
+          # hằng ngày, hoặc chạy tay) mặc định full — input thủ công luôn được ưu tiên.
+          CRAWL_MODE:              ${{ github.event.inputs.mode || (github.event.schedule == '*/5 10-19 * * *' && 'watch') || 'full' }}
           MONTHS_TO_CRAWL:         ${{ github.event.inputs.months || '6' }}
           HEADLESS:                "true"

@@ -422,12 +422,109 @@ def merge_events(new_events: list[dict], old_data: dict) -> list[dict]:
     return merged
 
 
+def merge_partial_month(new_events: list[dict], old_data: dict) -> list[dict]:
+    """
+    Dùng cho watch mode (chỉ crawl THÁNG HIỆN TẠI, nhanh).
+    Khác merge_events(): merge_events() chỉ trả về đúng những event có trong
+    new_events — nếu dùng trực tiếp cho watch mode sẽ XÓA MẤT toàn bộ event
+    của các tháng khác đã crawl trước đó (vì chúng không nằm trong new_events).
+    Hàm này giữ nguyên các event ở ngày KHÁC, chỉ thay thế/merge đúng những
+    ngày vừa crawl lại.
+    """
+    new_dates = {e["date"] for e in new_events}
+    kept = [e for e in old_data.get("events", []) if e["date"] not in new_dates]
+    merged_month = merge_events(new_events, old_data)
+    return kept + merged_month
+
+
+def run_watch_mode():
+    """
+    Watch mode — crawl NHANH chỉ tháng đang hiển thị (mặc định = tháng hiện tại,
+    không cần lặp qua nhiều tháng), dùng để chạy lặp lại nhiều lần gần giờ học
+    nhằm phát hiện LÙI LỊCH (đổi giờ) kịp thời trước khi vào học.
+
+    QUAN TRỌNG — GIỚI HẠN CỦA HÀM NÀY:
+    Hàm này KHÔNG tự lấy được link m3u8. Crawler hiện tại chỉ đọc DOM của trang
+    lịch (.fc-event), không phải trang phòng live — nên chưa biết link m3u8 lộ
+    ra ở chỗ nào trên trang live thật của hocmai (network request? biến JS?
+    iframe src?). Việc lấy link m3u8 hiện vẫn cần dán tay qua admin panel
+    "Go Live (Thủ công)" như cũ. Hàm này chỉ giải quyết phần "phát hiện lùi lịch
+    kịp thời" — nếu hocmai đổi giờ học ngay trước giờ, watch mode sẽ thấy được
+    sớm (chạy mỗi 5p) thay vì phải chờ đến lần full crawl hằng ngày kế tiếp.
+
+    Không logout sau khi xong (khác full mode) — vì hàm này chạy lặp lại liên
+    tục trong nhiều giờ, login/logout mỗi lần rất tốn thời gian và có thể bị
+    hocmai coi là hành vi bất thường nếu lặp lại quá nhiều lần/giờ.
+    """
+    from playwright.sync_api import sync_playwright
+
+    print("▶ Watch mode — crawl nhanh tháng hiện tại (phát hiện lùi lịch)...")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=HEADLESS)
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/149.0.0.0 Safari/537.36"
+            ),
+            locale="vi-VN",
+            timezone_id="Asia/Ho_Chi_Minh"
+        )
+
+        if GOOGLE_CREDENTIALS_JSON:
+            saved = load_cookies_from_firestore()
+            if saved:
+                context.add_cookies(saved)
+                print(f"  ✓ Loaded {len(saved)} cookies")
+
+        page = context.new_page()
+        cal_url = url(HM_CAL_PATH)
+        page.goto(cal_url, wait_until="domcontentloaded", timeout=30000)
+        time.sleep(1.5)
+
+        if not check_logged_in(page):
+            print("  Cookie không hợp lệ → đăng nhập bằng tài khoản...")
+            do_login(page)
+            page.goto(cal_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_load_state("networkidle", timeout=20000)
+            time.sleep(1.5)
+            if not check_logged_in(page):
+                raise RuntimeError("❌ Watch mode: không vào được calendar sau khi đăng nhập.")
+            if GOOGLE_CREDENTIALS_JSON:
+                save_cookies(context.cookies())
+        else:
+            print("  ✓ Cookie hợp lệ.")
+
+        click_month_view(page)
+        page.wait_for_load_state("networkidle", timeout=10000)
+        time.sleep(1)
+
+        new_events = parse_events_from_page(page)
+        print(f"  Tìm thấy {len(new_events)} sự kiện trong tháng hiện tại")
+        browser.close()
+
+    if not GOOGLE_CREDENTIALS_JSON:
+        print("⚠ Thiếu GOOGLE_CREDENTIALS_JSON — watch mode cần Firestore để hoạt động, bỏ qua push.")
+        return
+
+    old_data = load_existing_schedule()
+    merged = merge_partial_month(new_events, old_data)
+    merged.sort(key=lambda e: (e["date"], e["time"]))
+    output = {
+        "lastUpdated": datetime.now(timezone.utc).isoformat(),
+        "events": merged
+    }
+    push_schedule(output)
+    print(f"✓ Watch mode xong — tổng {len(merged)} buổi học (toàn bộ các tháng).")
+
+
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
     check_config()
 
     if CRAWL_MODE == "watch":
-        print("▶ Chế độ WATCH — sẽ implement sau khi có API m3u8")
+        run_watch_mode()
         return
 
     from playwright.sync_api import sync_playwright

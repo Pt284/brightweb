@@ -217,6 +217,32 @@ def save_debug_artifacts(page, prefix: str = "login_failure"):
         print(f"  ⚠ Không lưu được debug artifact ({prefix}): {e}")
 
 
+def _wait_for_visible_input(page, *selectors: str, timeout_ms: int = 12000, poll_ms: int = 500):
+    """
+    Giống _first_visible_input() nhưng CHỜ tối đa timeout_ms, poll lại mỗi
+    poll_ms — để chịu được trang có refresh/redirect trung gian.
+
+    Lý do cần hàm này: ảnh/html debug thật chụp được từ GitHub Actions cho
+    thấy khi context đang mang cookie MoodleSession CŨ (hết hạn) rồi mở
+    thẳng trang login, hocmai/Moodle KHÔNG trả form login ngay — mà trả 1
+    trang gần như rỗng (chỉ có <head>, <body></body> trống) kèm
+    `<meta http-equiv="refresh" content="5; url=.../loginv2/index.php">`,
+    tự nạp lại CHÍNH trang đó sau 5 giây mới ra form thật (cách Moodle xử
+    lý khi phát hiện session cũ không hợp lệ). Check 1 lần ngay sau
+    networkidle + sleep(1) như cũ là quá sớm — chưa tới giây thứ 5 nên
+    luôn thấy "không có field nào hiển thị", dù form thật vẫn sẽ xuất
+    hiện nếu chờ thêm vài giây.
+    """
+    deadline = time.time() + timeout_ms / 1000
+    while True:
+        el = _first_visible_input(page, *selectors)
+        if el:
+            return el
+        if time.time() >= deadline:
+            return None
+        page.wait_for_timeout(poll_ms)
+
+
 def do_login(page):
     """
     Đăng nhập bằng tài khoản/mật khẩu — phiên bản đơn giản hoá theo video.py.
@@ -236,14 +262,20 @@ def do_login(page):
     print("  → Đăng nhập bằng tài khoản/mật khẩu...")
     login_url = url(HM_LOGIN_PATH)  # /loginv2/index.php
 
+    # Xoá cookie cũ (MoodleSession hết hạn từ Firestore) TRƯỚC khi mở trang
+    # login. Nếu giữ cookie cũ, Moodle có thể trả về trang trung gian rỗng
+    # + meta-refresh 5s (xem _wait_for_visible_input) thay vì form login
+    # ngay — xoá cookie để đảm bảo đây luôn là 1 lượt ghé trang "sạch".
+    page.context.clear_cookies()
+
     # Mở trang login trước để lấy cookie phiên
     page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_load_state("networkidle", timeout=20000)
     time.sleep(1)
     print(f"  ℹ URL sau khi mở trang login: {page.url}")
 
-    username_field = _first_visible_input(page, 'input[name="username"]', 'input[type="text"]')
-    password_field = _first_visible_input(page, 'input[name="password"]', 'input[type="password"]')
+    username_field = _wait_for_visible_input(page, 'input[name="username"]', 'input[type="text"]')
+    password_field = _wait_for_visible_input(page, 'input[name="password"]', 'input[type="password"]')
 
     if not username_field:
         save_debug_artifacts(page)

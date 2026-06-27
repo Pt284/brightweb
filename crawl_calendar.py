@@ -198,6 +198,19 @@ def _first_visible_input(page, *selectors: str):
     return None
 
 
+def _save_login_debug(page, tag: str):
+    """Lưu screenshot + HTML khi do_login thất bại — xem artifact 'login-debug'
+    trên GitHub Actions để biết chính xác trang login hiện trông thế nào,
+    thay vì phải đoán mù lần 2."""
+    try:
+        page.screenshot(path="login_failure.png", full_page=True)
+        with open("login_failure.html", "w", encoding="utf-8") as f:
+            f.write(page.content())
+        print(f"  📸 [{tag}] Đã lưu login_failure.png + login_failure.html để debug")
+    except Exception as e:
+        print(f"  ⚠ Không lưu được debug artifact: {e}")
+
+
 def do_login(page):
     """
     Đăng nhập bằng tài khoản/mật khẩu — phiên bản đơn giản hoá theo video.py.
@@ -211,24 +224,57 @@ def do_login(page):
     Trang login có thể có field honeypot trùng name="username"/"password"
     để bẫy bot — xem _first_visible_input() (chọn theo trạng thái hiển thị,
     không đoán vị trí DOM).
+
+    Robust hơn bản cũ ở 2 điểm (sau khi gặp lỗi thật trên CI — trang load
+    chậm hơn dự kiến khiến field chưa kịp hiện khi check is_visible()):
+    - Chủ động wait_for_selector() thay vì chỉ networkidle + sleep cố định.
+    - Thử lại 1 lần (reload) nếu lần đầu chưa thấy field, trước khi raise.
+    - Tự lưu screenshot/HTML khi raise — xem _save_login_debug().
     """
     if not HM_USERNAME or not HM_PASSWORD:
         raise RuntimeError("❌ Thiếu HM_USERNAME hoặc HM_PASSWORD.")
     print("  → Đăng nhập bằng tài khoản/mật khẩu...")
     login_url = url(HM_LOGIN_PATH)  # /loginv2/index.php
 
-    # Mở trang login trước để lấy cookie phiên
-    page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_load_state("networkidle", timeout=20000)
-    time.sleep(1)
+    USERNAME_SELECTORS = [
+        'input[name="username"]', 'input[type="text"]', 'input[type="tel"]',
+        'input[autocomplete="username"]', 'input[id*="username" i]',
+        'input[placeholder*="email" i]', 'input[placeholder*="điện thoại" i]',
+    ]
+    PASSWORD_SELECTORS = [
+        'input[name="password"]', 'input[type="password"]',
+        'input[autocomplete="current-password"]',
+    ]
+    combined_username_sel = ", ".join(USERNAME_SELECTORS)
 
-    username_field = _first_visible_input(page, 'input[name="username"]', 'input[type="text"]')
-    password_field = _first_visible_input(page, 'input[name="password"]', 'input[type="password"]')
+    username_field = password_field = None
+    for attempt in range(2):
+        page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=20000)
+        except Exception:
+            pass
+        # Chờ chủ động field xuất hiện (poll tới 15s) — robust hơn sleep cố định
+        # cho trang render bằng JS/SPA chậm hơn dự kiến trên runner CI.
+        try:
+            page.wait_for_selector(combined_username_sel, timeout=15000, state="visible")
+        except Exception:
+            pass  # vẫn thử is_visible() bên dưới — có thể đã đủ điều kiện
 
-    if not username_field:
-        raise RuntimeError("❌ Không tìm thấy ô tài khoản (username) đang hiển thị trên trang login.")
-    if not password_field:
-        raise RuntimeError("❌ Không tìm thấy ô mật khẩu (password) đang hiển thị trên trang login.")
+        username_field = _first_visible_input(page, *USERNAME_SELECTORS)
+        password_field = _first_visible_input(page, *PASSWORD_SELECTORS)
+        if username_field and password_field:
+            break
+        print(f"  ⚠ Lần {attempt + 1}/2: chưa thấy field login đang hiển thị, thử reload...")
+        time.sleep(2)
+
+    if not username_field or not password_field:
+        _save_login_debug(page, "khong-thay-field")
+        missing = "username" if not username_field else "password"
+        raise RuntimeError(
+            f"❌ Không tìm thấy ô {missing} đang hiển thị trên trang login sau 2 lần thử. "
+            f"Xem artifact 'login-debug' trên GitHub Actions để biết trang login hiện trông thế nào."
+        )
 
     username_field.click()
     username_field.fill(HM_USERNAME)
@@ -248,6 +294,7 @@ def do_login(page):
     # Xác nhận qua cookie thay vì URL (vì có thể bị redirect linh tinh)
     cookies = page.context.cookies()
     if not any(c.get("name") == "MoodleSession" for c in cookies):
+        _save_login_debug(page, "khong-co-moodlesession")
         raise RuntimeError("❌ Đăng nhập thất bại — Không tìm thấy MoodleSession cookie.")
     print("  ✓ Đăng nhập thành công (đã lấy được session cookie)!")
 

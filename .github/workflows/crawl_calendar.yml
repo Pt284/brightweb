@@ -74,3 +74,16 @@ jobs:
           CRAWL_MODE:              ${{ github.event.inputs.mode || (github.event.schedule == '*/5 10-19 * * *' && 'watch') || 'full' }}
           MONTHS_TO_CRAWL:         ${{ github.event.inputs.months || '6' }}
           HEADLESS:                "true"
+
+      # 6. Lưu screenshot/HTML debug khi do_login() fail — xem được trang login
+      #    thật trông thế nào lúc lỗi, không phải đoán mù qua traceback.
+      - name: Upload login debug artifact (nếu fail)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-debug
+          path: |
+            login_failure.png
+            login_failure.html
+          retention-days: 5
+          if-no-files-found: ignore

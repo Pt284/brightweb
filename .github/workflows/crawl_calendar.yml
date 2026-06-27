@@ -52,9 +52,17 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
-      # 5. Chạy script crawl
+      # 4b. Cài xvfb — màn hình giả để Chromium chạy headFUL thật trên server
+      # không có màn hình. Lý do: hocmai có vẻ phát hiện Chromium chạy headless
+      # (qua navigator.webdriver hoặc fingerprint khác) và đổi field thật/honeypot
+      # — đã verify bằng test local: headless=False login được, headless=True thì không.
+      - name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      # 5. Chạy script crawl — qua xvfb-run, HEADLESS=false để Chromium chạy
+      # headful thật (không phải headless giả lập) ngay trên server.
       - name: Run crawl_calendar.py
-        run: python crawl_calendar.py
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python crawl_calendar.py
         env:
           # Tài khoản (ẩn trong secrets)
           HM_USERNAME:             ${{ secrets.HM_USERNAME }}
@@ -73,7 +81,7 @@ jobs:
           # hằng ngày, hoặc chạy tay) mặc định full — input thủ công luôn được ưu tiên.
           CRAWL_MODE:              ${{ github.event.inputs.mode || (github.event.schedule == '*/5 10-19 * * *' && 'watch') || 'full' }}
           MONTHS_TO_CRAWL:         ${{ github.event.inputs.months || '6' }}
-          HEADLESS:                "true"
+          HEADLESS:                "false"
 
       # 6. Lưu screenshot/HTML debug khi do_login() fail — xem được trang login
       #    thật trông thế nào lúc lỗi, không phải đoán mù qua traceback.

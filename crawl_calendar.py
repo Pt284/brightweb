@@ -9,7 +9,7 @@ Crawl lịch học, lưu cookie vào Firestore.
 """
 
 import os, re, json, time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # ── CONFIG (100% từ env, không hardcode URL) ─────────────────────────────────
 HM_BASE            = os.environ.get("HM_BASE_URL", "")
@@ -437,20 +437,140 @@ def merge_partial_month(new_events: list[dict], old_data: dict) -> list[dict]:
     return kept + merged_month
 
 
+# ── LOPHOC API — TỰ ĐỘNG LẤY M3U8 (xem phan_tich.md cùng repo) ────────────────
+LOPHOC_COOKIE_DOC = "app_data/lophoc_session"  # cache riêng, không đụng hm_cookies
+
+
+def load_lophoc_cache() -> dict | None:
+    try:
+        fields = read_fs(LOPHOC_COOKIE_DOC)
+        if not fields:
+            return None
+        raw = fields.get("session", {}).get("stringValue", "")
+        return json.loads(raw) if raw else None
+    except Exception as e:
+        print(f"  ⚠ Không đọc được lophoc cache: {e}")
+        return None
+
+
+def save_lophoc_cache(data: dict):
+    write_fs(LOPHOC_COOKIE_DOC, {
+        "session":   {"stringValue": json.dumps(data, ensure_ascii=False)},
+        "updatedAt": {"stringValue": datetime.now(timezone.utc).isoformat()}
+    })
+    print("  ✓ Đã lưu lophoc session cache lên Firestore")
+
+
+def get_lophoc_client():
+    """Factory tạo LophocClient với Firestore cache. Import trễ để main mode
+    (không cần lophoc) không bắt buộc phải có file lophoc_api.py hợp lệ."""
+    from lophoc_api import LophocClient
+    return LophocClient(
+        username=HM_USERNAME,
+        password=HM_PASSWORD,
+        cache_loader=load_lophoc_cache,
+        cache_saver=save_lophoc_cache,
+    )
+
+
+def _is_upcoming_or_open(start_iso: str, end_iso: str, now_vn) -> bool:
+    """now_vn PHẢI là datetime đã gắn tzinfo +07:00 (xem parse_lophoc_time)."""
+    from lophoc_api import parse_lophoc_time
+    if not start_iso or not end_iso:
+        return False
+    start = parse_lophoc_time(start_iso)
+    end = parse_lophoc_time(end_iso)
+    return start - timedelta(minutes=30) <= now_vn <= end + timedelta(minutes=30)
+
+
+def enrich_with_m3u8(events: list[dict]) -> list[dict]:
+    """
+    Gọi sau khi merge_events()/merge_partial_month() xong (browser Playwright
+    đã đóng — hàm này chỉ dùng requests qua lophoc_api, không cần Chromium).
+    Với mỗi event chưa có m3u8, thử khớp với lịch lophoc + check live-status,
+    nếu đang live thật thì gọi /api/livestreamlink lấy URL.
+
+    Quy tắc vàng: m3u8 đã có trong Firestore KHÔNG BAO GIỜ bị ghi đè bởi None —
+    chỉ set khi lấy được URL mới hợp lệ (xem điều kiện `if ev.get("m3u8"): continue`).
+    """
+    from lophoc_api import parse_lophoc_time, VN_TZ
+
+    if not HM_USERNAME or not HM_PASSWORD:
+        print("⚠ Thiếu HM_USERNAME/HM_PASSWORD — skip enrich m3u8")
+        return events
+
+    print("▶ Bắt đầu enrich m3u8 từ lophoc API...")
+    try:
+        client = get_lophoc_client()
+        client.ensure_logged_in()
+        lophoc_lessons = client.get_calendar()
+    except Exception as e:
+        print(f"  ⚠ Lophoc API lỗi, bỏ qua enrich lần này: {e}")
+        return events
+
+    # Match theo (subject, lesson_name) — xem phan_tich.md §4.2 về asymmetry
+    # match-key giữa Python (4 field) và JS (3 field, thiếu subject)
+    lophoc_idx = {}
+    for l in lophoc_lessons:
+        key = (l.get("subject", ""), l.get("lesson_name", ""))
+        lophoc_idx[key] = l
+
+    now_vn = datetime.now(VN_TZ)
+    upcoming = [l for l in lophoc_lessons
+                if _is_upcoming_or_open(l.get("start_time"), l.get("end_time"), now_vn)]
+    codes_to_check = list({l["code"] for l in upcoming if l.get("code")})
+
+    if not codes_to_check:
+        print("  Không có buổi nào sắp/đang live theo lịch lophoc — skip.")
+        return events
+
+    try:
+        from lophoc_api import get_live_status
+        live_status = get_live_status(client.session, codes_to_check)
+    except Exception as e:
+        print(f"  ⚠ live-status error: {e}")
+        live_status = {}
+
+    enriched_count = 0
+    for ev in events:
+        if ev.get("m3u8"):
+            continue  # đã có m3u8 (do anh dán tay hoặc lần crawl trước) → KHÔNG đè
+        match_key = (ev.get("subject", ""), ev.get("title", ""))
+        lesson = lophoc_idx.get(match_key)
+        if not lesson:
+            continue  # không enrolled môn này, hoặc title không khớp 100%
+        code = lesson.get("code")
+        learn_number = lesson.get("learn_number")
+        if not code or learn_number is None:
+            continue
+        if not live_status.get(code, False):
+            continue  # stream chưa live thật → đợi lần cron sau (5p), không spam
+        try:
+            m3u8 = client.get_m3u8(code, int(learn_number))
+            if m3u8:
+                ev["m3u8"] = m3u8
+                if not ev.get("liveStartEpoch"):
+                    start_dt = parse_lophoc_time(lesson["start_time"])
+                    ev["liveStartEpoch"] = int(start_dt.timestamp() * 1000)
+                ev["code"] = code
+                ev["learn_number"] = int(learn_number)
+                enriched_count += 1
+                print(f"  ✓ m3u8 cho {ev['subject']} - {ev['title'][:40]}...")
+                time.sleep(0.5)  # rate limit nhẹ giữa các buổi nếu có nhiều buổi live cùng lúc
+        except Exception as e:
+            print(f"  ⚠ Lấy m3u8 fail cho {code}-{learn_number}: {e}")
+
+    print(f"✓ Enriched {enriched_count}/{len(events)} events với m3u8")
+    return events
+
+
 def run_watch_mode():
     """
     Watch mode — crawl NHANH chỉ tháng đang hiển thị (mặc định = tháng hiện tại,
     không cần lặp qua nhiều tháng), dùng để chạy lặp lại nhiều lần gần giờ học
-    nhằm phát hiện LÙI LỊCH (đổi giờ) kịp thời trước khi vào học.
-
-    QUAN TRỌNG — GIỚI HẠN CỦA HÀM NÀY:
-    Hàm này KHÔNG tự lấy được link m3u8. Crawler hiện tại chỉ đọc DOM của trang
-    lịch (.fc-event), không phải trang phòng live — nên chưa biết link m3u8 lộ
-    ra ở chỗ nào trên trang live thật của hocmai (network request? biến JS?
-    iframe src?). Việc lấy link m3u8 hiện vẫn cần dán tay qua admin panel
-    "Go Live (Thủ công)" như cũ. Hàm này chỉ giải quyết phần "phát hiện lùi lịch
-    kịp thời" — nếu hocmai đổi giờ học ngay trước giờ, watch mode sẽ thấy được
-    sớm (chạy mỗi 5p) thay vì phải chờ đến lần full crawl hằng ngày kế tiếp.
+    nhằm phát hiện LÙI LỊCH (đổi giờ) kịp thời trước khi vào học, VÀ tự động
+    lấy m3u8 qua lophoc API (enrich_with_m3u8) khi buổi học thực sự đang live —
+    không cần dán tay qua admin panel "Go Live" nữa.
 
     Không logout sau khi xong (khác full mode) — vì hàm này chạy lặp lại liên
     tục trong nhiều giờ, login/logout mỗi lần rất tốn thời gian và có thể bị
@@ -510,6 +630,7 @@ def run_watch_mode():
 
     old_data = load_existing_schedule()
     merged = merge_partial_month(new_events, old_data)
+    merged = enrich_with_m3u8(merged)
     merged.sort(key=lambda e: (e["date"], e["time"]))
     output = {
         "lastUpdated": datetime.now(timezone.utc).isoformat(),
@@ -616,6 +737,7 @@ def main():
         print("▶ Đọc schedule cũ để merge...")
         old_data = load_existing_schedule()
         unique = merge_events(unique, old_data)
+        unique = enrich_with_m3u8(unique)
 
     output = {
         "lastUpdated": datetime.now(timezone.utc).isoformat(),

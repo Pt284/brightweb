@@ -198,6 +198,25 @@ def _first_visible_input(page, *selectors: str):
     return None
 
 
+def save_debug_artifacts(page, prefix: str = "login_failure"):
+    """
+    Lưu screenshot + HTML hiện tại của `page` khi có lỗi, để biết chính xác
+    CI thấy gì lúc fail — không phải đoán mù qua traceback nữa.
+
+    QUAN TRỌNG: trước đây workflow (.yml) đã có bước upload-artifact tìm
+    `login_failure.png`/`login_failure.html`, nhưng KHÔNG có hàm nào trong
+    crawl_calendar.py thực sự tạo ra 2 file này → artifact luôn rỗng
+    ("No files were found..."). Hàm này lấp đúng lỗ hổng đó.
+    """
+    try:
+        page.screenshot(path=f"{prefix}.png", full_page=True)
+        with open(f"{prefix}.html", "w", encoding="utf-8") as f:
+            f.write(page.content())
+        print(f"  📸 Đã lưu {prefix}.png + .html — URL lúc lỗi: {page.url}")
+    except Exception as e:
+        print(f"  ⚠ Không lưu được debug artifact ({prefix}): {e}")
+
+
 def do_login(page):
     """
     Đăng nhập bằng tài khoản/mật khẩu — phiên bản đơn giản hoá theo video.py.
@@ -221,13 +240,16 @@ def do_login(page):
     page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_load_state("networkidle", timeout=20000)
     time.sleep(1)
+    print(f"  ℹ URL sau khi mở trang login: {page.url}")
 
     username_field = _first_visible_input(page, 'input[name="username"]', 'input[type="text"]')
     password_field = _first_visible_input(page, 'input[name="password"]', 'input[type="password"]')
 
     if not username_field:
+        save_debug_artifacts(page)
         raise RuntimeError("❌ Không tìm thấy ô tài khoản (username) đang hiển thị trên trang login.")
     if not password_field:
+        save_debug_artifacts(page)
         raise RuntimeError("❌ Không tìm thấy ô mật khẩu (password) đang hiển thị trên trang login.")
 
     username_field.click()
@@ -248,6 +270,7 @@ def do_login(page):
     # Xác nhận qua cookie thay vì URL (vì có thể bị redirect linh tinh)
     cookies = page.context.cookies()
     if not any(c.get("name") == "MoodleSession" for c in cookies):
+        save_debug_artifacts(page)
         raise RuntimeError("❌ Đăng nhập thất bại — Không tìm thấy MoodleSession cookie.")
     print("  ✓ Đăng nhập thành công (đã lấy được session cookie)!")
 
@@ -474,6 +497,7 @@ def main():
             time.sleep(2)
 
             if not check_logged_in(page):
+                save_debug_artifacts(page, prefix="login_failure")
                 raise RuntimeError("❌ Không vào được trang calendar sau khi đăng nhập.")
 
             if GOOGLE_CREDENTIALS_JSON:

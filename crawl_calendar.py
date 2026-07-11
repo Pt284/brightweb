@@ -537,10 +537,24 @@ def _run_watch_mode():
         print("  ⚠ Không có dữ liệu schedule trong Firestore.")
         return
 
-    # ── 2. Lọc các buổi học chưa có m3u8 và nằm trong ngày hôm nay ──
+    # ── 2. Lọc các buổi học chưa có m3u8 và sắp diễn ra (trước 30 phút) ──
     now_vn = datetime.now(timezone(timedelta(hours=7)))
     today_str = now_vn.strftime("%Y-%m-%d")
-    target_events = [ev for ev in events if not ev.get("m3u8") and ev.get("date") == today_str]
+    now_minutes = now_vn.hour * 60 + now_vn.minute
+
+    def _is_soon(ev: dict) -> bool:
+        if ev.get("date") != today_str:
+            return False
+        t = ev.get("time", "00:00")
+        try:
+            h, m = int(t[:2]), int(t[3:5])
+            ev_min = h * 60 + m
+            # Chỉ check nếu giờ hiện tại nằm trong khoảng [trước 30p, sau 60p] so với giờ học
+            return -30 <= (now_minutes - ev_min) <= 60
+        except Exception:
+            return False
+
+    target_events = [ev for ev in events if not ev.get("m3u8") and _is_soon(ev)]
 
     if not target_events:
         print(f"  ℹ Tất cả buổi học hôm nay ({today_str}) đều đã có m3u8 hoặc không có lịch.")

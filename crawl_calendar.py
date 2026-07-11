@@ -536,26 +536,12 @@ def _run_watch_mode():
         print("  ⚠ Không có dữ liệu schedule trong Firestore.")
         return
 
-    # ── 2. Lọc các buổi học sắp hoặc đang diễn ra (trong 60ph quanh giờ học) ──
+    # ── 2. Lọc các buổi học chưa có m3u8 (bỏ giới hạn thời gian theo yêu cầu) ──
     now_vn = datetime.now(timezone(timedelta(hours=7)))
-    today_str = now_vn.strftime("%Y-%m-%d")
-    now_minutes = now_vn.hour * 60 + now_vn.minute
+    target_events = [ev for ev in events if not ev.get("m3u8")]
 
-    def _is_window(ev: dict) -> bool:
-        """True nếu buổi này trong cửa sổ -30min đến +90min quanh giờ học."""
-        if ev.get("date") != today_str:
-            return False
-        t = ev.get("time", "00:00")
-        try:
-            h, m = int(t[:2]), int(t[3:5])
-        except Exception:
-            return False
-        ev_min = h * 60 + m
-        return -30 <= (now_minutes - ev_min) <= 90
-
-    target_events = [ev for ev in events if _is_window(ev)]
     if not target_events:
-        print(f"  ℹ Không có buổi nào trong cửa sổ ±1h30 bây giờ ({now_vn.strftime('%H:%M')} VN)")
+        print("  ℹ Tất cả buổi học đều đã có m3u8 hoặc không có lịch.")
         return
 
     print(f"  Có {len(target_events)} buổi trong cửa sổ kiểm tra:")

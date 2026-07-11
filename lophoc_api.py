@@ -63,7 +63,8 @@ STANDARD_HEADERS = {
     "Accept-Encoding": "gzip, deflate, br, zstd",
     "Accept-Language": "en-US,en;q=0.9,vi;q=0.8",
     "Connection": "keep-alive",
-    "Host": _HOST,
+    # HOST không được đặt ở đây — requests tự đặt đúng theo URL,
+    # nếu set thêm sẽ tạo 2 header Host trùng nhau → server trả 403
     "Origin": BASE_URL,
     "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-Mode": "cors",
@@ -106,7 +107,12 @@ def decode_jwt_exp(token: str) -> Optional[int]:
 
 
 def is_jwt_expired(jwt_token: str, threshold_seconds: int = JWT_REFRESH_THRESHOLD) -> bool:
-    """True nếu JWT đã hết hạn hoặc sắp hết (trong threshold_seconds)."""
+    """True nếu JWT đã hết hạn hoặc sắp hết (trong threshold_seconds).
+    UUID session token (không phải JWT) → KHÔNG coi là expired,
+    vì UUID vẫn dùng được cho /api/calendar/ và /api/auth/room-token.
+    """
+    if not jwt_token.startswith("eyJ"):
+        return False  # UUID session token — không phải JWT, vẫn hợp lệ
     exp = decode_jwt_exp(jwt_token)
     if exp is None:
         return True
@@ -330,30 +336,37 @@ class LophocClient:
         return None
 
     def ensure_logged_in(self):
-        """Đảm bảo có JWT hợp lệ (sessionToken UUID hoặc roomToken JWT). Refresh/re-login nếu cần."""
-        jwt = self._get_current_jwt()
-        if jwt and not is_jwt_expired(jwt):
-            logger.info("✓ JWT còn hạn — skip login")
-            return
-
-        if not jwt:
+        """Nếu chưa có session token nào thì login bằng password.
+        UUID session token = hợp lệ (dùng cho calendar + room-token).
+        JWT roomToken = cần refresh khi sắp hết hạn.
+        """
+        token = self._get_any_session_token()
+        if not token:
             self._do_password_login()
             return
+        # Nếu là JWT, kiểm tra expiry
+        if token.startswith("eyJ") and is_jwt_expired(token):
+            code = self.session.cookies.get("_class_room_code")
+            learn_num = self.session.cookies.get("_learn_number")
+            if code and learn_num:
+                try:
+                    self._refresh_room_token(code, int(learn_num))
+                    return
+                except requests.HTTPError as e:
+                    if e.response is not None and e.response.status_code in (401, 403):
+                        logger.info("room-token 401/403 → re-login bằng password")
+                        self._do_password_login()
+                    else:
+                        raise
+            else:
+                self._do_password_login()
 
-        code = self.session.cookies.get("_class_room_code")
-        learn_number_str = self.session.cookies.get("_learn_number")
-        if code and learn_number_str:
-            try:
-                self._refresh_room_token(code, int(learn_number_str))
-                return
-            except requests.HTTPError as e:
-                if e.response is not None and e.response.status_code == 401:
-                    logger.info("room-token 401 → re-login bằng password")
-                    self._do_password_login()
-                else:
-                    raise
-        else:
-            self._do_password_login()
+    def _get_any_session_token(self) -> Optional[str]:
+        """Lấy session token hiện tại (UUID hoặc JWT), trả None nếu chưa login."""
+        for c in self.session.cookies:
+            if c.name == "_user_session_token" and c.value:
+                return c.value
+        return None
 
     def _do_password_login(self):
         login_with_password(self.session, self.username, self.password)
@@ -375,18 +388,18 @@ class LophocClient:
         return status.get(code, False)
 
     def get_m3u8(self, code: str, learn_number: int, ensure_room_token: bool = True) -> Optional[str]:
-        """Lấy m3u8 URL cho 1 buổi học, tự refresh roomToken nếu cần, tự retry 1 lần nếu 401."""
+        """Lấy m3u8 URL cho 1 buổi học, tự refresh roomToken nếu cần, tự retry 1 lần nếu 401/403."""
         self.ensure_logged_in()
         if ensure_room_token:
-            jwt = self._get_current_jwt()
-            jwt_code = self._extract_jwt_claim(jwt, "code") if jwt else None
-            if jwt_code != code:
+            # Luôn refresh room-token cho đúng code/learn_number
+            current_code = self.session.cookies.get("_class_room_code")
+            if current_code != code:
                 self._refresh_room_token(code, learn_number)
         try:
             return get_m3u8_url(self.session, code, learn_number)
         except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 401:
-                logger.warning("livestreamlink 401 — re-login và thử lại 1 lần")
+            if e.response is not None and e.response.status_code in (401, 403):
+                logger.warning(f"livestreamlink {e.response.status_code} — re-login và thử lại 1 lần")
                 self._do_password_login()
                 self._refresh_room_token(code, learn_number)
                 return get_m3u8_url(self.session, code, learn_number)

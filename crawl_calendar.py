@@ -86,6 +86,7 @@ def write_fs(doc_path: str, fields: dict):
 # ── COOKIE HELPERS ───────────────────────────────────────────────────────────
 COOKIE_DOC = "app_data/hm_cookies"
 SCHEDULE_DOC = "app_data/schedule"
+LOPHOC_SESSION_DOC = "app_data/lophoc_session"
 
 
 def load_cookies_from_firestore() -> list[dict] | None:
@@ -106,6 +107,30 @@ def save_cookies(cookies: list[dict]):
         "updatedAt": {"stringValue": datetime.now(timezone.utc).isoformat()}
     })
     print(f"  ✓ Đã lưu {len(cookies)} cookies lên Firestore")
+
+
+def load_lophoc_session() -> dict | None:
+    """Load lophoc session cache (UUID/JWT cookies) từ Firestore."""
+    try:
+        fields = read_fs(LOPHOC_SESSION_DOC)
+        if not fields:
+            return None
+        raw = fields.get("cookies", {}).get("stringValue", "")
+        return json.loads(raw) if raw else None
+    except Exception as e:
+        print(f"  ⚠ Không đọc được lophoc_session: {e}")
+        return None
+
+
+def save_lophoc_session(data: dict):
+    """Lưu lophoc session cookies vào Firestore."""
+    try:
+        write_fs(LOPHOC_SESSION_DOC, {
+            "cookies":   {"stringValue": json.dumps(data.get("cookies", {}), ensure_ascii=False)},
+            "updatedAt": {"stringValue": data.get("updatedAt", datetime.now(timezone.utc).isoformat())}
+        })
+    except Exception as e:
+        print(f"  ⚠ Không lưu được lophoc_session: {e}")
 
 
 def load_existing_schedule() -> dict:
@@ -477,12 +502,190 @@ def merge_events(new_events: list[dict], old_data: dict) -> list[dict]:
     return merged
 
 
+# ── WATCH MODE ────────────────────────────────────────────────────────────────
+def _run_watch_mode():
+    """
+    Watch mode: Không cần Playwright. Dùng lophoc_api.py (HTTP thuần) để:
+    1. Load schedule hiện tại từ Firestore
+    2. Tìm các buổi học sắp diễn ra (status='open' hoặc trong 30ph tới)
+    3. Dùng LophocClient kiểm tra stream nào đang live
+    4. Với stream đang live → lấy m3u8, update vào schedule + push lên Firestore
+    """
+    from datetime import datetime, timezone, timedelta
+    from lophoc_api import LophocClient
+
+    if not HM_USERNAME or not HM_PASSWORD:
+        print("❌ WATCH mode cần HM_USERNAME và HM_PASSWORD")
+        return
+
+    print("▶ WATCH mode: kiểm tra buổi học đang live...")
+
+    # ── 1. Load schedule từ Firestore hoặc local file ──
+    if GOOGLE_CREDENTIALS_JSON:
+        old_data = load_existing_schedule()
+    else:
+        try:
+            import json as _json
+            with open("schedule.json", "r", encoding="utf-8-sig") as f:
+                old_data = _json.load(f)
+        except Exception as e:
+            print(f"  ⚠ Không đọc được schedule.json local: {e}")
+            old_data = {"events": []}
+    events = old_data.get("events", [])
+    if not events:
+        print("  ⚠ Không có dữ liệu schedule trong Firestore.")
+        return
+
+    # ── 2. Lọc các buổi học sắp hoặc đang diễn ra (trong 60ph quanh giờ học) ──
+    now_vn = datetime.now(timezone(timedelta(hours=7)))
+    today_str = now_vn.strftime("%Y-%m-%d")
+    now_minutes = now_vn.hour * 60 + now_vn.minute
+
+    def _is_window(ev: dict) -> bool:
+        """True nếu buổi này trong cửa sổ -30min đến +90min quanh giờ học."""
+        if ev.get("date") != today_str:
+            return False
+        t = ev.get("time", "00:00")
+        try:
+            h, m = int(t[:2]), int(t[3:5])
+        except Exception:
+            return False
+        ev_min = h * 60 + m
+        return -30 <= (now_minutes - ev_min) <= 90
+
+    target_events = [ev for ev in events if _is_window(ev)]
+    if not target_events:
+        print(f"  ℹ Không có buổi nào trong cửa sổ ±1h30 bây giờ ({now_vn.strftime('%H:%M')} VN)")
+        return
+
+    print(f"  Có {len(target_events)} buổi trong cửa sổ kiểm tra:")
+    for ev in target_events:
+        m3u8_tag = "✓ đã có m3u8" if ev.get("m3u8") else "chưa có m3u8"
+        print(f"    [{ev['time']}] {ev['subject']} — {ev['title']} ({m3u8_tag})")
+
+    # ── 3. Khởi tạo LophocClient với Firestore cache ──
+    if GOOGLE_CREDENTIALS_JSON:
+        cache_loader = load_lophoc_session
+        cache_saver  = save_lophoc_session
+    else:
+        cache_loader = None
+        cache_saver  = None
+
+    client = LophocClient(HM_USERNAME, HM_PASSWORD, cache_loader, cache_saver)
+
+    # ── 4. Lấy calendar từ lophoc API để map code + learn_number ──
+    print("  → Lấy lịch từ lophoc API...")
+    try:
+        lophoc_lessons = client.get_calendar()
+    except Exception as e:
+        print(f"  ❌ Lấy lophoc calendar thất bại: {e}")
+        return
+
+    # Build index (subject, lesson_name) → lesson
+    lophoc_idx: dict = {}
+    for lesson in lophoc_lessons:
+        key = (lesson.get("subject", ""), lesson.get("lesson_name", ""))
+        lophoc_idx[key] = lesson
+
+    print(f"  ✓ Lophoc calendar: {len(lophoc_lessons)} buổi. Index: {len(lophoc_idx)} môn.")
+
+    # ── 5. Với từng buổi target, thử lấy m3u8 và check trực tiếp CDN ──
+    changed = False
+    for ev in target_events:
+        if ev.get("m3u8"):
+            continue  # đã có rồi → skip
+
+        match_key = (ev.get("subject", ""), ev.get("title", ""))
+        lesson = lophoc_idx.get(match_key)
+
+        if not lesson:
+            print(f"  ⚠ [{ev['time']}] {ev['subject']} — Không tìm thấy trong lophoc calendar (chưa enroll?)")
+            continue
+
+        code         = lesson.get("code", "")
+        learn_number = lesson.get("learn_number", 0)
+
+        # Bỏ qua bước kiểm tra live-status vì API hocmai thường trả False dù đã live
+        print(f"  ⏳ [{ev['time']}] {ev['subject']} — Thử lấy m3u8 và check CDN...")
+        try:
+            m3u8_url = client.get_m3u8(code, learn_number)
+        except Exception as e:
+            print(f"    ❌ Lấy m3u8 thất bại: {e}")
+            continue
+
+        if not m3u8_url:
+            print(f"    ⚠ API trả về m3u8 URL trống")
+            continue
+
+        # Check trực tiếp CDN xem có trả 200 không (m3u8 cần Referer/Origin)
+        cdn_ok = False
+        try:
+            import requests
+            r_cdn = requests.head(
+                m3u8_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+                    "Referer": "https://lophoc.hocmai.vn/",
+                    "Origin": "https://lophoc.hocmai.vn"
+                },
+                timeout=5
+            )
+            # Dùng GET nếu HEAD bị cấm
+            if r_cdn.status_code == 405:
+                r_cdn = requests.get(m3u8_url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+                    "Referer": "https://lophoc.hocmai.vn/",
+                    "Origin": "https://lophoc.hocmai.vn"
+                }, stream=True, timeout=5)
+                r_cdn.close()
+                
+            if r_cdn.status_code == 200:
+                cdn_ok = True
+            else:
+                print(f"    ⏳ Stream chưa live trên CDN (HTTP {r_cdn.status_code})")
+        except Exception as e:
+            print(f"    ⚠ Lỗi check CDN: {e}")
+
+        if not cdn_ok:
+            continue
+
+        # Stream đang live → cập nhật vào event
+        for main_ev in events:
+            if (main_ev.get("date") == ev["date"] and
+                    main_ev.get("subject") == ev["subject"] and
+                    main_ev.get("title") == ev["title"]):
+                main_ev["m3u8"] = m3u8_url
+                main_ev["status"] = "live"
+                main_ev["code"] = code
+                main_ev["learn_number"] = learn_number
+                if not main_ev.get("liveStartEpoch"):
+                    main_ev["liveStartEpoch"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+                changed = True
+                print(f"    🔴 ĐÃ LIVE! Ghi m3u8: {m3u8_url[:60]}...")
+                break
+
+    # ── 7. Push lên Firestore nếu có thay đổi ──
+    if changed:
+        old_data["events"] = events
+        old_data["lastUpdated"] = datetime.now(timezone.utc).isoformat()
+        if GOOGLE_CREDENTIALS_JSON:
+            push_schedule(old_data)
+        else:
+            import json as _json
+            with open("schedule_watch.json", "w", encoding="utf-8") as f:
+                _json.dump(old_data, f, ensure_ascii=False, indent=2)
+            print("→ Đã lưu schedule_watch.json (local mode)")
+        print("✅ Watch mode: Đã cập nhật m3u8!")
+    else:
+        print("✅ Watch mode: Không có thay đổi.")
+
+
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
     check_config()
 
     if CRAWL_MODE == "watch":
-        print("▶ Chế độ WATCH — sẽ implement sau khi có API m3u8")
+        _run_watch_mode()
         return
 
     from playwright.sync_api import sync_playwright

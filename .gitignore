@@ -1,0 +1,20 @@
+﻿# Environment / secrets
+.env
+.env.test
+*.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local test output
+schedule.json
+schedule_watch.json
+debug_*.png
+debug_*.html
+
+# Playwright
+playwright-report/
+test-results/

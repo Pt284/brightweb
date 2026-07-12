@@ -1196,7 +1196,7 @@ body.no-glass .plyr__menu__container {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  filter: brightness(20) saturate(10);
+  filter: brightness(12) saturate(5);
 }
 
 .cal-event-dot {

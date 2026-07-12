@@ -1229,7 +1229,7 @@ body.no-glass .plyr__menu__container {
   line-height: 1.25;
   flex: 1;
   min-width: 0;
-  text-shadow: 0 0px 10px rgba(255, 255, 255, 1)
+  text-shadow: 0 0px 10px rgba(255, 255, 255, 1);
 }
 
 

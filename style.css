@@ -1202,8 +1202,8 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event-dot {
-  width: 13px;
-  height: 13px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 4px;

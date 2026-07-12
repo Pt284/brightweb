@@ -1202,8 +1202,8 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event-dot {
-  width: 8px;
-  height: 8px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 4px;
@@ -1293,8 +1293,8 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-list-dot {
-  width: 10px;
-  height: 10px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   flex-shrink: 0;
 }

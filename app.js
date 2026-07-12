@@ -3128,7 +3128,7 @@ function _initCalendarButtons() {
       const headers = document.querySelectorAll('.cal-list-date-header');
       for (const h of headers) {
         if (h.dataset.date === todayDate) {
-          h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          h.scrollIntoView({ behavior: 'smooth', block: 'center' });
           // Phase 7: nhấp nháy viền giống month-view
           h.classList.remove('flash-today');
           void h.offsetWidth;

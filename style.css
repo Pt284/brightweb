@@ -1140,7 +1140,8 @@ body.no-glass .plyr__menu__container {
 .cal-day {
   border-right: 1px solid var(--color-border-glass);
   border-bottom: 1px solid var(--color-border-glass);
-  min-height: 90px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
   padding: 6px;
   position: relative;
   transition: background 0.15s;
@@ -1186,12 +1187,12 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event {
-  background: var(--color-surface-glass-hover);
+  background: transparent;
   border-radius: 4px;
-  padding: 3px 5px;
+  padding: 2px 0;
   margin-bottom: 3px;
   cursor: default;
-  transition: background 0.15s, transform 0.15s;
+  transition: transform 0.15s;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -1206,8 +1207,7 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event:hover {
-  background: rgba(255, 255, 255, 0.12);
-  transform: translateY(-1px);
+  background: transparent;
 }
 
 .cal-event-time {
@@ -1225,6 +1225,8 @@ body.no-glass .plyr__menu__container {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 
@@ -1357,7 +1359,6 @@ body.no-glass .plyr__menu__container {
   }
 
   .cal-day {
-    min-height: 60px;
     padding: 4px 2px;
   }
 

@@ -1196,7 +1196,6 @@ body.no-glass .plyr__menu__container {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  filter: brightness(1.5) saturate(1.2);
 }
 
 .cal-event-dot {
@@ -1217,6 +1216,7 @@ body.no-glass .plyr__menu__container {
   opacity: 1;
   color: inherit;
   white-space: nowrap;
+  -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.7);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
 }
 
@@ -1229,6 +1229,7 @@ body.no-glass .plyr__menu__container {
   line-height: 1.25;
   flex: 1;
   min-width: 0;
+  -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.7);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
 }
 
@@ -1306,8 +1307,8 @@ body.no-glass .plyr__menu__container {
   font-size: 0.95rem;
   font-weight: 700;
   color: inherit;
+  -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.7);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
-  filter: brightness(1.5) saturate(1.2);
 }
 
 .cal-list-title {
@@ -1323,8 +1324,8 @@ body.no-glass .plyr__menu__container {
   font-weight: 700;
   color: inherit;
   flex-shrink: 0;
+  -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.7);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
-  filter: brightness(1.5) saturate(1.2);
 }
 
 .cal-loading {

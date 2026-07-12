@@ -2609,10 +2609,10 @@ function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
     const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
     const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
     const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
-    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="border-left-color:${color};color:${color}" title="${ev.subject} — ${ev.title}" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}${statusAttr}>
+    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="color:${color}" title="${ev.subject} — ${ev.title}" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}${statusAttr}>
+      <div class="cal-event-dot" style="background:${color}"></div>
       <div class="cal-event-time">${ev.time || ''}</div>
       <div class="cal-event-subject">${ev.subject || ''}</div>
-      <div class="cal-event-title">${ev.title || ''}</div>
     </div>`;
   }).join('');
 

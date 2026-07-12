@@ -1187,13 +1187,22 @@ body.no-glass .plyr__menu__container {
 
 .cal-event {
   background: var(--color-surface-glass-hover);
-  border-left: 3px solid;
   border-radius: 4px;
   padding: 3px 5px;
   margin-bottom: 3px;
   cursor: default;
   transition: background 0.15s, transform 0.15s;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-event-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .cal-event:hover {
@@ -1218,21 +1227,6 @@ body.no-glass .plyr__menu__container {
   text-overflow: ellipsis;
 }
 
-.cal-event-title {
-  font-size: 0.65rem;
-  opacity: 0.75;
-  color: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .cal-event-title {
-    display: block;
-  }
-}
 
 .cal-event.is-past {
   opacity: 0.6;

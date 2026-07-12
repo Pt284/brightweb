@@ -10,8 +10,8 @@
   --color-surface: hsl(223, 52%, 25%);
   --color-surface2: hsl(225, 52%, 29%);
   --color-surface3: hsl(221, 53%, 22%);
-  --color-surface-glass: hsla(215, 0%, 100%, 0.06);
-  --color-surface-glass-hover: hsla(215, 0%, 100%, 0.1);
+  --color-surface-glass: hsla(215, 0%, 100%, 0.12);
+  --color-surface-glass-hover: hsla(215, 0%, 100%, 0.2);
   --color-surface-overlay: hsla(214, 78%, 4%, 0.55);
   --color-surface-modal: hsla(222, 54%, 20%, 0.8);
   --color-surface-input: hsla(215, 0%, 0%, 0.3);
@@ -1177,8 +1177,8 @@ body.no-glass .plyr__menu__container {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   background: var(--color-accent);
   color: #fff;
   border-radius: 50%;
@@ -1189,21 +1189,22 @@ body.no-glass .plyr__menu__container {
 .cal-event {
   background: transparent;
   border-radius: 4px;
-  padding: 2px 0;
-  margin-bottom: 3px;
+  padding: 4px 2px;
+  margin-bottom: 4px;
   cursor: default;
   transition: transform 0.15s;
-  overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
+  filter: brightness(1.5) saturate(1.2);
 }
 
 .cal-event-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  margin-top: 4px;
 }
 
 .cal-event:hover {
@@ -1211,22 +1212,24 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event-time {
-  font-size: 0.68rem;
-  font-weight: 700;
-  opacity: 0.85;
+  font-size: 0.75rem;
+  font-weight: 800;
+  opacity: 1;
   color: inherit;
   white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1);
 }
 
 .cal-event-subject {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 800;
   color: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.25;
   flex: 1;
   min-width: 0;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1);
 }
 
 
@@ -1300,9 +1303,11 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-list-subject {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: inherit;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1);
+  filter: brightness(1.5) saturate(1.2);
 }
 
 .cal-list-title {
@@ -1314,10 +1319,12 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-list-time {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: inherit;
   flex-shrink: 0;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1);
+  filter: brightness(1.5) saturate(1.2);
 }
 
 .cal-loading {

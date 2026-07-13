@@ -139,45 +139,20 @@ def main():
         m3u8    = ev.get("m3u8", "")
         start_at = ev.get("startAt") or ""
 
-        # Kiểm tra đã thông báo chưa (document tồn tại = đã gửi)
         print(f"\n🔍 Kiểm tra session {sid} ({subject} — {date} {time_s})...")
         existing = read_fs(f"session_clicks/{sid}")
         if existing is not None:
             print(f"  ↩ Đã thông báo trước đó → skip")
             continue
 
+        # [BUG #7] Log rõ khi startAt rỗng thay vì âm thầm bỏ qua reminder
+        if not start_at:
+            print(f"  ⚠ Session {sid} không có startAt hợp lệ → vẫn gửi 'link mới' nhưng SẼ KHÔNG có reminder T-90s")
+
+        # [BUG #5] Gửi push TRƯỚC — chỉ ghi Firestore khi có ít nhất 1 thành công
         print(f"  📣 Gửi thông báo tới {len(subs)} subscriber...")
-        now_iso = firestore_now_iso()
-
-        # Tạo session_clicks doc TRƯỚC KHI gửi push
-        # → "chốt" để tránh gửi trùng nếu job bị retry hoặc crash giữa chừng
-        write_fs(f"session_clicks/{sid}", {
-            "sessionId":    {"stringValue": sid},
-            "subject":      {"stringValue": subject},
-            "title":        {"stringValue": title},
-            "date":         {"stringValue": date},
-            "time":         {"stringValue": time_s},
-            "startAt":      {"stringValue": start_at},
-            "realLink":     {"stringValue": m3u8},
-            "notified":     {"booleanValue": True},
-            "reminderSent": {"booleanValue": False},
-            "createdAt":    {"stringValue": now_iso},
-        })
-
-        # Tạo users sub-docs
-        for s in subs:
-            try:
-                write_fs(f"session_clicks/{sid}/users/{s['uid']}", {
-                    "clicked":    {"booleanValue": False},
-                    "clickedAt":  {"nullValue": None},
-                    "remindedAt": {"nullValue": None},
-                    "createdAt":  {"stringValue": now_iso},
-                })
-            except Exception as e:
-                print(f"  ⚠ Không tạo user doc {s.get('uid')}: {e}")
-
-        # Gửi push cá nhân hoá cho từng subscriber
         ok_count = 0
+        sent_results = []
         for s in subs:
             # URL cá nhân hoá: khi click → Worker ghi clicked=true rồi redirect
             go_url = (
@@ -193,10 +168,44 @@ def main():
                 "tag":       f"new-{sid}",
                 "sessionId": sid,
             })
-            if send_one(s, payload):
+            success = send_one(s, payload)
+            if success:
                 ok_count += 1
+            sent_results.append((s, success))
 
         print(f"  ✅ Đã gửi: {ok_count}/{len(subs)}")
+
+        if ok_count == 0:
+            print(f"  ❌ Gửi thất bại toàn bộ cho session {sid} → KHÔNG tạo session_clicks, sẽ thử lại ở lần chạy kế")
+            continue   # Không set notified → lần sau retry
+
+        # [BUG #5] Chỉ tạo session_clicks + users/{uid} SAU KHI xác nhận có ít nhất 1 gửi thành công
+        now_iso = firestore_now_iso()
+        write_fs(f"session_clicks/{sid}", {
+            "sessionId":    {"stringValue": sid},
+            "subject":      {"stringValue": subject},
+            "title":        {"stringValue": title},
+            "date":         {"stringValue": date},
+            "time":         {"stringValue": time_s},
+            "startAt":      {"stringValue": start_at},
+            "realLink":     {"stringValue": m3u8},
+            "notified":     {"booleanValue": True},
+            "reminderSent": {"booleanValue": False},
+            "createdAt":    {"stringValue": now_iso},
+        })
+
+        # Tạo users sub-docs CHỈ cho người đã được gửi thành công
+        for s, success in sent_results:
+            try:
+                write_fs(f"session_clicks/{sid}/users/{s['uid']}", {
+                    "clicked":    {"booleanValue": False},
+                    "clickedAt":  {"nullValue": None},
+                    "remindedAt": {"nullValue": None},
+                    "createdAt":  {"stringValue": now_iso},
+                })
+            except Exception as e:
+                print(f"  ⚠ Không tạo user doc {s.get('uid')}: {e}")
+
         sent_count += 1
 
     print(f"\n🎉 Xong! Đã thông báo {sent_count} session mới.")

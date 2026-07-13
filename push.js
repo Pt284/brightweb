@@ -348,6 +348,13 @@
       } else {
         let sub = await reg.pushManager.getSubscription();
         if (sub && sub.options && sub.options.applicationServerKey) {
+          // [BUG #6] Guard: VAPID_PUBLIC_KEY có thể null nếu fetch /vapid-public-key thất bại
+          if (!VAPID_PUBLIC_KEY) {
+            console.warn("[push.js] VAPID_PUBLIC_KEY chưa sẵn sàng, bỏ qua kiểm tra auto-migration lần này");
+            updateBtnState(btn, !!sub);
+            return;
+          }
+
           // So sánh key hiện tại đang dùng với key mới
           const currentKeyArray = new Uint8Array(sub.options.applicationServerKey);
           const expectedKeyArray = urlB64ToUint8Array(VAPID_PUBLIC_KEY);

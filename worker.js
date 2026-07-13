@@ -179,7 +179,21 @@ async function handleSubscribe(request, env) {
     return new Response("Unauthorized", { status: 401, headers: corsH });
   }
 
-  // Parse body
+  // [BUG #2] Lấy uid/email từ JWT đã verify — KHÔNG tin body
+  const uid = payload.sub;
+  const emailFromToken = payload.email || "";
+  if (!emailFromToken) {
+    return new Response("Unauthorized: No email in token", { status: 401, headers: corsH });
+  }
+
+  // [BUG #1] Kiểm tra email có trong whitelist hoặc admins — chặn người ngoài nhóm
+  const isAllowed = await checkWhitelistOrAdmin(emailFromToken, idToken, env);
+  if (!isAllowed) {
+    console.warn(`[handleSubscribe] Rejected non-whitelisted: ${emailFromToken}`);
+    return new Response("Forbidden: Not whitelisted", { status: 403, headers: corsH });
+  }
+
+  // Parse body — BỎ uid, email ra khỏi destructuring (đã lấy từ JWT)
   let body;
   try {
     body = await request.json();
@@ -187,9 +201,9 @@ async function handleSubscribe(request, env) {
     return new Response("Bad Request: invalid JSON", { status: 400, headers: corsH });
   }
 
-  const { endpoint, keys, uid, email, deviceId, platform, userAgent } = body;
-  if (!endpoint || !keys || !uid) {
-    return new Response("Bad Request: missing endpoint/keys/uid", { status: 400, headers: corsH });
+  const { endpoint, keys, deviceId, platform, userAgent } = body;
+  if (!endpoint || !keys) {
+    return new Response("Bad Request: missing endpoint/keys", { status: 400, headers: corsH });
   }
 
   // Tính doc ID = sha1(endpoint).slice(0,32) bằng Web Crypto (không cần Node)
@@ -201,8 +215,8 @@ async function handleSubscribe(request, env) {
     endpoint:    { stringValue: endpoint },
     p256dh:      { stringValue: keys.p256dh || "" },
     auth:        { stringValue: keys.auth    || "" },
-    uid:         { stringValue: uid },
-    email:       { stringValue: email || "" },
+    uid:         { stringValue: uid },           // ✅ từ JWT, không phải body
+    email:       { stringValue: emailFromToken }, // ✅ từ JWT, không phải body
     deviceId:    { stringValue: deviceId || "" },
     platform:    { stringValue: platform || "" },
     userAgent:   { stringValue: (userAgent || "").slice(0, 200) },
@@ -237,10 +251,21 @@ async function handleUnsubscribe(request, env) {
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
   if (!idToken) return new Response("Unauthorized", { status: 401, headers: corsH });
 
+  let payload;
   try {
-    await verifyFirebaseJWT(idToken, env.FIREBASE_PROJECT_ID);
+    payload = await verifyFirebaseJWT(idToken, env.FIREBASE_PROJECT_ID);
   } catch (e) {
     return new Response("Unauthorized", { status: 401, headers: corsH });
+  }
+
+  // [BUG #1] Kiểm tra whitelist nhất quán với handleSubscribe
+  const emailFromToken = payload.email || "";
+  if (emailFromToken) {
+    const isAllowed = await checkWhitelistOrAdmin(emailFromToken, idToken, env);
+    if (!isAllowed) {
+      console.warn(`[handleUnsubscribe] Rejected non-whitelisted: ${emailFromToken}`);
+      return new Response("Forbidden: Not whitelisted", { status: 403, headers: corsH });
+    }
   }
 
   let body;
@@ -253,6 +278,13 @@ async function handleUnsubscribe(request, env) {
   const docId = sid.slice(0, 32);
 
   try {
+    // [BUG #3] Verify ownership: đọc doc trước, so uid với payload.sub
+    const existing = await firestoreGet(env, `push_subscriptions/${docId}`);
+    if (existing && existing.fields?.uid?.stringValue !== payload.sub) {
+      console.warn(`[handleUnsubscribe] uid mismatch: doc=${existing.fields?.uid?.stringValue} token=${payload.sub}`);
+      return new Response("Forbidden: Not the subscription owner", { status: 403, headers: corsH });
+    }
+
     await firestoreDelete(env, `push_subscriptions/${docId}`);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -288,15 +320,22 @@ async function handleGo(request, env) {
     return new Response("Bad Request: unsafe redirect target", { status: 400 });
   }
 
-  // Ghi click vào Firestore (fire-and-forget, không chặn redirect)
+  // [BUG #4] Ghi click vào Firestore — CHỈ patch nếu doc đã tồn tại sẵn
+  // (send_push.py tạo doc users/{uid} trước khi gửi push, nếu không có doc = user lạ/spam)
   if (user) {
     const now = new Date().toISOString();
     const docPath = `session_clicks/${session}/users/${user}`;
-    // Dùng waitUntil nếu có ctx, nếu không thì best-effort (không await)
-    firestorePatch(env, docPath, {
-      clicked:   { booleanValue: true },
-      clickedAt: { stringValue: now },
-    }, true).catch((e) => console.error("handleGo Firestore error:", e.message));
+    // fire-and-forget: không await, không chặn redirect
+    firestoreGet(env, docPath).then((existing) => {
+      if (existing) {
+        return firestorePatch(env, docPath, {
+          clicked:   { booleanValue: true },
+          clickedAt: { stringValue: now },
+        }, true);
+      } else {
+        console.warn(`[handleGo] Ignored click: doc ${docPath} does not exist (unknown user or session)`);
+      }
+    }).catch((e) => console.error("handleGo Firestore error:", e.message));
   }
 
   // Redirect 302 ngay lập tức
@@ -783,6 +822,24 @@ async function firestoreDelete(env, docPath) {
   return res;
 }
 
+/** GET một Firestore document đơn (trả null nếu 404) */
+async function firestoreGet(env, docPath) {
+  const projectId = env.FIREBASE_PROJECT_ID;
+  const token = await getGoogleAccessToken(env);
+
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${docPath}`;
+  const res = await fetch(url, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`firestoreGet ${docPath} failed: ${res.status} ${txt}`);
+  }
+  return res.json();
+}
+
 /** List documents trong một collection (để lấy toàn bộ push_subscriptions) */
 async function firestoreListCollection(env, collectionId) {
   const projectId = env.FIREBASE_PROJECT_ID;
@@ -942,6 +999,22 @@ async function verifyFirebaseJWT(token, projectId) {
 
   if (!valid) throw new Error("Invalid JWT signature");
   return payload;
+}
+
+// ── Whitelist / admin check (dùng token của chính user, Rules tự validate) ────
+/**
+ * Kiểm tra email có trong whitelist hoặc admins không.
+ * Dùng idToken của chính user → Firestore Rules tự validate quyền tự-đọc.
+ * Không cần service account, không cần sửa Firestore Rules.
+ */
+async function checkWhitelistOrAdmin(email, idToken, env) {
+  const base = `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const headers = { "Authorization": `Bearer ${idToken}` };
+  const [wlRes, adminRes] = await Promise.all([
+    fetch(`${base}/whitelist/${encodeURIComponent(email)}`, { headers }),
+    fetch(`${base}/admins/${encodeURIComponent(email)}`, { headers }),
+  ]);
+  return wlRes.ok || adminRes.ok;
 }
 
 // ── Rate limiting (giữ nguyên từ bản cũ) ─────────────────────────────────────

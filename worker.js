@@ -287,13 +287,27 @@ async function handleGo(request, env) {
 
 const WORKER_SELF = "https://brightweb-sync.mcdg5444.workers.dev";
 
+/**
+ * Chuyển timestamp (ms) sang ISO string khớp format Python isoformat():
+ * Python: "2026-07-13T03:33:00+00:00"  (không ms, dùng +00:00)
+ * JS:     "2026-07-13T03:33:00.123Z"   (có ms, dùng Z)
+ * Firestore so sánh lexicographic → format PHẢI nhất quán.
+ * Bug: '+' (ASCII 43) < '.' (ASCII 46) nên 'xxx+00:00' < 'xxx.123Z' ⇒ query SAI.
+ */
+function toFirestoreIso(ms) {
+  // Xóa milliseconds và thay 'Z' bằng '+00:00' → khớp Python isoformat()
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "+00:00");
+}
+
 async function reminderJob(env) {
   const now = Date.now();
-  // Cửa sổ thời gian: session bắt đầu trong [now+60s, now+120s]
-  const windowStart = new Date(now + 60_000).toISOString();
-  const windowEnd   = new Date(now + 120_000).toISOString();
+  // Cửa sổ [now-30s, now+150s]: ~ T-90s ± 60s buffer
+  // Mở rộng hơn [+60s, +120s] cũ → bắt kịp kể cả khi cron delay 30s
+  // reminderSent=true đảm bảo không gửi trùng
+  const windowStart = toFirestoreIso(now - 30_000);   // now - 30 giây
+  const windowEnd   = toFirestoreIso(now + 150_000);  // now + 150 giây
 
-  console.log(`[reminderJob] Checking window ${windowStart} → ${windowEnd}`);
+  console.log(`[reminderJob] Window: ${windowStart} → ${windowEnd}`);
 
   // 1. Query session_clicks trong cửa sổ thời gian
   let sessions;
@@ -318,6 +332,8 @@ async function reminderJob(env) {
     console.error("[reminderJob] query error:", e.message);
     return;
   }
+
+  console.log(`[reminderJob] Found ${sessions.length} session(s) in window`);
 
   // 2. Lọc session chưa được nhắc nhở
   const pending = sessions.filter(

@@ -131,10 +131,24 @@
   async function subscribe() {
     const reg = await navigator.serviceWorker.ready;
 
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
+    let subscription;
+    try {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    } catch (e) {
+      console.warn("[push.js] Lỗi subscribe, nghi ngờ kẹt VAPID key cũ. Đang dọn dẹp và thử lại...", e);
+      const oldSub = await reg.pushManager.getSubscription();
+      if (oldSub) {
+        await oldSub.unsubscribe(); // Xoá giấy phép cũ
+      }
+      // Thử xin lại giấy phép mới
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
 
     const subJson = subscription.toJSON();
 

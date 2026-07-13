@@ -32,10 +32,10 @@ export default {
     return handleSyncDispatch(request, env);
   },
 
-  // Phase 4 — Cron Trigger (sẽ uncomment sau khi bật Cron Trigger trên Dashboard)
-  // async scheduled(event, env, ctx) {
-  //   ctx.waitUntil(reminderJob(env));
-  // },
+  // Phase 4 — Cron Trigger (bật sau khi set Cron Trigger * * * * * trên Dashboard)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(reminderJob(env));
+  },
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -280,9 +280,356 @@ async function handleGo(request, env) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// PHASE 4 — reminderJob (sẽ kích hoạt sau khi bật Cron Trigger)
+// PHASE 4 — Cron reminder T-90s
+// Chạy mỗi phút, tìm session sắp bắt đầu trong [+60s, +120s],
+// gửi burst 3 thông báo cách nhau 4s cho user chưa click.
 // ════════════════════════════════════════════════════════════════════════════
-// async function reminderJob(env) { ... }
+
+const WORKER_SELF = "https://brightweb-sync.mcdg5444.workers.dev";
+
+async function reminderJob(env) {
+  const now = Date.now();
+  // Cửa sổ thời gian: session bắt đầu trong [now+60s, now+120s]
+  const windowStart = new Date(now + 60_000).toISOString();
+  const windowEnd   = new Date(now + 120_000).toISOString();
+
+  console.log(`[reminderJob] Checking window ${windowStart} → ${windowEnd}`);
+
+  // 1. Query session_clicks trong cửa sổ thời gian
+  let sessions;
+  try {
+    sessions = await firestoreRunQuery(env, "session_clicks", [
+      {
+        fieldFilter: {
+          field: { fieldPath: "startAt" },
+          op: "GREATER_THAN_OR_EQUAL",
+          value: { stringValue: windowStart },
+        },
+      },
+      {
+        fieldFilter: {
+          field: { fieldPath: "startAt" },
+          op: "LESS_THAN_OR_EQUAL",
+          value: { stringValue: windowEnd },
+        },
+      },
+    ]);
+  } catch (e) {
+    console.error("[reminderJob] query error:", e.message);
+    return;
+  }
+
+  // 2. Lọc session chưa được nhắc nhở
+  const pending = sessions.filter(
+    (s) => s.fields.reminderSent?.booleanValue !== true
+  );
+
+  if (pending.length === 0) {
+    console.log("[reminderJob] No pending sessions");
+    return;
+  }
+
+  // 3. Lấy toàn bộ subscription active
+  let allSubDocs;
+  try {
+    allSubDocs = await firestoreListCollection(env, "push_subscriptions");
+  } catch (e) {
+    console.error("[reminderJob] list subs error:", e.message);
+    return;
+  }
+
+  const activeSubs = allSubDocs
+    .filter((doc) => doc.fields?.active?.booleanValue === true)
+    .map((doc) => ({
+      endpoint: doc.fields.endpoint?.stringValue,
+      p256dh:   doc.fields.p256dh?.stringValue,
+      auth:     doc.fields.auth?.stringValue,
+      uid:      doc.fields.uid?.stringValue,
+      email:    doc.fields.email?.stringValue,
+      id:       doc.name.split("/").pop(),
+    }))
+    .filter((s) => s.endpoint && s.p256dh && s.auth);
+
+  if (activeSubs.length === 0) {
+    console.log("[reminderJob] No active subscriptions");
+    return;
+  }
+
+  // 4. Xử lý từng session
+  for (const session of pending) {
+    const sid      = session.id;
+    const fields   = session.fields;
+    const subject  = fields.subject?.stringValue || "Lịch học";
+    const title    = fields.title?.stringValue || "";
+    const realLink = fields.realLink?.stringValue || "";
+
+    // Mark reminderSent = true TRƯỚC KHI gửi (tránh 2 cron chồng nhau gửi trùng)
+    try {
+      await firestorePatch(env, `session_clicks/${sid}`, {
+        reminderSent: { booleanValue: true },
+      }, true);
+    } catch (e) {
+      console.error(`[reminderJob] patch reminderSent error for ${sid}:`, e.message);
+      continue;
+    }
+
+    // Lấy users chưa click
+    let users;
+    try {
+      users = await firestoreListSubcollection(env, `session_clicks/${sid}/users`);
+    } catch (e) {
+      console.error(`[reminderJob] list users error for ${sid}:`, e.message);
+      continue;
+    }
+
+    const pendingUids = new Set(
+      users
+        .filter((u) => u.fields?.clicked?.booleanValue !== true)
+        .map((u) => u.id)
+    );
+
+    if (pendingUids.size === 0) {
+      console.log(`[reminderJob] All users already clicked for ${sid}`);
+      continue;
+    }
+
+    // Lọc subscription cho user chưa click
+    const subsToNotify = activeSubs.filter((s) => pendingUids.has(s.uid));
+    if (subsToNotify.length === 0) {
+      console.log(`[reminderJob] No active subs for pending users of ${sid}`);
+      continue;
+    }
+
+    console.log(`[reminderJob] ${sid}: ${subsToNotify.length} users, burst x3`);
+
+    // Gửi 3 burst, tag khác nhau để iOS rung 3 lần
+    for (let burst = 1; burst <= 3; burst++) {
+      const nowIso = new Date().toISOString();
+      for (const sub of subsToNotify) {
+        const goUrl = (
+          `${WORKER_SELF}/go`
+          + `?session=${sid}`
+          + `&user=${sub.uid}`
+          + `&to=${encodeURIComponent(realLink)}`
+        );
+        const payload = JSON.stringify({
+          title:     `⏰ Sắp có lớp: ${subject}`,
+          body:      `${title ? title + " — " : ""}bắt đầu trong ~90 giây!`,
+          url:       goUrl,
+          tag:       `remind-${sid}-${burst}`,
+          sessionId: sid,
+        });
+
+        try {
+          const status = await sendWebPush(sub.endpoint, sub.p256dh, sub.auth, payload, env);
+          console.log(`  [burst ${burst}] ${sub.email || sub.uid}: HTTP ${status}`);
+
+          if (status === 404 || status === 410) {
+            // Subscription hỏng → xoá (fire-and-forget)
+            firestoreDelete(env, `push_subscriptions/${sub.id}`).catch(() => {});
+          } else if (status === 201 || status === 200 || status === 204) {
+            // Cập nhật remindedAt (fire-and-forget)
+            firestorePatch(env, `session_clicks/${sid}/users/${sub.uid}`, {
+              remindedAt: { stringValue: nowIso },
+            }, true).catch(() => {});
+          }
+        } catch (e) {
+          console.error(`  [burst ${burst}] error for ${sub.uid}:`, e.message);
+        }
+      }
+
+      // Đợi 4 giây giữa các burst (trừ burst cuối)
+      if (burst < 3) await sleep(4000);
+    }
+  }
+}
+
+// ── sleep helper ──────────────────────────────────────────────────────────────
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// WEB PUSH ENCRYPTION (RFC 8291 + RFC 8188 aes128gcm)
+// Thuần Web Crypto API — không cần Node.js / npm / nodejs_compat
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Gửi 1 Web Push tới 1 subscription.
+ * @returns {number} HTTP status code (201=success, 404/410=expired, v.v.)
+ */
+async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
+  // Parse subscriber keys
+  const recipientPublic = b64ToBytes(p256dhB64); // 65 bytes, uncompressed P-256
+  const authSecret      = b64ToBytes(authB64);    // 16 bytes
+
+  // 1. Ephemeral P-256 key pair (Application Server = Sender)
+  const ephemeralPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true, ["deriveBits"]
+  );
+  const senderPublicRaw = new Uint8Array(
+    await crypto.subtle.exportKey("raw", ephemeralPair.publicKey)
+  ); // 65 bytes uncompressed
+
+  // 2. Import recipient public key for ECDH
+  const recipientKey = await crypto.subtle.importKey(
+    "raw", recipientPublic,
+    { name: "ECDH", namedCurve: "P-256" },
+    false, []
+  );
+
+  // 3. ECDH shared secret (256 bits)
+  const sharedSecretBuf = await crypto.subtle.deriveBits(
+    { name: "ECDH", public: recipientKey },
+    ephemeralPair.privateKey,
+    256
+  );
+  const sharedSecret = new Uint8Array(sharedSecretBuf);
+
+  // 4. HKDF per RFC 8291 — derive IKM
+  //    auth_info = "WebPush: info\0" || ua_public(65) || as_public(65)
+  const authInfo = new Uint8Array([
+    ...new TextEncoder().encode("WebPush: info"),
+    0x00,
+    ...recipientPublic,
+    ...senderPublicRaw,
+  ]);
+
+  //    PRK_key = HMAC-SHA-256(auth_secret, sharedSecret)  [HKDF-Extract]
+  const prkKey = await crypto.subtle.importKey(
+    "raw", authSecret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const prkRaw = new Uint8Array(await crypto.subtle.sign("HMAC", prkKey, sharedSecret));
+
+  //    IKM = HMAC-SHA-256(PRK_key, auth_info || 0x01)[:32]  [HKDF-Expand, 1 block]
+  const ikmKey = await crypto.subtle.importKey(
+    "raw", prkRaw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const ikmInput = new Uint8Array([...authInfo, 0x01]);
+  const ikm      = new Uint8Array(await crypto.subtle.sign("HMAC", ikmKey, ikmInput));
+
+  // 5. Random 16-byte salt for content encryption
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  //    PRK2 = HMAC-SHA-256(salt, IKM)  [HKDF-Extract for content keys]
+  const prk2Key = await crypto.subtle.importKey(
+    "raw", salt, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const prk2 = new Uint8Array(await crypto.subtle.sign("HMAC", prk2Key, ikm));
+
+  const prk2SignKey = await crypto.subtle.importKey(
+    "raw", prk2, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+
+  //    CEK = HMAC-SHA-256(PRK2, "Content-Encoding: aes128gcm\0" || 0x01)[:16]
+  const cekInput = new Uint8Array([
+    ...new TextEncoder().encode("Content-Encoding: aes128gcm"),
+    0x00, 0x01,
+  ]);
+  const cek = new Uint8Array(await crypto.subtle.sign("HMAC", prk2SignKey, cekInput)).slice(0, 16);
+
+  //    NONCE = HMAC-SHA-256(PRK2, "Content-Encoding: nonce\0" || 0x01)[:12]
+  const nonceInput = new Uint8Array([
+    ...new TextEncoder().encode("Content-Encoding: nonce"),
+    0x00, 0x01,
+  ]);
+  const nonce = new Uint8Array(await crypto.subtle.sign("HMAC", prk2SignKey, nonceInput)).slice(0, 12);
+
+  // 6. AES-128-GCM encrypt
+  //    paddedPlaintext = plaintext + 0x02 (last-record delimiter, no extra padding)
+  const plaintext      = new TextEncoder().encode(payloadStr);
+  const paddedPlaintext = new Uint8Array([...plaintext, 0x02]);
+
+  const cekKey = await crypto.subtle.importKey(
+    "raw", cek, { name: "AES-GCM" }, false, ["encrypt"]
+  );
+  const ciphertextBuf = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, tagLength: 128 },
+    cekKey,
+    paddedPlaintext
+  );
+  const ciphertext = new Uint8Array(ciphertextBuf); // plaintext + 1 (delimiter) + 16 (GCM tag)
+
+  // 7. Build aes128gcm header: salt(16) | rs=4096(4) | idlen=65(1) | senderPublic(65)
+  const rs     = 4096;
+  const header = new Uint8Array(16 + 4 + 1 + 65);
+  header.set(salt, 0);
+  // rs as big-endian uint32
+  header[16] = (rs >>> 24) & 0xff;
+  header[17] = (rs >>> 16) & 0xff;
+  header[18] = (rs >>> 8)  & 0xff;
+  header[19] =  rs         & 0xff;
+  header[20] = 65; // idlen = length of sender public key
+  header.set(senderPublicRaw, 21);
+
+  const body = new Uint8Array(header.length + ciphertext.length);
+  body.set(header, 0);
+  body.set(ciphertext, header.length);
+
+  // 8. VAPID JWT (ES256)
+  const origin   = new URL(endpoint).origin;
+  const vapidJwt = await makeVapidJwt(origin, env);
+
+  // 9. POST to push endpoint
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization":    `vapid t=${vapidJwt},k=${env.VAPID_PUBLIC_KEY}`,
+      "Content-Type":     "application/octet-stream",
+      "Content-Encoding": "aes128gcm",
+      "TTL":              "3600",
+    },
+    body,
+  });
+
+  return resp.status;
+}
+
+/**
+ * Tạo VAPID JWT dùng ES256 (ECDSA P-256) — chuẩn Web Push VAPID (RFC 8292)
+ * VAPID_PRIVATE_KEY là raw base64url P-256 scalar (32 bytes)
+ * VAPID_PUBLIC_KEY  là raw base64url uncompressed P-256 point (65 bytes: 04||x||y)
+ */
+async function makeVapidJwt(audience, env) {
+  const now = Math.floor(Date.now() / 1000);
+  const header  = { alg: "ES256", typ: "JWT" };
+  const payload = {
+    aud: audience,
+    exp: now + 86400,
+    sub: env.VAPID_SUBJECT,
+  };
+
+  const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+
+  // Tách x, y từ uncompressed public key (04 || x(32) || y(32))
+  const pubKeyBytes  = b64ToBytes(env.VAPID_PUBLIC_KEY); // 65 bytes
+  const privKeyBytes = b64ToBytes(env.VAPID_PRIVATE_KEY); // 32 bytes
+
+  // Import dưới dạng JWK
+  const jwk = {
+    kty: "EC",
+    crv: "P-256",
+    d: b64url(privKeyBytes),                  // raw private scalar
+    x: b64url(pubKeyBytes.slice(1, 33)),      // x coordinate
+    y: b64url(pubKeyBytes.slice(33, 65)),     // y coordinate
+  };
+
+  const privateKey = await crypto.subtle.importKey(
+    "jwk", jwk,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false, ["sign"]
+  );
+
+  // ECDSA sign → raw format (r||s, 64 bytes) — khớp với ES256 JWT
+  const sigBytes = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  return `${signingInput}.${b64url(new Uint8Array(sigBytes))}`;
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // FIRESTORE REST HELPERS

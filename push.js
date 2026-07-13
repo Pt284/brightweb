@@ -8,8 +8,8 @@
   const BASE = "/brightweb";
   const WORKER_URL = "https://brightweb-sync.mcdg5444.workers.dev";
   // VAPID_PUBLIC_KEY sẽ được inject bởi workflow hoặc hardcode tạm ở đây
-  // Đây là PUBLIC key — an toàn để đặt trong client code
-  const VAPID_PUBLIC_KEY = "BBP28Zde3L6zZRRLfYMCUEEnRb8EVH--hu6Hhc7RpFjhMp-LAOJ9w2gOMBlfSc9klU1tdxFmndq9ZEEakdpnAmo";
+  // VAPID Public Key - khớp với private key mới
+  const VAPID_PUBLIC_KEY = "BNNHPHF77kCtd0jDah4dF_ezdFEGf_O50pF9nmQpEkUGu9NcTjlsVp41rv3TJTyRxgt0Q96gOCEdrMkszuZuV9U";
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

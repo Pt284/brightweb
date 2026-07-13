@@ -128,6 +128,10 @@
 
   // ── Subscribe ──────────────────────────────────────────────────────────────
   async function subscribe() {
+    if (!VAPID_PUBLIC_KEY) {
+      throw new Error("Không thể kết nối đến máy chủ để lấy VAPID Public Key. (Bạn đã copy worker.js mới lên Cloudflare chưa?)");
+    }
+
     const reg = await navigator.serviceWorker.ready;
 
     let subscription;

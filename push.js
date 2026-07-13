@@ -240,20 +240,6 @@
       return;
     }
 
-    // Lấy VAPID_PUBLIC_KEY động từ Cloudflare Worker
-    try {
-      const vapidRes = await fetch(`${WORKER_URL}/vapid-public-key`);
-      if (vapidRes.ok) {
-        VAPID_PUBLIC_KEY = await vapidRes.text();
-      } else {
-        console.error("[push.js] Lỗi lấy VAPID_PUBLIC_KEY:", vapidRes.status);
-        return;
-      }
-    } catch (e) {
-      console.error("[push.js] Lỗi mạng khi lấy VAPID_PUBLIC_KEY:", e);
-      return;
-    }
-
     // Tạo nút 🔔 trong header (đặt trước btn-calendar)
     const btnCalendar = document.getElementById("btn-calendar");
     if (!btnCalendar) {
@@ -269,6 +255,20 @@
     btn.style.opacity = "0.55";
     btn.style.filter = "grayscale(0.5)";
     btnCalendar.parentElement.insertBefore(btn, btnCalendar);
+
+    // Lấy VAPID_PUBLIC_KEY động từ Cloudflare Worker
+    try {
+      const vapidRes = await fetch(`${WORKER_URL}/vapid-public-key`);
+      if (vapidRes.ok) {
+        VAPID_PUBLIC_KEY = await vapidRes.text();
+      } else {
+        console.error("[push.js] Lỗi lấy VAPID_PUBLIC_KEY:", vapidRes.status);
+        // Không return ở đây để user vẫn thấy nút chuông và tắt thông báo nếu cần.
+      }
+    } catch (e) {
+      console.error("[push.js] Lỗi mạng khi lấy VAPID_PUBLIC_KEY:", e);
+      // Không return ở đây
+    }
 
     // Đăng ký Service Worker
     let reg;

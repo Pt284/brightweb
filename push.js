@@ -7,9 +7,8 @@
 
   const BASE = "/brightweb";
   const WORKER_URL = "https://brightweb-sync.mcdg5444.workers.dev";
-  // VAPID_PUBLIC_KEY sẽ được inject bởi workflow hoặc hardcode tạm ở đây
-  // VAPID Public Key - khớp với private key mới
-  const VAPID_PUBLIC_KEY = "BNNHPHF77kCtd0jDah4dF_ezdFEGf_O50pF9nmQpEkUGu9NcTjlsVp41rv3TJTyRxgt0Q96gOCEdrMkszuZuV9U";
+  // VAPID_PUBLIC_KEY sẽ được lấy động từ Worker
+  let VAPID_PUBLIC_KEY = null;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -238,6 +237,20 @@
     // Kiểm tra trình duyệt hỗ trợ
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       console.log("[push.js] Trình duyệt không hỗ trợ Web Push");
+      return;
+    }
+
+    // Lấy VAPID_PUBLIC_KEY động từ Cloudflare Worker
+    try {
+      const vapidRes = await fetch(`${WORKER_URL}/vapid-public-key`);
+      if (vapidRes.ok) {
+        VAPID_PUBLIC_KEY = await vapidRes.text();
+      } else {
+        console.error("[push.js] Lỗi lấy VAPID_PUBLIC_KEY:", vapidRes.status);
+        return;
+      }
+    } catch (e) {
+      console.error("[push.js] Lỗi mạng khi lấy VAPID_PUBLIC_KEY:", e);
       return;
     }
 

@@ -28,6 +28,30 @@ export default {
     if (url.pathname === "/push/unsubscribe" && method === "POST")
       return handleUnsubscribe(request, env);
 
+    // Route mới: GET /vapid-public-key (Cấp Public Key động cho Frontend)
+    if (url.pathname === "/vapid-public-key" && method === "GET") {
+      const allowedOrigin = `https://${env.GITHUB_OWNER}.github.io`;
+      return new Response(env.VAPID_PUBLIC_KEY, {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": allowedOrigin,
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+        }
+      });
+    }
+
+    // CORS cho OPTIONS /vapid-public-key
+    if (url.pathname === "/vapid-public-key" && method === "OPTIONS") {
+      const allowedOrigin = `https://${env.GITHUB_OWNER}.github.io`;
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": allowedOrigin,
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+        }
+      });
+    }
+
     // Route cũ: mọi POST còn lại → handleSyncDispatch (giữ nguyên 100%)
     return handleSyncDispatch(request, env);
   },

@@ -324,12 +324,39 @@
       }
     });
 
-    // Sync lại trạng thái nút khi user đăng nhập/đăng xuất
+    // Sync lại trạng thái nút và tự động sửa lỗi kẹt key (background update)
     firebase.auth().onAuthStateChanged(async (user) => {
       if (!user) {
         updateBtnState(btn, false);
       } else {
-        const sub = await reg.pushManager.getSubscription();
+        let sub = await reg.pushManager.getSubscription();
+        if (sub && sub.options && sub.options.applicationServerKey) {
+          // So sánh key hiện tại đang dùng với key mới
+          const currentKeyArray = new Uint8Array(sub.options.applicationServerKey);
+          const expectedKeyArray = urlB64ToUint8Array(VAPID_PUBLIC_KEY);
+          let isMatch = currentKeyArray.length === expectedKeyArray.length;
+          if (isMatch) {
+            for (let i = 0; i < currentKeyArray.length; i++) {
+              if (currentKeyArray[i] !== expectedKeyArray[i]) {
+                isMatch = false;
+                break;
+              }
+            }
+          }
+
+          // Nếu lệch key → tự động huỷ cái cũ và cấp lại cái mới (âm thầm)
+          if (!isMatch) {
+            console.warn("[push.js] Phát hiện đang dùng VAPID key cũ. Đang tự động nâng cấp ngầm...");
+            try {
+              await sub.unsubscribe();
+              sub = await subscribe();
+              console.log("[push.js] ✅ Tự động nâng cấp VAPID key thành công!");
+            } catch (e) {
+              console.error("[push.js] ❌ Tự nâng cấp thất bại:", e);
+              sub = null; // Hiện nút chuông gạch chéo để user tự bấm lại
+            }
+          }
+        }
         updateBtnState(btn, !!sub);
       }
     });

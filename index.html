@@ -12,10 +12,18 @@
   img-src 'self' https://fonts.gstatic.com https://i.ytimg.com data:;
   connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://brightweb-sync.mcdg5444.workers.dev https://www.youtube.com https://noembed.com;
   frame-src https://www.youtube.com https://brightwebaccbase.firebaseapp.com;
+  worker-src 'self';
   object-src 'none';
 ">
   <title>HM-LEAKBASE😈</title>
   <link rel="icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f608/512.gif" type="image/gif">
+  <!-- PWA -->
+  <link rel="manifest" href="/brightweb/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HM-LEAKBASE">
+  <link rel="apple-touch-icon" href="/brightweb/icons/icon-192.png">
+  <meta name="theme-color" content="#0b1220">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="glass.css">
   <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
@@ -358,6 +366,7 @@
 
   <script src="app.js"></script>
   <script src="color-settings.js"></script>
+  <script src="push.js"></script>
 
 </body>
 

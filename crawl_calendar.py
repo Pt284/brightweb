@@ -9,8 +9,8 @@ Crawl lịch học, lưu cookie vào Firestore.
 - Không có hardcode URL nào — toàn bộ lấy từ GitHub Secrets.
 """
 
-import os, re, json, time
-from datetime import datetime, timezone
+import os, re, json, time, hashlib
+from datetime import datetime, timezone, timedelta
 
 # ── CONFIG (100% từ env, không hardcode URL) ─────────────────────────────────
 HM_BASE            = os.environ.get("HM_BASE_URL", "")
@@ -29,6 +29,30 @@ FIRESTORE_PROJECT_ID    = os.environ.get("FIRESTORE_PROJECT_ID", "")
 CRAWL_MODE   = os.environ.get("CRAWL_MODE", "full")
 MONTHS_TO_CRAWL = int(os.environ.get("MONTHS_TO_CRAWL", "6"))
 HEADLESS     = os.environ.get("HEADLESS", "true").lower() != "false"
+
+
+# ── SESSION ID & STARTAT HELPERS (dùng cho Web Push) ─────────────────────────
+VN_TZ = timezone(timedelta(hours=7))   # múi giờ Việt Nam
+
+def session_id(date_str: str, time_str: str, title: str) -> str:
+    """Tạo ID duy nhất 16 ký tự cho mỗi buổi học, dựa trên date+time+title."""
+    raw = f"{date_str}|{time_str}|{title}".encode("utf-8")
+    return hashlib.sha1(raw).hexdigest()[:16]
+
+
+def compute_start_at(date_str: str, time_str: str):
+    """
+    Chuyển giờ học VN (naive) sang ISO-8601 UTC.
+    VD: date='2026-06-15', time='19:30' → '2026-06-15T12:30:00+00:00'
+    KHÔNG gắn 'Z' vào giờ VN — phải quy đổi đúng sang UTC.
+    Trả về None nếu parse lỗi.
+    """
+    try:
+        naive = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        vn_dt = naive.replace(tzinfo=VN_TZ)
+        return vn_dt.astimezone(timezone.utc).isoformat()
+    except Exception:
+        return None
 
 
 def check_config():
@@ -450,6 +474,8 @@ def parse_events_from_page(page) -> list[dict]:
         ev["time"] = normalize_time(ev.get("time", ""))
         ev["m3u8"] = None
         ev["liveStartEpoch"] = None
+        ev["sessionId"] = session_id(ev["date"], ev["time"], ev.get("title", ""))  # MỚI
+        ev["startAt"] = compute_start_at(ev["date"], ev["time"])                   # MỚI
         events.append(ev)
     return events
 

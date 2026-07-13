@@ -1,0 +1,29 @@
+{
+  "name": "HM-LEAKBASE 😈",
+  "short_name": "HM-LEAKBASE",
+  "description": "Lịch học và video trực tuyến HM-LEAKBASE",
+  "start_url": "/brightweb/?source=pwa",
+  "scope": "/brightweb/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/brightweb/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/brightweb/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/brightweb/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

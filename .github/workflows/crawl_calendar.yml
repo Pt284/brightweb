@@ -83,7 +83,18 @@ jobs:
           MONTHS_TO_CRAWL:         ${{ github.event.inputs.months || '6' }}
           HEADLESS:                "false"
 
-      # 6. Lưu screenshot/HTML debug khi do_login() fail — xem được trang login
+      # 6. Gửi Web Push cho session mới có m3u8
+      - name: Send push notifications for new links
+        if: success()
+        run: python tools/send_push.py
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
+          VAPID_PRIVATE_KEY:       ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT:           ${{ secrets.VAPID_SUBJECT }}
+          SITE_URL:                ${{ secrets.SITE_URL }}
+
+      # 7. Lưu screenshot/HTML debug khi do_login() fail — xem được trang login
       #    thật trông thế nào lúc lỗi, không phải đoán mù qua traceback.
       - name: Upload login debug artifact (nếu fail)
         if: failure()

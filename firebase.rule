@@ -59,5 +59,35 @@ service cloud.firestore {
         && request.auth != null
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
+
+    // ── Web Push Subscriptions ──────────────────────────────────────────────
+    // Mọi ghi thật sự từ server (Worker / send_push.py) đều dùng service account
+    // → bypass rules hoàn toàn. Rules ở đây chỉ ngăn client ghi trực tiếp tuỳ tiện.
+    match /push_subscriptions/{sid} {
+      // Client chỉ được tạo/cập nhật subscription của chính mình (uid phải khớp)
+      allow create, update: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      // Client chỉ được xoá subscription của chính mình
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+      // Không cho client đọc (chỉ server đọc qua service account)
+      allow read: if false;
+    }
+
+    // ── Session Clicks (ghi nhận click vào push notification) ───────────────
+    match /session_clicks/{sid} {
+      // Admin có thể đọc để hiện thống kê sau này
+      allow read: if request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      // Chỉ server ghi (service account bypass rules)
+      allow write: if false;
+
+      match /users/{uid} {
+        // Mỗi user chỉ đọc record click của chính mình
+        allow read: if request.auth != null && request.auth.uid == uid;
+        // Chỉ server ghi
+        allow write: if false;
+      }
+    }
   }
-}
+}

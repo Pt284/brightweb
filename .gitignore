@@ -18,3 +18,6 @@ debug_*.html
 # Playwright
 playwright-report/
 test-results/
+
+#test
+run_test_push.ps1

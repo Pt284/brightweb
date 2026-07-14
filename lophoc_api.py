@@ -34,7 +34,7 @@ import base64
 import logging
 import urllib.parse
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Callable
 
 import requests
 
@@ -303,13 +303,20 @@ class LophocClient:
             m3u8 = client.get_m3u8(code, learn_number)
     """
 
-    def __init__(self, username: str, password: str, cache_loader=None, cache_saver=None):
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        cache_loader: Optional[Callable[[], list[dict]]] = None,
+        cache_saver: Optional[Callable[[list[dict]], None]] = None,
+    ):
         self.username = username
         self.password = password
         self.session = requests.Session()
         self.session.headers.update(STANDARD_HEADERS)
-        self._cache_loader = cache_loader  # callable() -> dict | None
-        self._cache_saver = cache_saver    # callable(dict) -> None
+        self._cache_loader = cache_loader
+        self._cache_saver = cache_saver
+        self._retried_auth = False
         self._load_cache()
 
     def _load_cache(self):
@@ -398,8 +405,9 @@ class LophocClient:
         try:
             return get_m3u8_url(self.session, code, learn_number)
         except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code in (401, 403):
+            if not self._retried_auth and e.response is not None and e.response.status_code in (401, 403):
                 logger.warning(f"livestreamlink {e.response.status_code} — re-login và thử lại 1 lần")
+                self._retried_auth = True
                 self._do_password_login()
                 self._refresh_room_token(code, learn_number)
                 return get_m3u8_url(self.session, code, learn_number)

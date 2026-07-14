@@ -141,7 +141,7 @@ def main():
 
         print(f"\n🔍 Kiểm tra session {sid} ({subject} — {date} {time_s})...")
         existing = read_fs(f"session_clicks/{sid}")
-        old_real_link = existing.get("fields", {}).get("realLink", {}).get("stringValue") if existing else None
+        old_real_link = existing.get("realLink", {}).get("stringValue") if existing else None
 
         is_new_session = existing is None
         is_link_changed = (existing is not None) and old_real_link and (old_real_link != m3u8)
@@ -161,11 +161,16 @@ def main():
         ok_count = 0
         sent_results = []
         for s in subs:
+            uid = s.get("uid")
+            if not uid:
+                print(f"  ⚠ Bỏ qua subscription thiếu uid: {s.get('id', '?')}")
+                continue
+                
             # URL cá nhân hoá: khi click → Worker ghi clicked=true rồi redirect
             go_url = (
                 f"{WORKER_BASE}/go"
                 f"?session={sid}"
-                f"&user={s['uid']}"
+                f"&user={uid}"
                 f"&to={quote(m3u8, safe='')}"
             )
             payload = json.dumps({
@@ -197,14 +202,17 @@ def main():
             "startAt":      {"stringValue": start_at},
             "realLink":     {"stringValue": m3u8},
             "reminderSent": {"booleanValue": False},
-            "createdAt":    {"stringValue": existing.get("fields",{}).get("createdAt",{}).get("stringValue", now_iso) if existing else now_iso},
+            "createdAt":    {"stringValue": existing.get("createdAt",{}).get("stringValue", now_iso) if existing else now_iso},
             "updatedAt":    {"stringValue": now_iso},
         })
 
-        # Tạo users sub-docs CHỈ cho người đã được gửi thành công
+        # Tạo users sub-docs cho MỌI subscriber (kể cả người gửi push thất bại — vẫn cần
+        # doc này để reminderJob biết mà nhắc lại sau)
         for s, success in sent_results:
+            uid = s.get("uid")
+            if not uid: continue
             try:
-                write_fs(f"session_clicks/{sid}/users/{s['uid']}", {
+                write_fs(f"session_clicks/{sid}/users/{uid}", {
                     "clicked":    {"booleanValue": False},
                     "clickedAt":  {"nullValue": None},
                     "remindedAt": {"nullValue": None},

@@ -255,7 +255,13 @@ def do_logout(session: requests.Session):
         if sesskey and HM_LOGOUT_FINAL:
             logout_final = url(HM_LOGOUT_FINAL)
             session.get(f"{logout_final}?sesskey={sesskey}", timeout=15)
-            print("  ✓ Đã đăng xuất thành công (HTTP).")
+            
+            # Kiểm tra xem đã logout thật chưa
+            test = session.get(url(HM_CAL_PATH), timeout=15, allow_redirects=False)
+            if test.status_code in (301, 302, 303) and "login" in test.headers.get("location", "").lower():
+                print("  ✓ Đã đăng xuất thành công (HTTP).")
+            else:
+                print("  ⚠ Logout có thể chưa thành công — session vẫn còn hiệu lực tạm thời.")
     except Exception as e:
         print(f"  ⚠ Đăng xuất lỗi (bỏ qua): {e}")
 
@@ -291,6 +297,8 @@ def fetch_calendar_api(session: requests.Session, months: int) -> list[dict]:
     r = session.get(api_url, params=params, headers=headers, timeout=20)
     r.raise_for_status()
     raw_events = r.json()
+    if not isinstance(raw_events, list):
+        raise RuntimeError(f"API trả về không phải list (có thể lỗi auth/rate-limit): {str(raw_events)[:200]}")
     
     events = []
     for ev in raw_events:
@@ -365,11 +373,11 @@ def merge_events(new_events: list[dict], old_data: dict) -> list[dict]:
             partial_key = f"{ev['date']}_{ev['subject']}"
             old_candidates = old_by_date_subject.get(partial_key, [])
             for old_ev in old_candidates:
-                if old_ev.get("m3u8"):
+                if old_ev.get("m3u8") and old_ev.get("title") == ev.get("title"):
                     # Lùi lịch: giữ m3u8 nhưng dùng giờ mới
                     ev["m3u8"] = old_ev["m3u8"]
                     ev["liveStartEpoch"] = old_ev.get("liveStartEpoch")
-                    print(f"  ⚠ Phát hiện lùi lịch: {ev['subject']} ngày {ev['date']} từ {old_ev['time']} → {ev['time']}")
+                    print(f"  ⚠ Phát hiện lùi lịch: {ev['subject']} — {ev['title']} ngày {ev['date']} từ {old_ev['time']} → {ev['time']}")
                     break
 
         merged.append(ev)
@@ -594,12 +602,16 @@ def main():
         print(f"  ❌ Lấy lịch qua API thất bại: {e}")
         # Thử đăng nhập lại 1 lần nếu lỗi 401/403/500
         print("  → Thử đăng nhập lại...")
-        do_login(session)
-        did_login = True
-        if GOOGLE_CREDENTIALS_JSON:
-            save_cookies([{"name": c.name, "value": c.value, "domain": c.domain} for c in session.cookies])
-        all_events = fetch_calendar_api(session, MONTHS_TO_CRAWL)
-        print(f"  ✓ API trả về {len(all_events)} sự kiện")
+        try:
+            do_login(session)
+            did_login = True
+            if GOOGLE_CREDENTIALS_JSON:
+                save_cookies([{"name": c.name, "value": c.value, "domain": c.domain} for c in session.cookies])
+            all_events = fetch_calendar_api(session, MONTHS_TO_CRAWL)
+            print(f"  ✓ API trả về {len(all_events)} sự kiện")
+        except Exception as retry_e:
+            print(f"  ❌ Retry thất bại: {retry_e}")
+            raise SystemExit(1)
 
     # Bước 4: Đăng xuất
     if did_login:
@@ -617,9 +629,11 @@ def main():
     unique.sort(key=lambda e: (e["date"], e["time"]))
 
     # Bước 6: Merge với data cũ (giữ m3u8 đã có)
+    had_old_data = False
     if GOOGLE_CREDENTIALS_JSON:
         print("▶ Đọc schedule cũ để merge...")
         old_data = load_existing_schedule()
+        had_old_data = True
         unique = merge_events(unique, old_data)
 
     output = {
@@ -634,7 +648,7 @@ def main():
         print("⚠ API trả về 0 sự kiện sau merge — có thể lỗi auth/rate-limit. KHÔNG ghi đè schedule, giữ nguyên dữ liệu cũ.")
         return
     if GOOGLE_CREDENTIALS_JSON:
-        old_count = len(old_data.get("events", [])) if "old_data" in dir() else 0
+        old_count = len(old_data.get("events", [])) if had_old_data else 0
         if old_count > 0 and len(unique) < old_count * 0.5:
             print(f"⚠ Số sự kiện mới ({len(unique)}) giảm hơn 50% so với cũ ({old_count}) — nghi ngờ lỗi. KHÔNG ghi đè.")
             return

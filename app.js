@@ -1635,6 +1635,23 @@ function renderInlineLiveVideo(ev, vw) {
     _lessonLiveHls.loadSource(ev.m3u8);
     _lessonLiveHls.attachMedia(videoEl);
     _lessonLiveHls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => { }));
+    attachHlsEndDetection(_lessonLiveHls, () => {
+      if (_lessonLiveHls) { try { _lessonLiveHls.destroy(); } catch(e){} _lessonLiveHls = null; }
+      container.innerHTML = '<div style="padding:2rem;text-align:center;opacity:.7">⏹ Buổi học đã kết thúc.</div>';
+    }, (msg) => {
+      // Có thể tạo một overlay div để báo lỗi đang tải lại
+      if (msg && !document.getElementById('inline-live-status')) {
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'inline-live-status';
+        statusDiv.style = 'position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.5);color:white;padding:5px 10px;border-radius:4px;z-index:10;';
+        statusDiv.textContent = msg;
+        container.style.position = 'relative';
+        container.appendChild(statusDiv);
+      } else if (!msg) {
+        const statusDiv = document.getElementById('inline-live-status');
+        if (statusDiv) statusDiv.remove();
+      }
+    });
   } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     videoEl.src = ev.m3u8;
     videoEl.addEventListener('loadedmetadata', () => videoEl.play().catch(() => { }));
@@ -2939,6 +2956,45 @@ async function updateLiveBanner() {
   }
 }
 
+function attachHlsEndDetection(hlsInstance, onEnded, uiStatusUpdater) {
+  let errorCount = 0;
+  let retryTimer = null;
+  let firstErrorTime = 0;
+
+  hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+    if (!data.fatal) return;
+    console.warn('[Live] HLS fatal error:', data.type, data.details);
+    
+    const now = Date.now();
+    if (firstErrorTime === 0) firstErrorTime = now;
+
+    // Nếu đã trôi qua hơn 30 giây kể từ lỗi đầu tiên -> kết thúc thật
+    if (now - firstErrorTime > 30000) {
+      if (retryTimer) clearTimeout(retryTimer);
+      onEnded();
+      return;
+    }
+
+    // Nếu vẫn trong 30s, thử lại
+    uiStatusUpdater('Đang mất kết nối, đang thử lại...');
+    if (retryTimer) clearTimeout(retryTimer);
+    
+    retryTimer = setTimeout(() => {
+      try {
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hlsInstance.startLoad();
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hlsInstance.recoverMediaError();
+        else { hlsInstance.destroy(); onEnded(); }
+      } catch (e) { onEnded(); }
+    }, 2000); // Thử lại mỗi 2 giây
+  });
+
+  // Khi có video parse thành công, reset lại cờ lỗi
+  hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+    firstErrorTime = 0;
+    uiStatusUpdater(''); // xoá thông báo lỗi
+  });
+}
+
 function openLiveModal(ev) {
   if (!ev.m3u8) {
     navigateToMappedLesson(ev);
@@ -2972,6 +3028,13 @@ function openLiveModal(ev) {
     _liveModalHls.loadSource(ev.m3u8);
     _liveModalHls.attachMedia(videoEl);
     _liveModalHls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play());
+    attachHlsEndDetection(_liveModalHls, () => {
+      if (_liveElapsedTimer) { clearInterval(_liveElapsedTimer); _liveElapsedTimer = null; }
+      elapsedEl.textContent = '⏹ Buổi học đã kết thúc';
+      closeLiveModal();
+    }, (msg) => {
+      if (msg) elapsedEl.textContent = msg;
+    });
   } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     videoEl.src = ev.m3u8;
     videoEl.addEventListener('loadedmetadata', () => videoEl.play());

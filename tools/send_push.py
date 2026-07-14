@@ -141,9 +141,16 @@ def main():
 
         print(f"\n🔍 Kiểm tra session {sid} ({subject} — {date} {time_s})...")
         existing = read_fs(f"session_clicks/{sid}")
-        if existing is not None:
-            print(f"  ↩ Đã thông báo trước đó → skip")
+        old_real_link = existing.get("fields", {}).get("realLink", {}).get("stringValue") if existing else None
+
+        is_new_session = existing is None
+        is_link_changed = (existing is not None) and old_real_link and (old_real_link != m3u8)
+
+        if not is_new_session and not is_link_changed:
+            print(f"  ↩ Đã thông báo đúng link này rồi → skip")
             continue
+
+        push_title = "🆕 Link học mới" if is_new_session else "🔄 Link đã đổi — cập nhật ngay!"
 
         # [BUG #7] Log rõ khi startAt rỗng thay vì âm thầm bỏ qua reminder
         if not start_at:
@@ -162,8 +169,8 @@ def main():
                 f"&to={quote(m3u8, safe='')}"
             )
             payload = json.dumps({
-                "title":     f"🆕 {subject}",
-                "body":      f"{title} — {date} {time_s}",
+                "title":     push_title,
+                "body":      f"{subject} — {title} — {date} {time_s}",
                 "url":       go_url,
                 "tag":       f"new-{sid}",
                 "sessionId": sid,
@@ -189,9 +196,9 @@ def main():
             "time":         {"stringValue": time_s},
             "startAt":      {"stringValue": start_at},
             "realLink":     {"stringValue": m3u8},
-            "notified":     {"booleanValue": True},
             "reminderSent": {"booleanValue": False},
-            "createdAt":    {"stringValue": now_iso},
+            "createdAt":    {"stringValue": existing.get("fields",{}).get("createdAt",{}).get("stringValue", now_iso) if existing else now_iso},
+            "updatedAt":    {"stringValue": now_iso},
         })
 
         # Tạo users sub-docs CHỈ cho người đã được gửi thành công

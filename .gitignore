@@ -24,3 +24,6 @@ run_test_push.ps1
 
 #plan
 *.md
+
+#har
+*.har

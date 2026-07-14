@@ -200,292 +200,120 @@ def normalize_time(raw: str) -> str:
     return f"{h:02d}:{m:02d}"
 
 
-# ── PLAYWRIGHT HELPERS ───────────────────────────────────────────────────────
-def check_logged_in(page) -> bool:
-    """
-    Kiểm tra đã đăng nhập chưa bằng cách xem có MoodleSession không
-    và kiểm tra xem có lấy được calendar-wrapper không.
-    """
-    try:
-        # Check cookie first
-        cookies = page.context.cookies()
-        if not any(c.get("name") == "MoodleSession" for c in cookies):
-            return False
+# ── HTTP CRAWL HELPERS ───────────────────────────────────────────────────────
+import requests
 
-        page.wait_for_load_state("domcontentloaded", timeout=15000)
-        current = page.url.lower()
-        if "loginv2" in current or "/login" in current:
-            return False
-            
-        # Kiểm tra có phần tử đặc trưng của trang lịch không
-        return page.query_selector(".calendar-wrapper") is not None
-    except Exception:
-        return False
-
-
-def _first_visible_input(page, *selectors: str):
-    """
-    Đăng nhập kiểu đơn giản (giống video.py): trả về input ĐẦU TIÊN đang
-    HIỂN THỊ khớp 1 trong các selector truyền vào.
-
-    Bản cũ (_resolve_real_input) đoán field thật luôn là field CUỐI cùng
-    trong DOM khi có honeypot trùng name — giả định này sai khi trang đổi
-    cấu trúc (honeypot lại nằm sau), dẫn tới fill() nhầm field bị ẩn rồi
-    timeout. Hàm này không đoán vị trí nữa — chỉ quét tất cả field khớp
-    từng selector và lấy field đầu tiên có is_visible() == True, vì honeypot
-    luôn bị ẩn bằng CSS (display:none/visibility:hidden) bất kể nó nằm ở
-    đâu trong DOM.
-    """
-    for sel in selectors:
-        loc = page.locator(sel)
-        for i in range(loc.count()):
-            el = loc.nth(i)
-            try:
-                if el.is_visible():
-                    return el
-            except Exception:
-                continue
-    return None
-
-
-def save_debug_artifacts(page, prefix: str = "login_failure"):
-    """
-    Lưu screenshot + HTML hiện tại của `page` khi có lỗi, để biết chính xác
-    CI thấy gì lúc fail — không phải đoán mù qua traceback nữa.
-
-    QUAN TRỌNG: trước đây workflow (.yml) đã có bước upload-artifact tìm
-    `login_failure.png`/`login_failure.html`, nhưng KHÔNG có hàm nào trong
-    crawl_calendar.py thực sự tạo ra 2 file này → artifact luôn rỗng
-    ("No files were found..."). Hàm này lấp đúng lỗ hổng đó.
-    """
-    try:
-        page.screenshot(path=f"{prefix}.png", full_page=True)
-        with open(f"{prefix}.html", "w", encoding="utf-8") as f:
-            f.write(page.content())
-        print(f"  📸 Đã lưu {prefix}.png + .html — URL lúc lỗi: {page.url}")
-    except Exception as e:
-        print(f"  ⚠ Không lưu được debug artifact ({prefix}): {e}")
-
-
-def _wait_for_visible_input(page, *selectors: str, timeout_ms: int = 12000, poll_ms: int = 500):
-    """
-    Giống _first_visible_input() nhưng CHỜ tối đa timeout_ms, poll lại mỗi
-    poll_ms — để chịu được trang có refresh/redirect trung gian.
-
-    Lý do cần hàm này: ảnh/html debug thật chụp được từ GitHub Actions cho
-    thấy khi context đang mang cookie MoodleSession CŨ (hết hạn) rồi mở
-    thẳng trang login, hocmai/Moodle KHÔNG trả form login ngay — mà trả 1
-    trang gần như rỗng (chỉ có <head>, <body></body> trống) kèm
-    `<meta http-equiv="refresh" content="5; url=.../loginv2/index.php">`,
-    tự nạp lại CHÍNH trang đó sau 5 giây mới ra form thật (cách Moodle xử
-    lý khi phát hiện session cũ không hợp lệ). Check 1 lần ngay sau
-    networkidle + sleep(1) như cũ là quá sớm — chưa tới giây thứ 5 nên
-    luôn thấy "không có field nào hiển thị", dù form thật vẫn sẽ xuất
-    hiện nếu chờ thêm vài giây.
-    """
-    deadline = time.time() + timeout_ms / 1000
-    while True:
-        el = _first_visible_input(page, *selectors)
-        if el:
-            return el
-        if time.time() >= deadline:
-            return None
-        page.wait_for_timeout(poll_ms)
-
-
-def do_login(page):
-    """
-    Đăng nhập bằng tài khoản/mật khẩu — phiên bản đơn giản hoá theo video.py.
-
-    Flow login (login.har):
-    - URL: POST /loginv2/index.php
-    - Fields: a (rỗng), username, password
-    - Content-Type: multipart/form-data
-    - Success: redirect 302 → /study
-
-    Trang login có thể có field honeypot trùng name="username"/"password"
-    để bẫy bot — xem _first_visible_input() (chọn theo trạng thái hiển thị,
-    không đoán vị trí DOM).
-    """
+def do_login(session: requests.Session):
     if not HM_USERNAME or not HM_PASSWORD:
         raise RuntimeError("❌ Thiếu HM_USERNAME hoặc HM_PASSWORD.")
-    print("  → Đăng nhập bằng tài khoản/mật khẩu...")
-    login_url = url(HM_LOGIN_PATH)  # /loginv2/index.php
-
-    # Xoá cookie cũ (MoodleSession hết hạn từ Firestore) TRƯỚC khi mở trang
-    # login. Nếu giữ cookie cũ, Moodle có thể trả về trang trung gian rỗng
-    # + meta-refresh 5s (xem _wait_for_visible_input) thay vì form login
-    # ngay — xoá cookie để đảm bảo đây luôn là 1 lượt ghé trang "sạch".
-    page.context.clear_cookies()
-
-    # Mở trang login trước để lấy cookie phiên
-    page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_load_state("networkidle", timeout=20000)
-    time.sleep(1)
-    print(f"  ℹ URL sau khi mở trang login: {page.url}")
-
-    username_field = _wait_for_visible_input(page, 'input[name="username"]', 'input[type="text"]')
-    password_field = _wait_for_visible_input(page, 'input[name="password"]', 'input[type="password"]')
-
-    if not username_field:
-        save_debug_artifacts(page)
-        raise RuntimeError("❌ Không tìm thấy ô tài khoản (username) đang hiển thị trên trang login.")
-    if not password_field:
-        save_debug_artifacts(page)
-        raise RuntimeError("❌ Không tìm thấy ô mật khẩu (password) đang hiển thị trên trang login.")
-
-    username_field.click()
-    username_field.fill(HM_USERNAME)
-    time.sleep(0.3)
-
-    password_field.click()
-    password_field.fill(HM_PASSWORD)
-    time.sleep(0.3)
-
-    # Dùng press("Enter") trên password thay vì click để tránh nhầm form tìm kiếm
-    password_field.press("Enter")
-
-    # Chờ redirect hoàn tất
-    page.wait_for_load_state("networkidle", timeout=20000)
-    time.sleep(2)
-
-    # Xác nhận qua cookie thay vì URL (vì có thể bị redirect linh tinh)
-    cookies = page.context.cookies()
-    if not any(c.get("name") == "MoodleSession" for c in cookies):
-        save_debug_artifacts(page)
+    print("  → Đăng nhập bằng HTTP POST...")
+    login_url = url(HM_LOGIN_PATH)
+    
+    # Xoá cookie cũ
+    session.cookies.clear()
+    
+    session.get(login_url, timeout=15)
+    payload = {"username": HM_USERNAME, "password": HM_PASSWORD, "a": ""}
+    r = session.post(login_url, data=payload, allow_redirects=False, timeout=15)
+    
+    if not session.cookies.get("MoodleSession"):
         raise RuntimeError("❌ Đăng nhập thất bại — Không tìm thấy MoodleSession cookie.")
-    print("  ✓ Đăng nhập thành công (đã lấy được session cookie)!")
+    print("  ✓ Đăng nhập thành công (đã lấy được MoodleSession)!")
 
 
-def do_logout(page):
-    """
-    Logout đúng flow theo LOGOUT.HAR:
-    Bước 1: GET /loginv2/logout.php → trang hỏi 'Bạn có thực sự muốn đăng xuất?'
-    Bước 2: Click nút 'Có' (submit form với sesskey)
-            hoặc lấy sesskey rồi GET /login/logout.php?sesskey=XXX
-    """
+def do_logout(session: requests.Session):
     if not HM_LOGOUT_V2_PATH:
-        print("  ⚠ Thiếu HM_LOGOUT_V2_PATH — bỏ qua đăng xuất.")
         return
     try:
-        logout_v2 = url(HM_LOGOUT_V2_PATH)  # /loginv2/logout.php
-
-        page.goto(logout_v2, wait_until="domcontentloaded", timeout=15000)
-        page.wait_for_load_state("networkidle", timeout=10000)
-
-        # Cách 1: Click nút 'Có' trong trang confirmation
-        yes_btn = page.query_selector('input[type="submit"][value="Có"]')
-        if yes_btn:
-            yes_btn.click()
-            page.wait_for_load_state("networkidle", timeout=10000)
-            print("  ✓ Đã đăng xuất thành công (click Có).")
-            return
-
-        # Cách 2: Lấy sesskey và GET /login/logout.php?sesskey=XXX
-        if not HM_LOGOUT_FINAL:
-            print("  ⚠ Không tìm thấy nút Có và thiếu HM_LOGOUT_FINAL_PATH.")
-            return
-
+        logout_v2 = url(HM_LOGOUT_V2_PATH)
+        r = session.get(logout_v2, timeout=15)
+        
         sesskey = None
-        el = page.query_selector('input[name="sesskey"]')
-        if el:
-            sesskey = el.get_attribute("value")
-        else:
-            content = page.content()
-            m_key = re.search(r'sesskey[=:]\s*["\']?([A-Za-z0-9]+)', content)
-            if m_key:
-                sesskey = m_key.group(1)
-
-        if not sesskey:
-            print("  ⚠ Không tìm được sesskey — bỏ qua đăng xuất.")
-            return
-
-        logout_final = url(HM_LOGOUT_FINAL)  # /login/logout.php
-        page.goto(f"{logout_final}?sesskey={sesskey}",
-                  wait_until="domcontentloaded", timeout=15000)
-        page.wait_for_load_state("networkidle", timeout=10000)
-        print("  ✓ Đã đăng xuất thành công (sesskey GET).")
+        m_key = re.search(r'sesskey[=:]\s*["\']?([A-Za-z0-9]+)', r.text)
+        if m_key:
+            sesskey = m_key.group(1)
+            
+        if sesskey and HM_LOGOUT_FINAL:
+            logout_final = url(HM_LOGOUT_FINAL)
+            session.get(f"{logout_final}?sesskey={sesskey}", timeout=15)
+            print("  ✓ Đã đăng xuất thành công (HTTP).")
     except Exception as e:
         print(f"  ⚠ Đăng xuất lỗi (bỏ qua): {e}")
 
 
-def click_month_view(page):
-    try:
-        btn = page.query_selector('button[data-view="dayGridMonth"]')
-        if btn:
-            btn.click()
-            time.sleep(1.5)
-            print("  ✓ Chuyển sang chế độ xem Tháng")
-    except Exception as e:
-        print(f"  ⚠ Không click được nút 'Tháng': {e}")
-
-
-def navigate_to_next_month(page):
-    try:
-        btn = page.query_selector('#nextBtn, button#nextBtn')
-        if btn:
-            btn.click()
-            page.wait_for_load_state("networkidle", timeout=10000)
-            time.sleep(1.5)
-    except Exception as e:
-        print(f"  ⚠ Không chuyển tháng được: {e}")
-
-
-# ── PARSE CALENDAR DOM ───────────────────────────────────────────────────────
-def parse_events_from_page(page) -> list[dict]:
-    """
-    Trích xuất danh sách buổi học từ DOM.
-    Trả về list[dict] với: date, time, subject, title, color, status, m3u8, liveStartEpoch
-    """
-    raw_events = page.evaluate("""
-    () => {
-        const results = [];
-        const dayCells = document.querySelectorAll('td.fc-daygrid-day[data-date]');
-        dayCells.forEach(cell => {
-            const date = cell.getAttribute('data-date');
-            const eventEls = cell.querySelectorAll('.fc-event');
-            eventEls.forEach(evEl => {
-                const timeEl    = evEl.querySelector('.time');
-                const subjectEl = evEl.querySelector('.subject');
-                const titleEl   = evEl.querySelector('.title');
-                const dotEl     = evEl.querySelector('.dot');
-
-                const time    = timeEl    ? timeEl.textContent.trim()    : '';
-                const subject = subjectEl ? subjectEl.textContent.trim() : '';
-                const title   = titleEl   ? titleEl.textContent.trim()   : '';
-                const color   = dotEl     ? (dotEl.style.background || '') : '';
-
-                const cls = Array.from(evEl.classList);
-                let status = 'unknown';
-                if (cls.some(c => c === 'event-past'))     status = 'past';
-                else if (cls.some(c => c === 'event-too_early')) status = 'upcoming';
-                else if (cls.some(c => c === 'event-open')) status = 'open';
-
-                if (date && (subject || title)) {
-                    results.push({ date, time, subject, title, color, status });
-                }
-            });
-        });
-        return results;
+def fetch_calendar_api(session: requests.Session, months: int) -> list[dict]:
+    """Gọi API JSON trực tiếp thay vì cào DOM."""
+    now = datetime.now(timezone(timedelta(hours=7)))
+    start_date = now.replace(day=1)
+    
+    end_month = start_date.month + months
+    end_year = start_date.year + (end_month - 1) // 12
+    end_month = (end_month - 1) % 12 + 1
+    
+    # Check edge case if day is 31 and end_month has 30 days, just use day=1 for safe end_date
+    end_date = datetime(end_year, end_month, 1, tzinfo=VN_TZ)
+    
+    api_url = f"{HM_BASE.rstrip('/')}/study/calendar/event"
+    params = {
+        "debug": "1",
+        "exam": "",
+        "subject": "",
+        "start": start_date.strftime("%Y-%m-%dT00:00:00+07:00"),
+        "end": end_date.strftime("%Y-%m-%dT00:00:00+07:00")
     }
-    """)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": url(HM_CAL_PATH)
+    }
+    
+    print(f"  → Đang tải API từ {params['start']} đến {params['end']}...")
+    r = session.get(api_url, params=params, headers=headers, timeout=20)
+    r.raise_for_status()
+    raw_events = r.json()
+    
     events = []
-    for ev in (raw_events or []):
-        ev["time"] = normalize_time(ev.get("time", ""))
-        ev["m3u8"] = None
-        ev["liveStartEpoch"] = None
-        ev["sessionId"] = session_id(ev["date"], ev["time"], ev.get("title", ""))  # MỚI
-        ev["startAt"] = compute_start_at(ev["date"], ev["time"])                   # MỚI
-        events.append(ev)
+    for ev in raw_events:
+        start_iso = ev.get("start")
+        if not start_iso: continue
+        
+        try:
+            dt = datetime.fromisoformat(start_iso)
+            # Make timezone aware if naive
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=VN_TZ)
+        except Exception:
+            continue
+            
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M")
+        title = ev.get("title", "")
+        
+        props = ev.get("extendedProps", {})
+        subject = props.get("subject", "")
+        color = props.get("color", "")
+        
+        if dt < now:
+            status = "past"
+        elif dt <= now + timedelta(minutes=30):
+            status = "open"
+        else:
+            status = "upcoming"
+            
+        events.append({
+            "date": date_str,
+            "time": time_str,
+            "subject": subject,
+            "title": title,
+            "color": color,
+            "status": status,
+            "m3u8": None,
+            "liveStartEpoch": None,
+            "sessionId": session_id(date_str, time_str, title),
+            "startAt": compute_start_at(date_str, time_str)
+        })
     return events
-
-
-def get_month_label(page) -> str:
-    try:
-        el = page.query_selector('.calendar-title .title, #calendarTitle .title')
-        return el.inner_text().strip() if el else ""
-    except Exception:
-        return ""
 
 
 # ── MERGE LOGIC ──────────────────────────────────────────────────────────────
@@ -580,7 +408,7 @@ def _run_watch_mode():
         except Exception:
             return False
 
-    target_events = [ev for ev in events if not ev.get("m3u8") and _is_soon(ev)]
+    target_events = [ev for ev in events if _is_soon(ev)]
 
     if not target_events:
         print(f"  ℹ Tất cả buổi học hôm nay ({today_str}) đều đã có m3u8 hoặc không có lịch.")
@@ -620,8 +448,6 @@ def _run_watch_mode():
     # ── 5. Với từng buổi target, thử lấy m3u8 và check trực tiếp CDN ──
     changed = False
     for ev in target_events:
-        if ev.get("m3u8"):
-            continue  # đã có rồi → skip
 
         match_key = (ev.get("subject", ""), ev.get("title", ""))
         lesson = lophoc_idx.get(match_key)
@@ -645,8 +471,11 @@ def _run_watch_mode():
             print(f"    ⚠ API trả về m3u8 URL trống")
             continue
 
+        old_m3u8 = ev.get("m3u8")
+        link_changed = bool(old_m3u8) and (m3u8_url != old_m3u8)
+
         # Check trực tiếp CDN xem có trả 200 không (m3u8 cần Referer/Origin)
-        cdn_ok = False
+        cdn_note = "?"
         try:
             import requests
             r_cdn = requests.head(
@@ -667,30 +496,30 @@ def _run_watch_mode():
                 }, stream=True, timeout=5)
                 r_cdn.close()
                 
-            if r_cdn.status_code == 200:
-                cdn_ok = True
-            else:
-                print(f"    ⏳ Stream chưa live trên CDN (HTTP {r_cdn.status_code})")
+            cdn_note = f"HTTP {r_cdn.status_code}"
         except Exception as e:
-            print(f"    ⚠ Lỗi check CDN: {e}")
+            cdn_note = f"lỗi check: {e}"
 
-        if not cdn_ok:
-            continue
-
-        # Stream đang live → cập nhật vào event
-        for main_ev in events:
-            if (main_ev.get("date") == ev["date"] and
-                    main_ev.get("subject") == ev["subject"] and
-                    main_ev.get("title") == ev["title"]):
-                main_ev["m3u8"] = m3u8_url
-                main_ev["status"] = "live"
-                main_ev["code"] = code
-                main_ev["learn_number"] = learn_number
-                if not main_ev.get("liveStartEpoch"):
-                    main_ev["liveStartEpoch"] = int(datetime.now(timezone.utc).timestamp() * 1000)
-                changed = True
-                print(f"    🔴 ĐÃ LIVE! Ghi m3u8: {m3u8_url[:60]}...")
-                break
+        if not old_m3u8 or link_changed:
+            # Stream đang live → cập nhật vào event
+            for main_ev in events:
+                if (main_ev.get("date") == ev["date"] and
+                        main_ev.get("subject") == ev["subject"] and
+                        main_ev.get("title") == ev["title"]):
+                    main_ev["m3u8"] = m3u8_url
+                    main_ev["status"] = "live"
+                    main_ev["code"] = code
+                    main_ev["learn_number"] = learn_number
+                    if not main_ev.get("liveStartEpoch"):
+                        main_ev["liveStartEpoch"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+                    changed = True
+                    if link_changed:
+                        print(f"    🔄 LINK ĐÃ ĐỔI ({cdn_note}): ...{old_m3u8[-30:]} → ...{m3u8_url[-30:]}")
+                    else:
+                        print(f"    🔴 Có link ({cdn_note}): {m3u8_url[:60]}...")
+                    break
+        else:
+            print(f"    = Không đổi ({cdn_note})")
 
     # ── 7. Push lên Firestore nếu có thay đổi ──
     if changed:
@@ -716,82 +545,49 @@ def main():
         _run_watch_mode()
         return
 
-    from playwright.sync_api import sync_playwright
-
-    print(f"▶ Bắt đầu crawl lịch (mode={CRAWL_MODE}, months={MONTHS_TO_CRAWL})...")
-    all_events: list[dict] = []
+    print(f"▶ Bắt đầu crawl lịch qua API (mode={CRAWL_MODE}, months={MONTHS_TO_CRAWL})...")
+    
+    session = requests.Session()
     did_login = False
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=HEADLESS)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/149.0.0.0 Safari/537.36"
-            ),
-            locale="vi-VN",
-            timezone_id="Asia/Ho_Chi_Minh"
-        )
+    # Bước 1: Load cookie từ Firestore
+    if GOOGLE_CREDENTIALS_JSON:
+        print("▶ Đọc cookie từ Firestore...")
+        saved = load_cookies_from_firestore()
+        if saved:
+            for c in saved:
+                session.cookies.set(c.get("name"), c.get("value"), domain=c.get("domain", ".hocmai.vn"))
+            print(f"  ✓ Loaded {len(saved)} cookies")
 
-        # Bước 1: Load cookie từ Firestore
+    # Bước 2: Kiểm tra đăng nhập (bằng cách lấy thử 1 api rỗng)
+    if not session.cookies.get("MoodleSession"):
+        print("  Cookie không có MoodleSession → đăng nhập bằng tài khoản...")
+        do_login(session)
+        did_login = True
         if GOOGLE_CREDENTIALS_JSON:
-            print("▶ Đọc cookie từ Firestore...")
-            saved = load_cookies_from_firestore()
-            if saved:
-                context.add_cookies(saved)
-                print(f"  ✓ Loaded {len(saved)} cookies")
+            save_cookies([{"name": c.name, "value": c.value, "domain": c.domain} for c in session.cookies])
 
-        page = context.new_page()
+    # Bước 3: Fetch API
+    try:
+        all_events = fetch_calendar_api(session, MONTHS_TO_CRAWL)
+        print(f"  ✓ API trả về {len(all_events)} sự kiện")
+    except Exception as e:
+        print(f"  ❌ Lấy lịch qua API thất bại: {e}")
+        # Thử đăng nhập lại 1 lần nếu lỗi 401/403/500
+        print("  → Thử đăng nhập lại...")
+        do_login(session)
+        did_login = True
+        if GOOGLE_CREDENTIALS_JSON:
+            save_cookies([{"name": c.name, "value": c.value, "domain": c.domain} for c in session.cookies])
+        all_events = fetch_calendar_api(session, MONTHS_TO_CRAWL)
+        print(f"  ✓ API trả về {len(all_events)} sự kiện")
 
-        # Bước 2: Mở trang calendar, kiểm tra login
-        cal_url = url(HM_CAL_PATH)
-        print(f"▶ Mở trang calendar...")
-        page.goto(cal_url, wait_until="domcontentloaded", timeout=30000)
-        time.sleep(2)
+    # Bước 4: Đăng xuất
+    if did_login:
+        print("▶ Đăng xuất...")
+        do_logout(session)
 
-        if not check_logged_in(page):
-            print("  Cookie không hợp lệ → đăng nhập bằng tài khoản...")
-            do_login(page)
-            did_login = True
-
-            page.goto(cal_url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_load_state("networkidle", timeout=20000)
-            time.sleep(2)
-
-            if not check_logged_in(page):
-                save_debug_artifacts(page, prefix="login_failure")
-                raise RuntimeError("❌ Không vào được trang calendar sau khi đăng nhập.")
-
-            if GOOGLE_CREDENTIALS_JSON:
-                save_cookies(context.cookies())
-        else:
-            print("  ✓ Cookie hợp lệ.")
-
-        # Bước 3: Chuyển sang chế độ xem Tháng
-        click_month_view(page)
-        page.wait_for_load_state("networkidle", timeout=10000)
-        time.sleep(1)
-
-        # Bước 4: Crawl từng tháng
-        for i in range(MONTHS_TO_CRAWL):
-            label = get_month_label(page)
-            print(f"  → Crawling: {label or f'tháng {i+1}'}...")
-            events = parse_events_from_page(page)
-            print(f"     Tìm thấy {len(events)} sự kiện")
-            all_events.extend(events)
-
-            if i < MONTHS_TO_CRAWL - 1:
-                navigate_to_next_month(page)
-
-        # Bước 5: Đăng xuất
-        if did_login:
-            print("▶ Đăng xuất...")
-            do_logout(page)
-
-        browser.close()
-
-    # Bước 6: Dedup + sort
+    # Bước 5: Dedup + sort
     seen = set()
     unique: list[dict] = []
     for ev in all_events:
@@ -801,7 +597,7 @@ def main():
             unique.append(ev)
     unique.sort(key=lambda e: (e["date"], e["time"]))
 
-    # Bước 7: Merge với data cũ (giữ m3u8 đã có)
+    # Bước 6: Merge với data cũ (giữ m3u8 đã có)
     if GOOGLE_CREDENTIALS_JSON:
         print("▶ Đọc schedule cũ để merge...")
         old_data = load_existing_schedule()
@@ -812,9 +608,9 @@ def main():
         "events": unique
     }
 
-    print(f"✓ Tổng số buổi học: {len(unique)}")
+    print(f"✓ Tổng số buổi học sau khi merge: {len(unique)}")
 
-    # Bước 8: Push lên Firestore
+    # Bước 7: Push lên Firestore
     if GOOGLE_CREDENTIALS_JSON:
         push_schedule(output)
     else:

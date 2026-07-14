@@ -10,7 +10,15 @@ on:
     # Watch mode: mỗi 5 phút trong khung giờ live (~09:00 VN → 21:45 VN
     # = 02:00-14:45 UTC cùng ngày) — chỉ đọc Firestore, gọi api lophoc lấy m3u8.
     # Lịch chia làm 2 dòng:
-    - cron: "*/5 2-13 * * *"
+    # 09:25 → 09:55 VN
+    - cron: "25-59/5 2 * * *"
+    # 10:00 → 10:45 VN
+    - cron: "0-45/5 3 * * *"
+    # 14:30 → 14:55 VN
+    - cron: "30-59/5 7 * * *"
+    # 15:00 → 20:55 VN
+    - cron: "*/5 8-13 * * *"
+    # 21:00 → 21:45 VN
     - cron: "0-45/5 14 * * *"
 
   # Chạy tay từ GitHub UI
@@ -68,7 +76,7 @@ jobs:
           # Tham số chạy
           # Tự chọn watch mode khi đúng cron watch-mode kích hoạt; còn lại (full crawl
           # hằng ngày, hoặc chạy tay) mặc định full — input thủ công luôn được ưu tiên.
-          CRAWL_MODE:              ${{ github.event.inputs.mode || (github.event.schedule == '*/5 2-13 * * *' && 'watch') || (github.event.schedule == '0-45/5 14 * * *' && 'watch') || 'full' }}
+          CRAWL_MODE:              ${{ github.event.inputs.mode || (github.event.schedule == '25-59/5 2 * * *' && 'watch') || (github.event.schedule == '0-45/5 3 * * *' && 'watch') || (github.event.schedule == '30-59/5 7 * * *' && 'watch') || (github.event.schedule == '*/5 8-13 * * *' && 'watch') || (github.event.schedule == '0-45/5 14 * * *' && 'watch') || 'full' }}
           MONTHS_TO_CRAWL:         ${{ github.event.inputs.months || '6' }}
 
       # 6. Gửi Web Push cho session mới có m3u8

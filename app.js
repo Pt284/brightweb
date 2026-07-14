@@ -1699,7 +1699,7 @@ async function renderLesson(courseId, lessonId) {
     banner.className = 'live-in-lesson-banner';
     banner.innerHTML = `
       <span class="live-pulse-dot"></span>
-      <span>🔴 ĐANG PHÁT TRỰC TIẾP — <strong>${resolvedLive.title}</strong></span>
+      <span>🔴 ĐANG PHÁT TRỰC TIẾP — <strong>${escapeHtml(resolvedLive.title)}</strong></span>
     `;
     lessonMain.insertBefore(banner, lessonMain.firstChild);
   }
@@ -2611,6 +2611,12 @@ function renderCalendarMonthView(events) {
   return html;
 }
 
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
 function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
   const isToday = dateStr === todayStr;
   const cls = ['cal-day', isOther ? 'other-month' : '', isToday ? 'today' : ''].filter(Boolean).join(' ');
@@ -2623,13 +2629,13 @@ function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
   const evHtml = dayEvents.map(ev => {
     const color = _parseColor(ev.color);
     const isPast = ev.status === 'past';
-    const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
+    const m3u8Attr = ev.m3u8 ? ` data-m3u8="${escapeHtml(ev.m3u8)}"` : '';
     const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
     const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
-    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="color:${color}" title="${ev.subject} — ${ev.title}" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}${statusAttr}>
+    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="color:${color}" title="${escapeHtml(ev.subject)} — ${escapeHtml(ev.title)}" data-date="${dateStr}" data-subject="${escapeHtml(ev.subject)}" data-title="${escapeHtml(ev.title)}"${m3u8Attr}${liveStartAttr}${statusAttr}>
       <div class="cal-event-dot" style="background:${color}"></div>
-      <div class="cal-event-time">${ev.time || ''}</div>
-      <div class="cal-event-subject">${ev.subject || ''}</div>
+      <div class="cal-event-time">${escapeHtml(ev.time || '')}</div>
+      <div class="cal-event-subject">${escapeHtml(ev.subject || '')}</div>
     </div>`;
   }).join('');
 
@@ -2670,16 +2676,16 @@ function renderCalendarListView(events) {
       </div>`;
     groups[dateStr].forEach(ev => {
       const color = _parseColor(ev.color);
-      const m3u8Attr = ev.m3u8 ? ` data-m3u8="${ev.m3u8}"` : '';
+      const m3u8Attr = ev.m3u8 ? ` data-m3u8="${escapeHtml(ev.m3u8)}"` : '';
       const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
       const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
-      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${ev.subject}" data-title="${ev.title}"${m3u8Attr}${liveStartAttr}${statusAttr} style="cursor:pointer">
+      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${escapeHtml(ev.subject)}" data-title="${escapeHtml(ev.title)}"${m3u8Attr}${liveStartAttr}${statusAttr} style="cursor:pointer">
         <div class="cal-list-dot" style="background:${color}"></div>
         <div class="cal-list-info">
-          <div class="cal-list-subject">${ev.subject || ''}</div>
-          <div class="cal-list-title">${ev.title || ''}</div>
+          <div class="cal-list-subject">${escapeHtml(ev.subject || '')}</div>
+          <div class="cal-list-title">${escapeHtml(ev.title || '')}</div>
         </div>
-        <div class="cal-list-time">${ev.time || ''}</div>
+        <div class="cal-list-time">${escapeHtml(ev.time || '')}</div>
       </div>`;
     });
     html += `</div>`;

@@ -60,6 +60,13 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
 
+    // ── Server-only data (cookie đăng nhập HocMai, session cache) ──────────────
+    // KHÔNG BAO GIỜ cho client đọc/ghi — chỉ crawl_calendar.py (service account) truy cập.
+    // Cookie MoodleSession bị lộ = kẻ tấn công có thể login thẳng vào tài khoản HocMai trả phí.
+    match /server_only/{doc} {
+      allow read, write: if false;
+    }
+
     // ── Web Push Subscriptions ──────────────────────────────────────────────
     // Mọi ghi thật sự từ server (Worker / send_push.py) đều dùng service account
     // → bypass rules hoàn toàn. Rules ở đây chỉ ngăn client ghi trực tiếp tuỳ tiện.

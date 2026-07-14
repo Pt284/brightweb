@@ -109,9 +109,11 @@ def write_fs(doc_path: str, fields: dict):
 
 
 # ── COOKIE HELPERS ───────────────────────────────────────────────────────────
-COOKIE_DOC = "app_data/hm_cookies"
+# QUAN TRỌNG: server_only/* bị chặn hoàn toàn pha client (được khai báo trong firebase.rule).
+# KHÔNG đưa bất kỳ dữ liệu nhạy cảm nào sang app_data (read: if request.auth != null).
+COOKIE_DOC = "server_only/hm_cookies"
 SCHEDULE_DOC = "app_data/schedule"
-LOPHOC_SESSION_DOC = "app_data/lophoc_session"
+LOPHOC_SESSION_DOC = "server_only/lophoc_session"
 
 
 def load_cookies_from_firestore() -> list[dict] | None:
@@ -208,17 +210,34 @@ def do_login(session: requests.Session):
         raise RuntimeError("❌ Thiếu HM_USERNAME hoặc HM_PASSWORD.")
     print("  → Đăng nhập bằng HTTP POST...")
     login_url = url(HM_LOGIN_PATH)
-    
-    # Xoá cookie cũ
+
+    # Xoá cookie cũ để tránh Moodle nhận nhầm session cũ hết hạn
     session.cookies.clear()
-    
-    session.get(login_url, timeout=15)
-    payload = {"username": HM_USERNAME, "password": HM_PASSWORD, "a": ""}
+
+    # GET trang login trước để lấy CSRF token (logintoken) — Moodle yêu cầu field này
+    login_page = session.get(login_url, timeout=15)
+    m_token = re.search(r'name=["\']logintoken["\']\s+value=["\']([^"\']+)["\']', login_page.text)
+    logintoken = m_token.group(1) if m_token else ""
+    if logintoken:
+        print(f"  ℹ logintoken: {logintoken[:12]}...")
+    else:
+        print("  ⚠ Không tìm thấy logintoken trong trang login — thử POST không có token.")
+
+    payload = {"username": HM_USERNAME, "password": HM_PASSWORD, "a": "", "logintoken": logintoken}
     r = session.post(login_url, data=payload, allow_redirects=False, timeout=15)
-    
-    if not session.cookies.get("MoodleSession"):
-        raise RuntimeError("❌ Đăng nhập thất bại — Không tìm thấy MoodleSession cookie.")
-    print("  ✓ Đăng nhập thành công (đã lấy được MoodleSession)!")
+
+    # Verify thật: gọi thử endpoint cần đăng nhập — nếu bị redirect về trang login là sai mật khẩu/bị chặn
+    test = session.get(url(HM_CAL_PATH), timeout=15, allow_redirects=False)
+    is_redirected_to_login = (
+        test.status_code in (301, 302, 303)
+        and "login" in test.headers.get("location", "").lower()
+    )
+    if is_redirected_to_login or not session.cookies.get("MoodleSession"):
+        raise RuntimeError(
+            f"❌ Đăng nhập thất bại — sai tài khoản/mật khẩu hoặc bị chặn. "
+            f"HTTP POST: {r.status_code}, HTTP verify: {test.status_code}"
+        )
+    print("  ✓ Đăng nhập thành công (đã verify bằng cách gọi thử trang cần login)!")
 
 
 def do_logout(session: requests.Session):
@@ -411,7 +430,7 @@ def _run_watch_mode():
     target_events = [ev for ev in events if _is_soon(ev)]
 
     if not target_events:
-        print(f"  ℹ Tất cả buổi học hôm nay ({today_str}) đều đã có m3u8 hoặc không có lịch.")
+        print(f"  ℹ Không có buổi học nào trong cửa sổ kiểm tra hôm nay ({today_str}).")
         return
 
     print(f"  Có {len(target_events)} buổi trong cửa sổ kiểm tra:")
@@ -610,7 +629,17 @@ def main():
 
     print(f"✓ Tổng số buổi học sau khi merge: {len(unique)}")
 
-    # Bước 7: Push lên Firestore
+    # Bước 7: Guard — không ghi đè nếu dữ liệu bất thường (auth fail / rate-limit / lỗi API)
+    if len(unique) == 0:
+        print("⚠ API trả về 0 sự kiện sau merge — có thể lỗi auth/rate-limit. KHÔNG ghi đè schedule, giữ nguyên dữ liệu cũ.")
+        return
+    if GOOGLE_CREDENTIALS_JSON:
+        old_count = len(old_data.get("events", [])) if "old_data" in dir() else 0
+        if old_count > 0 and len(unique) < old_count * 0.5:
+            print(f"⚠ Số sự kiện mới ({len(unique)}) giảm hơn 50% so với cũ ({old_count}) — nghi ngờ lỗi. KHÔNG ghi đè.")
+            return
+
+    # Bước 8: Push lên Firestore
     if GOOGLE_CREDENTIALS_JSON:
         push_schedule(output)
     else:

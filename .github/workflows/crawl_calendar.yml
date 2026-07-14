@@ -29,6 +29,9 @@ jobs:
   crawl:
     name: Crawl & Push to Firestore
     runs-on: ubuntu-latest
+    concurrency:
+      group: crawl-calendar
+      cancel-in-progress: false   # xếp hàng, không huỷ job đang chạy
 
     steps:
       # 1. Checkout repo

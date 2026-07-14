@@ -1199,7 +1199,7 @@ body.no-glass .plyr__menu__container {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  filter: brightness(2.2) saturate(5);
+  filter: brightness(5) saturate(5);
 }
 
 .cal-event-dot {
@@ -1310,7 +1310,7 @@ body.no-glass .plyr__menu__container {
   font-weight: 800;
   color: inherit;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
-  filter: brightness(2.2) saturate(5);
+  filter: brightness(5) saturate(5);
 }
 
 .cal-list-title {

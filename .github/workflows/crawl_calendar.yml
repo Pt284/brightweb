@@ -1,4 +1,4 @@
-name: Crawl HMCalendar
+name: Crawl Calendar
 
 on:
   schedule:

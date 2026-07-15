@@ -150,7 +150,7 @@ def main():
             print(f"  ↩ Đã thông báo đúng link này rồi → skip")
             continue
 
-        push_title = "🆕 Link học mới" if is_new_session else "🔄 Link đã đổi — cập nhật ngay!"
+        push_title = "🗣🔥🔥🔥 ĐÃ CÓ LINK HỌC 😈" if is_new_session else "📡 LINK BỊ THAY ĐỔI ĐỘT NGỘT"
 
         # [BUG #7] Log rõ khi startAt rỗng thay vì âm thầm bỏ qua reminder
         if not start_at:

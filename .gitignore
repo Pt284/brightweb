@@ -1,7 +1,16 @@
-﻿# Environment / secrets
+# Environment / secrets
 .env
 .env.test
 *.env
+
+# Credentials / private keys — không bao giờ commit
+*.pem
+*.key
+*.p12
+service-account*.json
+google-credentials*.json
+youtube-oauth*.json
+vapid*.json
 
 # Python cache
 __pycache__/

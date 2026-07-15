@@ -129,6 +129,23 @@ def create_test_session(minutes_from_now: float = 1.5):
     minutes_from_now: bao nhiêu phút nữa thì session 'bắt đầu'
     Cron sẽ nhận ra khi cửa sổ [now-30s, now+150s] bao phủ startAt.
     """
+    # ── PRODUCTION GUARD ─────────────────────────────────────────────────────
+    # Script này đọc TOÀN BỘ subscriber thật và tạo document khiến cron Worker
+    # gửi push thật cho cả nhóm. Chặn hoàn toàn trừ khi:
+    #   (a) đang chạy với Firestore Emulator  → FIRESTORE_EMULATOR_HOST được set, HOẶC
+    #   (b) người dùng chủ động xác nhận      → ALLOW_PROD_TEST=1 được set
+    if not os.environ.get("FIRESTORE_EMULATOR_HOST") and not os.environ.get("ALLOW_PROD_TEST"):
+        print("❌ DỪNG: Script này sẽ gửi push THẬT cho TOÀN BỘ subscriber production!")
+        print("   Cron Worker đang chạy mỗi phút và sẽ TỰ ĐỘNG tìm thấy document giả này.")
+        print()
+        print("   Nếu muốn test với Firestore Emulator:")
+        print("     $env:FIRESTORE_EMULATOR_HOST='localhost:8080'")
+        print()
+        print("   Nếu CHẮC CHẮN muốn chạy trên production (hiểu rõ hậu quả):")
+        print("     $env:ALLOW_PROD_TEST='1'")
+        sys.exit(1)
+    # ─────────────────────────────────────────────────────────────────────────
+
     print("\n" + "="*60)
     print("📋 TEST 2: Tạo test session document (đúng format)")
     print("="*60)

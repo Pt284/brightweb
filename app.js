@@ -1619,6 +1619,24 @@ async function getTodayLiveEventForLesson(lessonId) {
   return null;
 }
 
+// ── Security: Allowlist host cho stream URL (HLS / video src) ──────────────
+// Chặn URL độc hại nếu Firestore app_data/schedule bị ghi bởi kẻ tấn công
+// đã chiếm service account hoặc tài khoản admin.
+function isTrustedStreamUrl(u) {
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== 'https:') return false;
+    const allowedHosts = [
+      /\.hocmai\.net$/,
+      /\.viettelcdn\.vn$/,
+      /^www\.youtube\.com$/,
+      /^youtube\.com$/,
+      /^youtu\.be$/,
+    ];
+    return allowedHosts.some(re => re.test(parsed.hostname));
+  } catch { return false; }
+}
+
 // Phase B: nhúng trực tiếp video live (HLS) vào ô video bài học, giống video thường
 function renderInlineLiveVideo(ev, vw) {
   const container = document.createElement('div');
@@ -1629,6 +1647,12 @@ function renderInlineLiveVideo(ev, vw) {
   videoEl.playsInline = true;
   container.appendChild(videoEl);
   vw.appendChild(container);
+
+  if (!isTrustedStreamUrl(ev.m3u8)) {
+    console.warn('[App] Chặn stream URL không tin cậy (renderInlineLiveVideo):', ev.m3u8);
+    container.innerHTML = '<div style="padding:2rem;text-align:center;opacity:.7">⚠ URL stream không hợp lệ.</div>';
+    return;
+  }
 
   if (window.Hls && Hls.isSupported()) {
     _lessonLiveHls = new Hls({ enableWorker: true });
@@ -3040,6 +3064,13 @@ function openLiveModal(ev) {
   }
   
   const videoEl = document.getElementById('live-video');
+
+  if (!isTrustedStreamUrl(ev.m3u8)) {
+    console.warn('[App] Chặn stream URL không tin cậy (openLiveModal):', ev.m3u8);
+    elapsedEl.textContent = '⚠ URL stream không hợp lệ.';
+    return;
+  }
+
   if (window.Hls && Hls.isSupported()) {
     _liveModalHls = new Hls({ enableWorker: true });
     _liveModalHls.loadSource(ev.m3u8);

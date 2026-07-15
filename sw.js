@@ -54,9 +54,26 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = (event.notification.data && event.notification.data.url)
+  let targetUrl = (event.notification.data && event.notification.data.url)
     ? event.notification.data.url
     : (BASE + "/");
+
+  // ── Origin Allowlist — chặn open redirect nếu push payload bị giả mạo ──
+  try {
+    const u = new URL(targetUrl, self.location.origin);
+    const allowedOrigins = [
+      self.location.origin,
+      "https://brightweb-sync.mcdg5444.workers.dev",
+    ];
+    if (!allowedOrigins.includes(u.origin)) {
+      console.warn("[SW] Chặn navigate tới origin không hợp lệ:", u.origin);
+      targetUrl = BASE + "/";
+    }
+  } catch (e) {
+    // URL không hợp lệ → về trang chủ
+    targetUrl = BASE + "/";
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   event.waitUntil(
     // Ưu tiên focus tab đang mở site, không mở tab mới thừa
@@ -74,6 +91,7 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
 
 // ── Notification Close ───────────────────────────────────────────────────────
 self.addEventListener("notificationclose", (_event) => {

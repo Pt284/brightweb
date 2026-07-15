@@ -2548,8 +2548,8 @@ function _eventsForDate(events, dateStr) {
 // Parse color string ra CSS usable
 function _parseColor(colorStr) {
   if (!colorStr) return '#4096ee';
-  // rgba(...) or #hex or rgb(...)
-  return colorStr.trim();
+  const c = colorStr.trim();
+  return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#4096ee';
 }
 
 function renderCalendarMonthView(events) {
@@ -2922,7 +2922,11 @@ async function updateLiveBanner() {
   let activeEvent = null;
   
   // Ưu tiên 1: Đang live
-  activeEvent = todayEvents.find(e => e.m3u8);
+  const liveEvents = todayEvents.filter(e => e.m3u8);
+  if (liveEvents.length > 0) {
+    liveEvents.sort((a, b) => (b.liveStartEpoch || 0) - (a.liveStartEpoch || 0));
+    activeEvent = liveEvents[0];
+  }
   
   // Ưu tiên 2: Sắp live
   if (!activeEvent) {
@@ -2999,6 +3003,13 @@ function attachHlsEndDetection(hlsInstance, onEnded, uiStatusUpdater) {
     firstErrorTime = 0;
     uiStatusUpdater(''); // xoá thông báo lỗi
   });
+
+  // Hỗ trợ tự động end live khi stream kết thúc sạch (#EXT-X-ENDLIST)
+  hlsInstance.on(Hls.Events.BUFFER_EOS, () => {
+    console.log('[Live] HLS buffer EOS reached. Stream ended.');
+    if (retryTimer) clearTimeout(retryTimer);
+    onEnded();
+  });
 }
 
 function openLiveModal(ev) {
@@ -3044,6 +3055,11 @@ function openLiveModal(ev) {
   } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     videoEl.src = ev.m3u8;
     videoEl.addEventListener('loadedmetadata', () => videoEl.play());
+    videoEl.addEventListener('ended', () => {
+      if (_liveElapsedTimer) { clearInterval(_liveElapsedTimer); _liveElapsedTimer = null; }
+      elapsedEl.textContent = '⏹ Buổi học đã kết thúc';
+      closeLiveModal();
+    });
   }
   
   _liveModalPlyr = new Plyr(videoEl, {
@@ -3159,22 +3175,34 @@ async function initGoLivePanel() {
     }
     const ev = JSON.parse(lessonSel.value);
     statusEl.textContent = 'Đang đẩy lên server...';
-    await setLiveModeOnEvent(ev, m3u8Input.value);
-    statusEl.textContent = '✅ Đã Go Live!';
-    m3u8Input.value = '';
+    try {
+      await setLiveModeOnEvent(ev, m3u8Input.value);
+      statusEl.textContent = '✅ Đã Go Live!';
+      m3u8Input.value = '';
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = '❌ Lỗi: ' + e.message;
+    }
   };
   
   document.getElementById('btn-stop-live').onclick = async () => {
     const todayEvents = groups[todayStr] || [];
-    const liveEv = todayEvents.find(e => e.m3u8);
-    if (!liveEv) {
+    const liveEvs = todayEvents.filter(e => e.m3u8);
+    if (liveEvs.length === 0) {
       statusEl.textContent = '⚠️ Không có bài nào đang live hôm nay';
       return;
     }
+    liveEvs.sort((a, b) => (b.liveStartEpoch || 0) - (a.liveStartEpoch || 0));
+    const liveEv = liveEvs[0];
     statusEl.textContent = 'Đang dừng...';
-    await setLiveModeOnEvent({date: liveEv.date, time: liveEv.time, title: liveEv.title}, null);
-    closeLiveModal();
-    statusEl.textContent = '■ Đã dừng live';
+    try {
+      await setLiveModeOnEvent({date: liveEv.date, time: liveEv.time, title: liveEv.title}, null);
+      closeLiveModal();
+      statusEl.textContent = '■ Đã dừng live';
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = '❌ Lỗi: ' + e.message;
+    }
   };
 }
 function _initCalendarButtons() {

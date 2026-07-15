@@ -309,15 +309,17 @@ async function handleGo(request, env) {
   if (!session || !to) {
     return new Response("Bad Request: missing session or to", { status: 400 });
   }
-  // Whitelist: chỉ redirect tới https://
   let decodedTo;
   try {
     decodedTo = decodeURIComponent(to);
+    const targetUrl = new URL(decodedTo);
+    const allowedDomains = [".hocmai.net", ".hocmai.vn", ".hcdn.vn", ".viettelcdn.vn"];
+    const isAllowed = allowedDomains.some(domain => targetUrl.hostname.endsWith(domain));
+    if (!isAllowed) {
+      return new Response("Bad Request: unsafe redirect domain", { status: 403 });
+    }
   } catch {
     return new Response("Bad Request: invalid 'to'", { status: 400 });
-  }
-  if (!decodedTo.startsWith("https://")) {
-    return new Response("Bad Request: unsafe redirect target", { status: 400 });
   }
 
   // [BUG #4] Ghi click vào Firestore — CHỈ patch nếu doc đã tồn tại sẵn

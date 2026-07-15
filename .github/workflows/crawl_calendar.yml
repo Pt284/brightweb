@@ -57,6 +57,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      # 4. Debug cron schedule
+      - name: Debug github.event.schedule
+        run: echo "github.event.schedule=${{ github.event.schedule }}"
+
       # 5. Chạy script crawl bằng Python thuần
       - name: Run crawl_calendar.py
         run: python crawl_calendar.py

@@ -2,6 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isWhitelistedOrAdmin() {
+      return request.auth != null &&
+        (exists(/databases/$(database)/documents/whitelist/$(request.auth.token.email))
+         || exists(/databases/$(database)/documents/admins/$(request.auth.token.email)));
+    }
+
     match /progress/{docId} {
       allow read, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
@@ -50,12 +56,12 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
 
-    // [UPDATED] Phân quyền cho app_data hỗ trợ tính năng Overrides của Admin
+    // [UPDATED] Phân quyền cho app_data hỗ trợ tính năng Overrides của Admin và bảo vệ schedule
     match /app_data/{doc} {
-      allow read: if request.auth != null;  // Chỉ user đã login mới đọc được
+      allow read: if isWhitelistedOrAdmin();
       
-      // overrides: Chỉ admin có trong danh sách dynamic collection 'admins' mới được ghi đè dữ liệu công khai
-      allow write: if doc == 'overrides'
+      // overrides & schedule: Chỉ admin có trong danh sách dynamic collection 'admins' mới được ghi đè
+      allow write: if (doc == 'overrides' || doc == 'schedule')
         && request.auth != null
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }

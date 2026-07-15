@@ -16,6 +16,10 @@ jobs:
   sync:
     name: Sync & Publish
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: sync-drive
+      cancel-in-progress: false
 
     permissions:
       contents: write  # cần để git push data.json

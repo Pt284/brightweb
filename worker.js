@@ -206,6 +206,19 @@ async function handleSubscribe(request, env) {
     return new Response("Bad Request: missing endpoint/keys", { status: 400, headers: corsH });
   }
 
+  // [H1 Fix] Validate SSRF endpoint: phải là https và đúng domain các push services phổ biến
+  try {
+    const epUrl = new URL(endpoint);
+    if (epUrl.protocol !== "https:") throw new Error("not https");
+    const validHosts = ["googleapis.com", "push.services.mozilla.com", "notify.windows.com", "push.apple.com"];
+    if (!validHosts.some(h => epUrl.hostname === h || epUrl.hostname.endsWith("." + h))) {
+      throw new Error("untrusted host");
+    }
+  } catch (e) {
+    console.warn(`[handleSubscribe] Rejected invalid endpoint: ${endpoint} (${e.message})`);
+    return new Response("Bad Request: invalid endpoint URL", { status: 400, headers: corsH });
+  }
+
   // Tính doc ID = sha1(endpoint).slice(0,32) bằng Web Crypto (không cần Node)
   const sid = await sha1Hex(endpoint);
   const docId = sid.slice(0, 32);
@@ -263,7 +276,7 @@ async function handleUnsubscribe(request, env) {
   if (emailFromToken) {
     const isAllowed = await checkWhitelistOrAdmin(emailFromToken, idToken, env);
     if (!isAllowed) {
-      console.warn(`[handleUnsubscribe] Rejected non-whitelisted: ${emailFromToken}`);
+      console.warn(`[hhandleUnsubscribe] Rejected non-whitelisted: ${emailFromToken}`);
       return new Response("Forbidden: Not whitelisted", { status: 403, headers: corsH });
     }
   }
@@ -309,6 +322,15 @@ async function handleGo(request, env) {
   if (!session || !to) {
     return new Response("Bad Request: missing session or to", { status: 400 });
   }
+
+  // [C1/C2 Fix] Regex validation chống path traversal / parameter injection
+  // Dù sao worker auth header không gửi được qua redirect, nên ta check format chặt chẽ
+  const idRegex = /^[\w-]{1,128}$/;
+  if (!idRegex.test(session) || (user && !idRegex.test(user))) {
+    console.warn(`[handleGo] Rejected invalid session/user format: ${session} / ${user}`);
+    return new Response("Bad Request: invalid format", { status: 400 });
+  }
+
   let decodedTo;
   try {
     decodedTo = decodeURIComponent(to);
@@ -326,7 +348,9 @@ async function handleGo(request, env) {
   // (send_push.py tạo doc users/{uid} trước khi gửi push, nếu không có doc = user lạ/spam)
   if (user) {
     const now = new Date().toISOString();
-    const docPath = `session_clicks/${session}/users/${user}`;
+    // [C1 Fix] Encode thành phần path
+    const docPath = `session_clicks/${encodeURIComponent(session)}/users/${encodeURIComponent(user)}`;
+    
     // fire-and-forget: không await, không chặn redirect
     firestoreGet(env, docPath).then((existing) => {
       if (existing) {

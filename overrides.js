@@ -262,6 +262,7 @@ function _recomputeMerged() {
 
 // ── BACKUP ──
 function downloadBackup() {
+  if (typeof _isAdmin !== 'undefined' && !_isAdmin) return;
   const blob = new Blob([JSON.stringify({
     exportedAt: new Date().toISOString(),
     mergedCourses: appData?.courses ?? [],

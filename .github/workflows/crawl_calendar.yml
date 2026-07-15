@@ -37,6 +37,9 @@ jobs:
   crawl:
     name: Crawl & Push to Firestore
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     concurrency:
       group: crawl-calendar
       cancel-in-progress: false   # xếp hàng, không huỷ job đang chạy
@@ -59,7 +62,9 @@ jobs:
 
       # 4. Debug cron schedule
       - name: Debug github.event.schedule
-        run: echo "github.event.schedule=${{ github.event.schedule }}"
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: echo "github.event.schedule=$SCHEDULE"
 
       # 5. Chạy script crawl bằng Python thuần
       - name: Run crawl_calendar.py

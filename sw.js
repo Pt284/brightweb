@@ -22,6 +22,7 @@ self.addEventListener("push", (event) => {
     data = event.data ? event.data.json() : {};
   } catch (e) {
     console.error("[SW] push data parse error:", e);
+    event.waitUntil(self.registration.showNotification("Lỗi hiển thị", { body: "Có thông báo mới nhưng không thể tải nội dung." }));
     return;
   }
 
@@ -63,7 +64,6 @@ self.addEventListener("notificationclick", (event) => {
     const u = new URL(targetUrl, self.location.origin);
     const allowedOrigins = [
       self.location.origin,
-      "https://brightweb-sync.mcdg5444.workers.dev",
     ];
     if (!allowedOrigins.includes(u.origin)) {
       console.warn("[SW] Chặn navigate tới origin không hợp lệ:", u.origin);
@@ -96,4 +96,15 @@ self.addEventListener("notificationclick", (event) => {
 // ── Notification Close ───────────────────────────────────────────────────────
 self.addEventListener("notificationclose", (_event) => {
   // Có thể track analytics sau này nếu cần
+});
+
+// ── Push Subscription Change ────────────────────────────────────────────────
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({ type: "PUSH_SUBSCRIPTION_CHANGE" });
+      }
+    })
+  );
 });

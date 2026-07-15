@@ -58,6 +58,7 @@ def send_one(sub: dict, payload_str: str) -> bool:
     """
     from pywebpush import webpush, WebPushException
 
+    sub_id = sub.get('id', '?')  # [H6] chỉ log doc ID, không log email/PII
     try:
         webpush(
             subscription_info={
@@ -68,22 +69,24 @@ def send_one(sub: dict, payload_str: str) -> bool:
             vapid_private_key=VAPID_PRIVATE_KEY,
             vapid_claims={"sub": VAPID_SUBJECT},
             ttl=86400,   # notification sống 24h nếu device offline
+            timeout=15,  # [H4] tránh treo vô hạn nếu push endpoint không phản hồi
         )
-        print(f"    ✓ → {sub.get('email', sub.get('uid', '?'))}")
+        print(f"    ✓ subscription/{sub_id}")
         return True
     except WebPushException as e:
         code = getattr(e.response, "status_code", None) if e.response else None
-        print(f"    ✗ → {sub.get('email', '?')} [HTTP {code}]")
+        print(f"    ✗ subscription/{sub_id} [HTTP {code}]")
         # 404/410 = subscription đã hết hạn → xoá khỏi Firestore
         if code in (404, 410):
             try:
-                delete_doc(f"push_subscriptions/{sub['id']}")
-                print(f"      🗑 Đã xoá subscription hỏng: {sub['id']}")
+                delete_doc(f"push_subscriptions/{sub_id}")
+                print(f"      🗑 Đã xoá subscription hỏng: {sub_id}")
             except Exception as del_e:
                 print(f"      ⚠ Không xoá được: {del_e}")
         return False
     except Exception as e:
-        print(f"    ✗ → {sub.get('email', '?')} [lỗi không xác định: {e}]")
+        # Không log exception object trực tiếp — có thể chứa endpoint URL (bearer token trong path)
+        print(f"    ✗ subscription/{sub_id} [lỗi: {type(e).__name__}]")
         return False
 
 
@@ -166,11 +169,12 @@ def main():
                 print(f"  ⚠ Bỏ qua subscription thiếu uid: {s.get('id', '?')}")
                 continue
                 
-            # URL cá nhân hoá: khi click → Worker ghi clicked=true rồi redirect
+            # [C4] URL-encode sid và uid để tránh parameter injection
+            # (uid do client cung cấp lúc subscribe, có thể chứa ký tự đặc biệt)
             go_url = (
                 f"{WORKER_BASE}/go"
-                f"?session={sid}"
-                f"&user={uid}"
+                f"?session={quote(sid, safe='')}"
+                f"&user={quote(uid, safe='')}"
                 f"&to={quote(m3u8, safe='')}"
             )
             payload = json.dumps({

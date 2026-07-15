@@ -76,14 +76,14 @@ const SUBJECT_COURSE_ORDER = {
 // id của chương không thay đổi khi reparent → dùng làm "chìa khóa ổn định"
 // để tìm đúng bài TSA live dù chương đã bị chuyển sang khóa manual-...
 const TSA_CHAPTER_PREFIX = {
-  "Toán":       "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
-  "Tư duy toán":"03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
-  "Sinh học":   "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Vật lí":     "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Hóa học":    "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Khoa học":   "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Đọc hiểu":   "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
-  "Ngữ văn":    "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
+  "Toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
+  "Tư duy toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
+  "Sinh học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Vật lí": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Hóa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Khoa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
+  "Đọc hiểu": "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
+  "Ngữ văn": "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
 };
 // Phase 3: caption watchdog interval handle
 let _captionWatchdogInterval = null;
@@ -247,6 +247,7 @@ auth.onAuthStateChanged(async user => {
       openLiveModal(liveEvent);
     });
   } else {
+    if (_calLiveBannerTimer) { clearInterval(_calLiveBannerTimer); _calLiveBannerTimer = null; }
     editMode = false;
     _isAdmin = false;
     document.body.classList.remove('edit-mode');
@@ -1660,7 +1661,7 @@ function renderInlineLiveVideo(ev, vw) {
     _lessonLiveHls.attachMedia(videoEl);
     _lessonLiveHls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => { }));
     attachHlsEndDetection(_lessonLiveHls, () => {
-      if (_lessonLiveHls) { try { _lessonLiveHls.destroy(); } catch(e){} _lessonLiveHls = null; }
+      if (_lessonLiveHls) { try { _lessonLiveHls.destroy(); } catch (e) { } _lessonLiveHls = null; }
       container.innerHTML = '<div style="padding:2rem;text-align:center;opacity:.7">⏹ Buổi học đã kết thúc.</div>';
     }, (msg) => {
       // Có thể tạo một overlay div để báo lỗi đang tải lại
@@ -1714,6 +1715,8 @@ async function renderLesson(courseId, lessonId) {
   // Chống race: nếu trong lúc chờ, người dùng đã bấm sang bài khác thì dừng,
   // tránh đè nhầm sidebar/video của bài mới bằng dữ liệu bài cũ
   if (currentLessonId !== lessonId) return;
+  const thisLessonId = lessonId;
+  const thisCourseId = courseId;
 
   const lessonMain = document.querySelector('.lesson-main');
   const existingBanner = lessonMain?.querySelector('.live-in-lesson-banner');
@@ -1839,33 +1842,35 @@ async function renderLesson(courseId, lessonId) {
     // Phase 2: lastKnownPosition — cập nhật mọi frame, dùng để flush khi pause
     let lastKnownPosition = 0;
     plyrInstance.on('timeupdate', () => {
-      if (!plyrInstance) return;
+      if (currentLessonId !== thisLessonId || !plyrInstance) return;
       const t = plyrInstance.currentTime;
       const d = plyrInstance.duration;
       lastKnownPosition = t; // luôn cập nhật
       if (Math.abs(t - lastSavedTime) >= 5) {
         lastSavedTime = t;
-        saveLocalProgress(currentLessonId, t, d, lesson.youtubeId, t);
+        saveLocalProgress(thisLessonId, t, d, lesson.youtubeId, t);
         updateRealtimeProgressUI();
       }
     });
 
     plyrInstance.on('pause', () => {
-      if (currentLessonId) {
+      if (currentLessonId !== thisLessonId) return;
+      if (thisLessonId) {
         // Phase 2: flush với vị trí hiện tại — giữ lastPosition đúng dù dừng giữa chừng
         const d = plyrInstance.duration;
-        saveLocalProgress(currentLessonId, plyrInstance.currentTime, d, lesson.youtubeId, lastKnownPosition);
-        flushProgressToFirestore(currentLessonId, currentCourseId);
+        saveLocalProgress(thisLessonId, plyrInstance.currentTime, d, lesson.youtubeId, lastKnownPosition);
+        flushProgressToFirestore(thisLessonId, thisCourseId);
       }
     });
 
     plyrInstance.on('ended', () => {
-      flushProgressToFirestore(currentLessonId, currentCourseId);
-      const old = getLocalProgress(currentLessonId) || {};
+      if (currentLessonId !== thisLessonId) return;
+      flushProgressToFirestore(thisLessonId, thisCourseId);
+      const old = getLocalProgress(thisLessonId) || {};
       const oldMax = old.watchedTime || 0;
       const d = plyrInstance.duration || 1;
       if (d - oldMax <= 600) {
-        if (!progress[currentLessonId]) toggleWatch(true);
+        if (!progress[thisLessonId]) toggleWatch(true);
       }
     });
 
@@ -1962,7 +1967,13 @@ async function addExtraDoc() {
   const title = titleEl.value.trim();
   const url = urlEl.value.trim();
   if (!title || !url) { alert('Vui lòng điền đủ tên và URL'); return; }
-  if (!url.includes('drive.google.com')) { alert('Chỉ chấp nhận Google Drive URL'); return; }
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'drive.google.com') throw new Error();
+  } catch (e) {
+    alert('Chỉ chấp nhận Google Drive URL hợp lệ');
+    return;
+  }
   const normalizedUrl = url.replace(/\/edit.*$/, '/view').replace(/\/preview.*$/, '/view');
   const existing = _overrides.patches?.[currentLessonId]?.extraDocs || [];
   await patchNode(currentLessonId, { extraDocs: [...existing, { title, url: normalizedUrl }] });
@@ -2087,6 +2098,7 @@ async function disableFlattenAll() {
 
 // ── ADMIN ──
 function toggleAdmin() {
+  if (!_isAdmin) return;
   $('admin-panel').classList.toggle('open');
   if ($('admin-panel').classList.contains('open')) {
     loadAdminData();
@@ -2095,6 +2107,7 @@ function toggleAdmin() {
 }
 
 async function loadAdminData() {
+  if (!_isAdmin) return;
   const wl = $('whitelist-list'); wl.innerHTML = 'Đang tải...';
   try {
     const snap = await db.collection('whitelist').get();
@@ -2110,7 +2123,7 @@ async function loadAdminData() {
         wl.appendChild(el('div', { className: 'whitelist-item' }, emailText, removeBtn));
       });
     }
-  } catch (e) { wl.innerHTML = 'Lỗi: ' + e.message; }
+  } catch (e) { wl.textContent = 'Lỗi: ' + e.message; }
 
   const sl = $('security-logs'); sl.innerHTML = 'Đang tải...';
   try {
@@ -2125,16 +2138,18 @@ async function loadAdminData() {
         sl.appendChild(div);
       });
     }
-  } catch (e) { sl.innerHTML = 'Lỗi: ' + e.message; }
+  } catch (e) { sl.textContent = 'Lỗi: ' + e.message; }
 }
 
 async function addWhitelist() {
+  if (!_isAdmin) return;
   const input = $('whitelist-input'), email = input.value.trim().toLowerCase();
   if (!email || !email.includes('@')) { alert('Email không hợp lệ'); return; }
   await db.collection('whitelist').doc(email).set({ addedAt: firebase.firestore.FieldValue.serverTimestamp() });
   input.value = ''; loadAdminData();
 }
 async function removeWhitelist(email) {
+  if (!_isAdmin) return;
   if (!confirm(`Xoá quyền của ${email}?`)) return;
   await db.collection('whitelist').doc(email).delete(); loadAdminData();
 }
@@ -2145,6 +2160,7 @@ document.addEventListener('click', e => {
 });
 
 async function triggerSync(e) {
+  if (!_isAdmin) return;
   const btn = e.target; btn.disabled = true; btn.textContent = 'Đang sync...';
   try {
     if (!currentUser) { alert('Bạn chưa đăng nhập.'); return; }
@@ -2463,6 +2479,7 @@ async function resetCurrentCourse(courseId) {
 }
 
 function loadBackupFromFile(e) {
+  if (!_isAdmin) return;
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -2557,11 +2574,11 @@ function _fmtDateVN(dateStr) {
   // '2026-06-15' → 'Thứ Hai, 15/06/2026'
   const d = new Date(dateStr + 'T00:00:00');
   const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-  return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 function _eventsForMonth(events, year, month) {
-  const prefix = `${year}-${String(month+1).padStart(2,'0')}-`;
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   return events.filter(e => e.date && e.date.startsWith(prefix));
 }
 
@@ -2577,10 +2594,10 @@ function _parseColor(colorStr) {
 }
 
 function renderCalendarMonthView(events) {
-  const year  = _calViewDate.getFullYear();
+  const year = _calViewDate.getFullYear();
   const month = _calViewDate.getMonth();
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const firstDow = _calFirstDayOfWeek(year, month);
   const daysInMonth = _calDaysInMonth(year, month);
@@ -2589,7 +2606,7 @@ function renderCalendarMonthView(events) {
   // Update subtitle
   const monthEvents = _eventsForMonth(events, year, month);
   const upcoming = monthEvents.filter(e => e.status !== 'past').length;
-  const total    = monthEvents.length;
+  const total = monthEvents.length;
   const subtitleEl = document.getElementById('cal-subtitle');
   if (subtitleEl) {
     subtitleEl.innerHTML = total > 0
@@ -2597,7 +2614,7 @@ function renderCalendarMonthView(events) {
       : 'Không có buổi học nào trong tháng này';
   }
 
-  const WEEKDAYS = ['THU 2', 'THU 3', 'THU 4', 'THU 5', 'THU 6', 'THU 7', 'CN'];
+  const WEEKDAYS = ['THỨ 2', 'THỨ 3', 'THỨ 4', 'THỨ 5', 'THỨ 6', 'THỨ 7', 'CN'];
   const WEEKDAYS_FULL = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
 
   let html = `<div class="cal-grid-wrap">
@@ -2611,13 +2628,13 @@ function renderCalendarMonthView(events) {
     const day = prevDays - firstDow + 1 + i;
     const mo = month === 0 ? 12 : month;
     const yr = month === 0 ? year - 1 : year;
-    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     html += renderCalDay(day, dateStr, events, todayStr, true);
   }
 
   // Cells trong thang
   for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     html += renderCalDay(day, dateStr, events, todayStr, false);
   }
 
@@ -2627,7 +2644,7 @@ function renderCalendarMonthView(events) {
   for (let i = 1; i <= afterCells; i++) {
     const mo = month === 11 ? 1 : month + 2;
     const yr = month === 11 ? year + 1 : year;
-    const dateStr = `${yr}-${String(mo).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+    const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
     html += renderCalDay(i, dateStr, events, todayStr, true);
   }
 
@@ -2667,7 +2684,7 @@ function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
 }
 
 function renderCalendarListView(events) {
-  const year  = _calViewDate.getFullYear();
+  const year = _calViewDate.getFullYear();
   const month = _calViewDate.getMonth();
 
   // Nhóm theo ngày, chỉ lấy sự kiện của tháng đang xem
@@ -2735,7 +2752,7 @@ async function renderCalendar() {
   window.location.hash = '#calendar';
   if (typeof destroyPlyr === 'function') destroyPlyr();
 
-  const titleEl   = document.getElementById('cal-month-title');
+  const titleEl = document.getElementById('cal-month-title');
   const contentEl = document.getElementById('cal-content');
   if (!contentEl) return;
 
@@ -2766,8 +2783,8 @@ function attachCalendarEventListeners() {
   const content = document.getElementById('cal-content');
   const fresh = content.cloneNode(true);
   content.parentNode.replaceChild(fresh, content);
-  
-  document.getElementById('cal-content').addEventListener('click', function(e) {
+
+  document.getElementById('cal-content').addEventListener('click', function (e) {
     const ev = e.target.closest('[data-date][data-subject]');
     if (!ev) return;
     handleCalendarEventClick({
@@ -2939,19 +2956,19 @@ async function updateLiveBanner() {
   const events = await loadCalendarData();
   const todayStr = getTodayStr();
   const todayEvents = events.filter(e => e.date === todayStr);
-  
+
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  
+
   let activeEvent = null;
-  
+
   // Ưu tiên 1: Đang live
   const liveEvents = todayEvents.filter(e => e.m3u8);
   if (liveEvents.length > 0) {
     liveEvents.sort((a, b) => (b.liveStartEpoch || 0) - (a.liveStartEpoch || 0));
     activeEvent = liveEvents[0];
   }
-  
+
   // Ưu tiên 2: Sắp live
   if (!activeEvent) {
     activeEvent = todayEvents.find(e => {
@@ -2961,23 +2978,23 @@ async function updateLiveBanner() {
       return diff <= 60 && diff >= -30;
     });
   }
-  
+
   if (!activeEvent) {
     banner.style.display = 'none';
     return;
   }
-  
+
   banner.style.display = 'flex';
   banner.className = activeEvent.m3u8 ? 'live-active' : 'live-upcoming';
-  
+
   const icon = document.getElementById('live-banner-dot');
   const text = document.getElementById('live-banner-text');
-  const cd   = document.getElementById('live-banner-countdown');
-  
+  const cd = document.getElementById('live-banner-countdown');
+
   // Phase B: "ấn vào banner để mở bài" — mở thẳng trang bài học (video live hiện inline
   // trong ô video), không qua modal. Modal vẫn dùng cho auto-open khi vào web / bấm event lịch.
   banner.onclick = () => navigateToMappedLesson(activeEvent);
-  
+
   if (activeEvent.m3u8) {
     text.textContent = `ĐANG LIVE: ${activeEvent.subject} — ${activeEvent.title}`;
     cd.textContent = '';
@@ -2998,7 +3015,7 @@ function attachHlsEndDetection(hlsInstance, onEnded, uiStatusUpdater) {
   hlsInstance.on(Hls.Events.ERROR, (event, data) => {
     if (!data.fatal) return;
     console.warn('[Live] HLS fatal error:', data.type, data.details);
-    
+
     const now = Date.now();
     if (firstErrorTime === 0) firstErrorTime = now;
 
@@ -3012,7 +3029,7 @@ function attachHlsEndDetection(hlsInstance, onEnded, uiStatusUpdater) {
     // Nếu vẫn trong 30s, thử lại
     uiStatusUpdater('Đang mất kết nối, đang thử lại...');
     if (retryTimer) clearTimeout(retryTimer);
-    
+
     retryTimer = setTimeout(() => {
       try {
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hlsInstance.startLoad();
@@ -3037,19 +3054,27 @@ function attachHlsEndDetection(hlsInstance, onEnded, uiStatusUpdater) {
 }
 
 function openLiveModal(ev) {
+  closeLiveModal();
   if (!ev.m3u8) {
     navigateToMappedLesson(ev);
     return;
   }
-  
+
   const modal = document.getElementById('live-modal');
   if (!modal) return;
   modal.style.display = 'flex';
-  
+
   document.getElementById('live-modal-subject').textContent = ev.subject;
   document.getElementById('live-modal-title-text').textContent = ev.title;
-  
+
   const elapsedEl = document.getElementById('live-modal-elapsed');
+
+  if (!isTrustedStreamUrl(ev.m3u8)) {
+    console.warn('[App] Chặn stream URL không tin cậy (openLiveModal):', ev.m3u8);
+    elapsedEl.textContent = '⚠ URL stream không hợp lệ.';
+    return;
+  }
+
   if (ev.liveStartEpoch) {
     _liveElapsedTimer = setInterval(() => {
       const diff = Math.floor((Date.now() - ev.liveStartEpoch) / 1000);
@@ -3062,14 +3087,8 @@ function openLiveModal(ev) {
   } else {
     elapsedEl.textContent = '';
   }
-  
-  const videoEl = document.getElementById('live-video');
 
-  if (!isTrustedStreamUrl(ev.m3u8)) {
-    console.warn('[App] Chặn stream URL không tin cậy (openLiveModal):', ev.m3u8);
-    elapsedEl.textContent = '⚠ URL stream không hợp lệ.';
-    return;
-  }
+  const videoEl = document.getElementById('live-video');
 
   if (window.Hls && Hls.isSupported()) {
     _liveModalHls = new Hls({ enableWorker: true });
@@ -3092,7 +3111,7 @@ function openLiveModal(ev) {
       closeLiveModal();
     });
   }
-  
+
   _liveModalPlyr = new Plyr(videoEl, {
     // Live stream m3u8 không hỗ trợ tua lại (không phải VOD) — bỏ progress/current-time
     // để tránh hiểu lầm có thể kéo thanh tiến trình
@@ -3101,15 +3120,15 @@ function openLiveModal(ev) {
     // Phase 4: không cần nhớ giữa các lần mở, tránh rò muted sang player bài học
     storage: { enabled: false },
   });
-  
+
   document.getElementById('live-goto-lesson').onclick = () => {
     closeLiveModal();
     navigateToMappedLesson(ev);
   };
-  
+
   const closeBtn = document.getElementById('live-modal-close');
   closeBtn.onclick = closeLiveModal;
-  
+
   modal.onclick = (e) => {
     if (e.target === modal) closeLiveModal();
   };
@@ -3126,13 +3145,17 @@ function closeLiveModal() {
 }
 
 async function setLiveModeOnEvent(eventToFind, m3u8Url) {
+  if (!_isAdmin) return;
+  if (m3u8Url && typeof isTrustedStreamUrl === 'function' && !isTrustedStreamUrl(m3u8Url)) {
+    throw new Error('URL stream không tin cậy');
+  }
   const docRef = db.collection('app_data').doc('schedule');
   const doc = await docRef.get();
   if (!doc.exists) return;
   const raw = doc.data().json;
   const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const events = parsed.events || [];
-  
+
   let found = false;
   for (const e of events) {
     if (e.date === eventToFind.date && e.time === eventToFind.time && e.title === eventToFind.title) {
@@ -3144,7 +3167,7 @@ async function setLiveModeOnEvent(eventToFind, m3u8Url) {
       break;
     }
   }
-  
+
   if (found) {
     parsed.lastUpdated = new Date().toISOString();
     await docRef.set({ json: JSON.stringify(parsed), updatedAt: parsed.lastUpdated });
@@ -3154,15 +3177,16 @@ async function setLiveModeOnEvent(eventToFind, m3u8Url) {
 }
 
 async function initGoLivePanel() {
+  if (!_isAdmin) return;
   const dateSel = document.getElementById('go-live-date');
   const lessonSel = document.getElementById('go-live-lesson');
   const m3u8Input = document.getElementById('go-live-m3u8');
   const statusEl = document.getElementById('go-live-status');
   if (!dateSel || !lessonSel) return;
-  
+
   const events = await loadCalendarData();
   const todayStr = getTodayStr();
-  
+
   // Các ngày từ hôm nay + 7 ngày
   const groups = {};
   for (const ev of events) {
@@ -3171,7 +3195,7 @@ async function initGoLivePanel() {
       groups[ev.date].push(ev);
     }
   }
-  
+
   dateSel.innerHTML = '';
   const sortedDates = Object.keys(groups).sort();
   for (const d of sortedDates) {
@@ -3179,26 +3203,26 @@ async function initGoLivePanel() {
     opt.value = d; opt.textContent = _fmtDateVN(d);
     dateSel.appendChild(opt);
   }
-  
+
   function populateLessons() {
     lessonSel.innerHTML = '';
     const d = dateSel.value;
     if (!groups[d]) return;
     for (const ev of groups[d]) {
       const opt = document.createElement('option');
-      opt.value = JSON.stringify({date: ev.date, time: ev.time, title: ev.title, subject: ev.subject});
+      opt.value = JSON.stringify({ date: ev.date, time: ev.time, title: ev.title, subject: ev.subject });
       opt.textContent = `[${ev.time}] ${ev.subject} — ${ev.title}`;
       lessonSel.appendChild(opt);
     }
   }
-  
+
   dateSel.onchange = populateLessons;
   if (sortedDates.length > 0) {
     dateSel.value = todayStr;
     if (!groups[todayStr]) dateSel.value = sortedDates[0];
     populateLessons();
   }
-  
+
   document.getElementById('btn-go-live').onclick = async () => {
     if (!lessonSel.value || !m3u8Input.value) {
       statusEl.textContent = '❌ Vui lòng chọn bài và nhập m3u8';
@@ -3215,7 +3239,7 @@ async function initGoLivePanel() {
       statusEl.textContent = '❌ Lỗi: ' + e.message;
     }
   };
-  
+
   document.getElementById('btn-stop-live').onclick = async () => {
     const todayEvents = groups[todayStr] || [];
     const liveEvs = todayEvents.filter(e => e.m3u8);
@@ -3227,7 +3251,7 @@ async function initGoLivePanel() {
     const liveEv = liveEvs[0];
     statusEl.textContent = 'Đang dừng...';
     try {
-      await setLiveModeOnEvent({date: liveEv.date, time: liveEv.time, title: liveEv.title}, null);
+      await setLiveModeOnEvent({ date: liveEv.date, time: liveEv.time, title: liveEv.title }, null);
       closeLiveModal();
       statusEl.textContent = '■ Đã dừng live';
     } catch (e) {
@@ -3241,9 +3265,9 @@ function _initCalendarButtons() {
     const el = document.getElementById(id);
     if (el) el.addEventListener('click', fn);
   };
-  on('cal-today-btn', async () => { 
-    _calViewDate = new Date(); 
-    await renderCalendar(); 
+  on('cal-today-btn', async () => {
+    _calViewDate = new Date();
+    await renderCalendar();
     const todayCell = document.querySelector('.cal-day.today');
     if (todayCell) {
       todayCell.classList.remove('flash-today');
@@ -3267,14 +3291,14 @@ function _initCalendarButtons() {
       }
     }
   });
-  on('cal-prev-btn',  () => {
+  on('cal-prev-btn', () => {
     // Phase 8: chặn vượt biên dưới (trước 6/2026)
     const candidate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() - 1, 1);
     if (candidate < CAL_MIN_DATE) return;
     _calViewDate = candidate;
     renderCalendar();
   });
-  on('cal-next-btn',  () => {
+  on('cal-next-btn', () => {
     // Phase 8: chặn vượt biên trên (sau 5/2027)
     const candidate = new Date(_calViewDate.getFullYear(), _calViewDate.getMonth() + 1, 1);
     if (candidate > CAL_MAX_DATE) return;
@@ -3282,7 +3306,7 @@ function _initCalendarButtons() {
     renderCalendar();
   });
   on('cal-view-month', () => { _calViewMode = 'month'; renderCalendar(); });
-  on('cal-view-list',  () => { _calViewMode = 'list';  renderCalendar(); });
+  on('cal-view-list', () => { _calViewMode = 'list'; renderCalendar(); });
 }
 _initCalendarButtons();
 

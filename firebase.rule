@@ -29,13 +29,16 @@ service cloud.firestore {
       
       // Kiểm tra quyền ghi thông qua collection admins thay vì hardcode email
       allow write: if request.auth != null
+        && request.auth.token.email_verified == true
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
 
     // Thêm quy tắc cho collection admins để kiểm tra phân quyền động
     match /admins/{email} {
-      allow read: if request.auth != null
+      allow get: if request.auth != null
         && request.auth.token.email == email;
+      allow list: if request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
       allow write: if false;
     }
 
@@ -61,9 +64,10 @@ service cloud.firestore {
       allow read: if isWhitelistedOrAdmin();
       
       // overrides & schedule: Chỉ admin có trong danh sách dynamic collection 'admins' mới được ghi đè
-      allow write: if (doc == 'overrides' || doc == 'schedule')
+      allow create, update: if (doc == 'overrides' || doc == 'schedule')
         && request.auth != null
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      allow delete: if false;
     }
 
     // ── Server-only data (cookie đăng nhập HocMai, session cache) ──────────────

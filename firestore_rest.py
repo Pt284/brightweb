@@ -9,30 +9,65 @@ Tái sử dụng logic từ crawl_calendar.py, bổ sung thêm:
 
 import os
 import json
+import time
+import threading
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
 FIRESTORE_PROJECT_ID    = os.environ.get("FIRESTORE_PROJECT_ID", "")
 
 
-# ── TOKEN ─────────────────────────────────────────────────────────────────────
+# ── TOKEN (với cache — [H3]) ──────────────────────────────────────────────────
+_token_cache: dict = {"token": None, "project": None, "expires_at": 0}
+_token_lock = threading.Lock()
+
+
 def _get_firestore_token():
+    """
+    Lấy OAuth token cho Firestore REST API.
+    Token được cache để tránh gọi Google OAuth endpoint nhiều lần trong cùng
+    một lần chạy script (token có hiệu lực 1 giờ, cache tự expire sau 55 phút).
+    """
     import google.auth.transport.requests
     from google.oauth2 import service_account
 
-    creds_info = json.loads(GOOGLE_CREDENTIALS_JSON)
-    creds = service_account.Credentials.from_service_account_info(
-        creds_info, scopes=["https://www.googleapis.com/auth/datastore"]
-    )
-    creds.refresh(google.auth.transport.requests.Request())
-    project = FIRESTORE_PROJECT_ID or creds_info.get("project_id", "")
-    return creds.token, project
+    with _token_lock:
+        now = time.time()
+        # Cache còn hiệu lực → dùng lại
+        if _token_cache["token"] and now < _token_cache["expires_at"]:
+            return _token_cache["token"], _token_cache["project"]
+
+        creds_info = json.loads(GOOGLE_CREDENTIALS_JSON)
+        creds = service_account.Credentials.from_service_account_info(
+            creds_info, scopes=["https://www.googleapis.com/auth/datastore"]
+        )
+        creds.refresh(google.auth.transport.requests.Request())
+        project = FIRESTORE_PROJECT_ID or creds_info.get("project_id", "")
+        if not project:
+            raise RuntimeError("Missing FIRESTORE_PROJECT_ID — set env var hoặc service account JSON phải có project_id")
+
+        # Cache token với TTL 55 phút (token thật hết hạn sau 60 phút)
+        _token_cache["token"]      = creds.token
+        _token_cache["project"]    = project
+        _token_cache["expires_at"] = now + 55 * 60
+        return creds.token, project
+
+
+def _encode_doc_path(doc_path: str) -> str:
+    """
+    URL-encode từng segment của Firestore doc path để tránh path traversal.
+    Ví dụ: 'session_clicks/abc/users/uid@x' → 'session_clicks/abc/users/uid%40x'
+    Dấu '/' giữa các segment được giữ nguyên (safe separator).
+    [C3 Fix]
+    """
+    return "/".join(quote(seg, safe="") for seg in doc_path.split("/"))
 
 
 def _fs_url(project: str, doc_path: str) -> str:
     return (
         f"https://firestore.googleapis.com/v1/projects/{project}"
-        f"/databases/(default)/documents/{doc_path}"
+        f"/databases/(default)/documents/{_encode_doc_path(doc_path)}"
     )
 
 
@@ -148,10 +183,16 @@ def list_active_subscriptions() -> list[dict]:
         fields = _extract_fields(doc)
         # Lấy document ID từ cuối path
         fields["id"] = doc["name"].split("/")[-1]
+        # Validate keys tồn tại và không rỗng (tránh WebPushException cryptic)
+        p256dh = fields.get("p256dh", "")
+        auth   = fields.get("auth", "")
+        if not p256dh or not auth:
+            print(f"  ⚠ Bỏ qua subscription {fields['id']}: thiếu p256dh hoặc auth")
+            continue
         # Rebuild keys dict cho pywebpush (cần format gốc)
         fields["keys"] = {
-            "p256dh": fields.get("p256dh", ""),
-            "auth":   fields.get("auth", ""),
+            "p256dh": p256dh,
+            "auth":   auth,
         }
         subs.append(fields)
     return subs
@@ -159,28 +200,46 @@ def list_active_subscriptions() -> list[dict]:
 
 def list_subcollection(path: str) -> list[dict]:
     """
-    List documents trong một sub-collection.
+    List documents trong một sub-collection, có hỗ trợ phân trang.
     path: vd 'session_clicks/{sid}/users'
     Trả về list[dict] với fields đã unwrap + 'id'.
+    [H2 Fix: pagination loop]
     """
     import requests as req
     token, project = _get_firestore_token()
 
-    url = _fs_url(project, path) + "?pageSize=100"
-    r = req.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
-    if r.status_code == 404:
-        return []
-    r.raise_for_status()
-    docs = r.json().get("documents", [])
     result = []
-    for doc in docs:
-        fields = _extract_fields(doc)
-        fields["id"] = doc["name"].split("/")[-1]
-        result.append(fields)
+    page_token = None
+
+    while True:
+        url = _fs_url(project, path) + "?pageSize=100"
+        if page_token:
+            url += f"&pageToken={quote(page_token, safe='')}"
+
+        r = req.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        if r.status_code == 404:
+            break
+        r.raise_for_status()
+
+        data = r.json()
+        for doc in data.get("documents", []):
+            fields = _extract_fields(doc)
+            fields["id"] = doc["name"].split("/")[-1]
+            result.append(fields)
+
+        page_token = data.get("nextPageToken")
+        if not page_token:
+            break
+
     return result
 
 
 # ── MISC ──────────────────────────────────────────────────────────────────────
 def firestore_now_iso() -> str:
-    """Trả về thời điểm hiện tại dưới dạng ISO-8601 UTC string."""
-    return datetime.now(timezone.utc).isoformat()
+    """
+    Trả về thời điểm hiện tại dưới dạng ISO-8601 UTC string, khớp format
+    với Worker.js toFirestoreIso(): không có microseconds, dùng '+00:00' suffix.
+    Ví dụ: '2026-07-13T03:33:00+00:00'  (so sánh lexicographic đúng với Firestore)
+    [H1 Fix]
+    """
+    return datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")

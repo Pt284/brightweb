@@ -1,4 +1,4 @@
-# 😈 BrightWeb — Nền tảng học chui trực tuyến
+# 😈 BrightWeb — Nền tảng học <details>chui<summary></details></summary> trực tuyến
 
 > **Tự động đồng bộ cấu trúc khóa học từ Google Drive + video từ YouTube → hiển thị thành web học tập đầy đủ tính năng, với lớp override thủ công mạnh mẽ không phá vỡ dữ liệu gốc.**
 

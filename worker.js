@@ -59,8 +59,8 @@ export default {
   // Phase 4 — Cron Trigger (bật sau khi set Cron Trigger * * * * * trên Dashboard)
   async scheduled(event, env, ctx) {
     // Cron mỗi phút (* * * * *) → reminderJob (T-90s push)
-    // Cron 5 phút (*/5 0-16 * * * = 07:00-23:55 VN) → watchModeJob (lấy m3u8)
-    if (event.cron === "*/5 0-16 * * *") {
+    // Cron 3 phút (*/3 0-16 * * * = 07:00-23:55 VN) → watchModeJob (lấy m3u8)
+    if (event.cron === "*/3 0-16 * * *") {
       ctx.waitUntil(watchModeJob(env));
     } else {
       ctx.waitUntil(reminderJob(env));

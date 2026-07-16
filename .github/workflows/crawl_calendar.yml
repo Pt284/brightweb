@@ -98,19 +98,3 @@ jobs:
           VAPID_PRIVATE_KEY:       ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT:           ${{ secrets.VAPID_SUBJECT }}
           SITE_URL:                ${{ secrets.SITE_URL }}
-
-      # ── TEMP DEBUG: in HM_BASE_URL để nhớ lại — XÓA SAU ──
-      - name: Debug HM_BASE_URL
-        env:
-          HM_BASE_URL: ${{ secrets.HM_BASE_URL }}
-        run: |
-          echo "HM_BASE_URL = $HM_BASE_URL"
-          echo "HM_CAL_PATH = $HM_CAL_PATH"
-          echo "HM_LOGIN_PATH = $HM_LOGIN_PATH"
-          echo "HM_LOGOUT_FINAL_PATH = $HM_LOGOUT_FINAL_PATH"
-          echo "HM_LOGOUT_V2_PATH = $HM_LOGOUT_V2_PATH"
-          echo "→ lophoc domain sẽ là: https://lophoc.$(echo $HM_BASE_URL | sed 's|https\?://||; s|/.*||')"
-          echo "→ API endpoint: $(echo $HM_BASE_URL | sed 's|/$||')/study/calendar/event"
-
-      - name: Setup Python 3.11
-        # ... rest giữ nguyên

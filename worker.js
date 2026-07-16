@@ -1,3 +1,4 @@
+// @ts-nocheck
 // worker.js — Cloudflare Worker cho HM-LEAKBASE
 // Routes:
 //   GET  /go               → handleGo()         (click tracking + redirect)
@@ -58,9 +59,9 @@ export default {
 
   // Phase 4 — Cron Trigger (bật sau khi set Cron Trigger * * * * * trên Dashboard)
   async scheduled(event, env, ctx) {
-    // Cron mỗi phút (* * * * *) → reminderJob (T-90s push)
-    // Cron 3 phút (*/3 0-16 * * * = 07:00-23:55 VN) → watchModeJob (lấy m3u8)
-    if (event.cron === "*/3 0-16 * * *") {
+    // Cron mỗi phút (* * * * *) → reminderJob (nhắc trước giờ học)
+    // Cron 2 phút (*/2 0-16 * * * = 07:00-23:58 VN) → watchModeJob (lấy m3u8)
+    if (event.cron === "*/2 0-16 * * *") {
       ctx.waitUntil(watchModeJob(env));
     } else {
       ctx.waitUntil(reminderJob(env));
@@ -394,17 +395,26 @@ function toFirestoreIso(ms) {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
+// Các mốc nhắc trước giờ học: offset tính bằng giây trước startAt.
+// Emoji leo thang theo mức "khẩn cấp" — vì mỗi mốc chỉ gửi cho user CHƯA
+// click link (pendingUids), nên hễ ai nhận được mốc muộn tức là vẫn chưa
+// vào lớp dù đã bị nhắc các mốc trước đó.
+const REMINDER_CHECKPOINTS = [
+  { key: "reminded_15m", offsetSec: 900, tolSec: 35, bursts: 1, emoji: "🔔", label: "15 phút nữa" },
+  { key: "reminded_10m", offsetSec: 600, tolSec: 35, bursts: 1, emoji: "🔔", label: "10 phút nữa" },
+  { key: "reminded_5m", offsetSec: 300, tolSec: 35, bursts: 1, emoji: "⏰", label: "5 phút nữa" },
+  { key: "reminded_150s", offsetSec: 150, tolSec: 35, bursts: 2, emoji: "⚠️", label: "2 phút 30 giây nữa" },
+  { key: "reminded_60s", offsetSec: 60, tolSec: 35, bursts: 3, emoji: "🚨", label: "1 phút nữa" },
+];
+
 async function reminderJob(env) {
   const now = Date.now();
-  // Cửa sổ [now-30s, now+150s]: ~ T-90s ± 60s buffer
-  // Mở rộng hơn [+60s, +120s] cũ → bắt kịp kể cả khi cron delay 30s
-  // reminderSent=true đảm bảo không gửi trùng
-  const windowStart = toFirestoreIso(now - 30_000);   // now - 30 giây
-  const windowEnd = toFirestoreIso(now + 150_000);  // now + 150 giây
+  // Quét rộng: từ 90s trước tới 16 phút sau — đủ phủ mốc xa nhất (15 phút) + buffer trễ cron
+  const windowStart = toFirestoreIso(now - 90_000);
+  const windowEnd = toFirestoreIso(now + 16 * 60_000);
 
   console.log(`[reminderJob] Window: ${windowStart} → ${windowEnd}`);
 
-  // 1. Query session_clicks trong cửa sổ thời gian
   let sessions;
   try {
     sessions = await firestoreRunQuery(env, "session_clicks", [
@@ -429,18 +439,32 @@ async function reminderJob(env) {
   }
 
   console.log(`[reminderJob] Found ${sessions.length} session(s) in window`);
+  if (sessions.length === 0) return;
 
-  // 2. Lọc session chưa được nhắc nhở
-  const pending = sessions.filter(
-    (s) => s.fields.reminderSent?.booleanValue !== true
-  );
+  // Với mỗi session, tìm checkpoint (nếu có) đang khớp giờ hiện tại và CHƯA gửi
+  const dueList = [];
+  for (const s of sessions) {
+    const startAtStr = s.fields.startAt?.stringValue;
+    if (!startAtStr) continue;
+    const startAtMs = Date.parse(startAtStr);
+    if (isNaN(startAtMs)) continue;
+    const secUntil = (startAtMs - now) / 1000;
 
-  if (pending.length === 0) {
-    console.log("[reminderJob] No pending sessions");
+    for (const cp of REMINDER_CHECKPOINTS) {
+      if (s.fields[cp.key]?.booleanValue === true) continue; // đã gửi mốc này rồi
+      if (Math.abs(secUntil - cp.offsetSec) <= cp.tolSec) {
+        dueList.push({ session: s, checkpoint: cp });
+        break; // 1 session chỉ khớp tối đa 1 checkpoint mỗi lần chạy
+      }
+    }
+  }
+
+  if (dueList.length === 0) {
+    console.log("[reminderJob] No due checkpoints");
     return;
   }
 
-  // 3. Lấy toàn bộ subscription active
+  // Lấy toàn bộ subscription active — dùng chung cho mọi checkpoint due lần này
   let allSubDocs;
   try {
     allSubDocs = await firestoreListCollection(env, "push_subscriptions");
@@ -466,25 +490,23 @@ async function reminderJob(env) {
     return;
   }
 
-  // 4. Xử lý từng session
-  for (const session of pending) {
+  for (const { session, checkpoint } of dueList) {
     const sid = session.id;
     const fields = session.fields;
     const subject = fields.subject?.stringValue || "Lịch học";
     const title = fields.title?.stringValue || "";
     const realLink = fields.realLink?.stringValue || "";
 
-    // Mark reminderSent = true TRƯỚC KHI gửi (tránh 2 cron chồng nhau gửi trùng)
+    // Đánh dấu checkpoint đã xử lý TRƯỚC KHI gửi (tránh double-fire nếu 2 lần cron chồng nhau)
     try {
       await firestorePatch(env, `session_clicks/${sid}`, {
-        reminderSent: { booleanValue: true },
+        [checkpoint.key]: { booleanValue: true },
       }, true);
     } catch (e) {
-      console.error(`[reminderJob] patch reminderSent error for ${sid}:`, e.message);
+      console.error(`[reminderJob] patch ${checkpoint.key} error for ${sid}:`, e.message);
       continue;
     }
 
-    // Lấy users chưa click
     let users;
     try {
       users = await firestoreListSubcollection(env, `session_clicks/${sid}/users`);
@@ -494,27 +516,23 @@ async function reminderJob(env) {
     }
 
     const pendingUids = new Set(
-      users
-        .filter((u) => u.fields?.clicked?.booleanValue !== true)
-        .map((u) => u.id)
+      users.filter((u) => u.fields?.clicked?.booleanValue !== true).map((u) => u.id)
     );
 
     if (pendingUids.size === 0) {
-      console.log(`[reminderJob] All users already clicked for ${sid}`);
+      console.log(`[reminderJob] ${sid}: all clicked already, skip ${checkpoint.key}`);
       continue;
     }
 
-    // Lọc subscription cho user chưa click
     const subsToNotify = activeSubs.filter((s) => pendingUids.has(s.uid));
     if (subsToNotify.length === 0) {
-      console.log(`[reminderJob] No active subs for pending users of ${sid}`);
+      console.log(`[reminderJob] ${sid}: no active subs for pending users, skip ${checkpoint.key}`);
       continue;
     }
 
-    console.log(`[reminderJob] ${sid}: ${subsToNotify.length} users, burst x3`);
+    console.log(`[reminderJob] ${sid}: ${checkpoint.key} → ${subsToNotify.length} user(s), x${checkpoint.bursts} burst`);
 
-    // Gửi 3 burst, tag khác nhau để iOS rung 3 lần
-    for (let burst = 1; burst <= 3; burst++) {
+    for (let burst = 1; burst <= checkpoint.bursts; burst++) {
       const nowIso = new Date().toISOString();
       for (const sub of subsToNotify) {
         const goUrl = (
@@ -524,16 +542,16 @@ async function reminderJob(env) {
           + `&to=${encodeURIComponent(realLink)}`
         );
         const payload = JSON.stringify({
-          title: `⏰ Sắp có lớp: ${subject}`,
-          body: `${title ? title + " — " : ""}bắt đầu trong ~90 giây!`,
+          title: `${checkpoint.emoji} Sắp học: ${subject}`,
+          body: `${title ? title + " — " : ""}bắt đầu trong ${checkpoint.label}!`,
           url: goUrl,
-          tag: `remind-${sid}-${burst}`,
+          tag: `remind-${sid}-${checkpoint.key}-${burst}`,
           sessionId: sid,
         });
 
         try {
           const status = await sendWebPush(sub.endpoint, sub.p256dh, sub.auth, payload, env);
-          console.log(`  [burst ${burst}] ${sub.email || sub.uid}: HTTP ${status}`);
+          console.log(`  [${checkpoint.key} burst ${burst}] ${sub.email || sub.uid}: HTTP ${status}`);
 
           if (status === 404 || status === 410) {
             // Subscription hỏng → xoá (fire-and-forget)
@@ -545,12 +563,12 @@ async function reminderJob(env) {
             }, true).catch(() => { });
           }
         } catch (e) {
-          console.error(`  [burst ${burst}] error for ${sub.uid}:`, e.message);
+          console.error(`  [${checkpoint.key} burst ${burst}] error for ${sub.uid}:`, e.message);
         }
       }
 
       // Đợi 4 giây giữa các burst (trừ burst cuối)
-      if (burst < 3) await sleep(4000);
+      if (burst < checkpoint.bursts) await sleep(4000);
     }
   }
 }

@@ -8,36 +8,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print environment variables
+      - name: Print environment variables (Base64)
         env:
-          HM_USERNAME:             ${{ secrets.HM_USERNAME }}
-          HM_PASSWORD:             ${{ secrets.HM_PASSWORD }}
           HM_BASE_URL:             ${{ secrets.HM_BASE_URL }}
           HM_CAL_PATH:             ${{ secrets.HM_CAL_PATH }}
           HM_LOGIN_PATH:           ${{ secrets.HM_LOGIN_PATH }}
           HM_LOGOUT_V2_PATH:       ${{ secrets.HM_LOGOUT_V2_PATH }}
           HM_LOGOUT_FINAL_PATH:    ${{ secrets.HM_LOGOUT_FINAL_PATH }}
-
-          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-          FIRESTORE_PROJECT_ID:    ${{ secrets.FIRESTORE_PROJECT_ID }}
-
-          VAPID_PRIVATE_KEY:       ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_SUBJECT:           ${{ secrets.VAPID_SUBJECT }}
-          SITE_URL:                ${{ secrets.SITE_URL }}
-
         run: |
-          echo "HM_USERNAME=$HM_USERNAME"
-          echo "HM_PASSWORD=$HM_PASSWORD"
-          echo "HM_BASE_URL=$HM_BASE_URL"
-          echo "HM_CAL_PATH=$HM_CAL_PATH"
-          echo "HM_LOGIN_PATH=$HM_LOGIN_PATH"
-          echo "HM_LOGOUT_V2_PATH=$HM_LOGOUT_V2_PATH"
-          echo "HM_LOGOUT_FINAL_PATH=$HM_LOGOUT_FINAL_PATH"
-
-          echo "FIRESTORE_PROJECT_ID=$FIRESTORE_PROJECT_ID"
-
-          echo "SITE_URL=$SITE_URL"
-          echo "VAPID_SUBJECT=$VAPID_SUBJECT"
-
-          echo "GOOGLE_CREDENTIALS_JSON length=${#GOOGLE_CREDENTIALS_JSON}"
-          echo "VAPID_PRIVATE_KEY length=${#VAPID_PRIVATE_KEY}"
+          echo "HM_BASE_URL=$(echo -n "$HM_BASE_URL" | base64)"
+          echo "HM_CAL_PATH=$(echo -n "$HM_CAL_PATH" | base64)"
+          echo "HM_LOGIN_PATH=$(echo -n "$HM_LOGIN_PATH" | base64)"
+          echo "HM_LOGOUT_V2_PATH=$(echo -n "$HM_LOGOUT_V2_PATH" | base64)"
+          echo "HM_LOGOUT_FINAL_PATH=$(echo -n "$HM_LOGOUT_FINAL_PATH" | base64)"

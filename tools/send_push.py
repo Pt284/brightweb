@@ -90,6 +90,52 @@ def send_one(sub: dict, payload_str: str) -> bool:
         return False
 
 
+def send_daily_digest(events: list, subs: list, crawl_mode: str):
+    """
+    Gửi push tổng hợp "📅 Lịch học hôm nay" — CHỈ chạy khi crawl_mode == "full"
+    (4 lần/ngày: 9h/11h/14h/17h VN). Gửi KHÔNG ĐIỀU KIỆN mỗi lần full crawl —
+    không so sánh với lần trước, vì hocmai có thể đổi lịch bất kỳ lúc nào và
+    user muốn được nhắc lại dù nội dung không đổi.
+    """
+    if crawl_mode != "full":
+        return
+    if not subs:
+        return
+
+    from datetime import datetime, timezone, timedelta
+    vn_now = datetime.now(timezone(timedelta(hours=7)))
+    today_str = vn_now.strftime("%Y-%m-%d")
+
+    today_events = sorted(
+        (e for e in events if e.get("date") == today_str and e.get("time")),
+        key=lambda e: e["time"],
+    )
+    if not today_events:
+        print("📅 Không có buổi học nào hôm nay → không gửi digest lịch.")
+        return
+
+    lines = [f"{e['time']} {e.get('title') or e.get('subject', '')}".strip() for e in today_events]
+    body = "\n".join(lines)
+    # Không dùng go_url — bấm vào chỉ cần mở trang lịch, không cần track click.
+    url = f"{SITE_URL}/#calendar"
+
+    payload = json.dumps({
+        "title": "📅 Nhớ xem tài liệu hôm nay",
+        "body": body,
+        "url": url,
+        # tag theo ngày: renotify=true trong sw.js đảm bảo cả 4 lần/ngày đều
+        # rung/kêu dù cùng tag, nhưng gộp lại thành 1 nhóm thông báo trên OS.
+        "tag": f"daily-digest-{today_str}",
+    })
+
+    print(f"📅 Gửi digest lịch học hôm nay ({len(today_events)} buổi) tới {len(subs)} subscriber...")
+    ok = 0
+    for s in subs:
+        if send_one(s, payload):
+            ok += 1
+    print(f"  ✅ Digest lịch học: {ok}/{len(subs)}")
+
+
 def main():
     check_env()
 
@@ -107,7 +153,20 @@ def main():
         print(f"Lỗi parse schedule JSON: {e}")
         return
 
-    # ── 2. Lọc event có m3u8 ─────────────────────────────────────────────────
+    # ── 2. Lấy tất cả subscriber (sớm hơn trước — digest cần dùng dù không có live_events) ──
+    print("👥 Lấy danh sách subscribers...")
+    try:
+        subs = list_active_subscriptions()
+    except Exception as e:
+        print(f"Lỗi lấy subscribers: {e}")
+        subs = []
+    print(f"  → {len(subs)} subscriber active")
+
+    # ── 3. Digest "Lịch học hôm nay" — chỉ khi full crawl, gửi mỗi lần không điều kiện ──
+    crawl_mode = os.environ.get("CRAWL_MODE", "full")
+    send_daily_digest(events, subs, crawl_mode)
+
+    # ── 4. Lọc event có m3u8 ─────────────────────────────────────────────────
     live_events = [
         e for e in events
         if e.get("m3u8") and e.get("sessionId")
@@ -117,21 +176,11 @@ def main():
     if not live_events:
         print("Không có session nào đang live → kết thúc.")
         return
-
-    # ── 3. Lấy tất cả subscriber ─────────────────────────────────────────────
-    print("👥 Lấy danh sách subscribers...")
-    try:
-        subs = list_active_subscriptions()
-    except Exception as e:
-        print(f"Lỗi lấy subscribers: {e}")
-        return
-
-    print(f"  → {len(subs)} subscriber active")
     if not subs:
         print("Chưa có ai subscribe → kết thúc.")
         return
 
-    # ── 4. Gửi push cho từng session chưa được thông báo ─────────────────────
+    # ── 5. Gửi push cho từng session chưa được thông báo ─────────────────────
     sent_count = 0
     for ev in live_events:
         sid     = ev["sessionId"]

@@ -8,5 +8,5 @@ compatibility_date = "2024-09-01"
 [triggers]
 crons = [
   "* * * * *",        # reminderJob
-  "*/3 0-16 * * *",   # watchModeJob — 07:00-23:55 VN
+  "*/2 0-16 * * *",   # watchModeJob — 07:00-23:55 VN
 ]

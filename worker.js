@@ -58,7 +58,13 @@ export default {
 
   // Phase 4 — Cron Trigger (bật sau khi set Cron Trigger * * * * * trên Dashboard)
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(reminderJob(env));
+    // Cron mỗi phút (* * * * *) → reminderJob (T-90s push)
+    // Cron 5 phút (*/5 0-16 * * * = 07:00-23:55 VN) → watchModeJob (lấy m3u8)
+    if (event.cron === "*/5 0-16 * * *") {
+      ctx.waitUntil(watchModeJob(env));
+    } else {
+      ctx.waitUntil(reminderJob(env));
+    }
   },
 };
 
@@ -1064,4 +1070,374 @@ function b64Decode(str) {
 }
 function b64ToBytes(str) {
   return Uint8Array.from(b64Decode(str), (c) => c.charCodeAt(0));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// WATCH MODE — port từ crawl_calendar.py _run_watch_mode() + lophoc_api.py
+//
+// ⚠️ QUAN TRỌNG: API lophoc KHÔNG trả Set-Cookie. Toàn bộ "cookie" là tự
+// dựng từ field trong JSON response body rồi tự gắn vào header Cookie của
+// các request sau — y hệt cách lophoc_api.py làm (session.cookies.set(...)).
+// Auth có 2 lớp: sessionToken (UUID, từ verify-user) rồi roomToken (JWT,
+// từ /api/auth/room-token, PHẢI lấy riêng cho từng code/learn_number
+// TRƯỚC KHI gọi livestreamlink — thiếu bước này livestreamlink sẽ 401/403).
+// ════════════════════════════════════════════════════════════════════════════
+
+const VN_TZ_OFFSET_MS = 7 * 60 * 60 * 1000;
+const LOPHOC_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36";
+
+/** ms UTC → {date, time, nowMinutes} theo giờ VN (không dùng Intl — tốn CPU) */
+function toVnParts(ms) {
+  const d = new Date(ms + VN_TZ_OFFSET_MS);
+  const iso = d.toISOString(); // đã lệch +7h nên các thành phần đọc bằng slice() ra đúng giờ VN
+  return {
+    date: iso.slice(0, 10),
+    time: iso.slice(11, 16),
+    nowMinutes: parseInt(iso.slice(11, 13), 10) * 60 + parseInt(iso.slice(14, 16), 10),
+  };
+}
+
+/** BASE_URL lophoc từ HM_BASE_URL — khớp lophoc_api.py: "https://X" → "https://lophoc.X" */
+function lophocBaseUrl(env) {
+  try {
+    const u = new URL(env.HM_BASE_URL);
+    return `${u.protocol}//lophoc.${u.host}`;
+  } catch {
+    return "";
+  }
+}
+
+/** UTF-8-safe base64 (btoa thường chỉ chạy đúng với Latin1) */
+function utf8ToB64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/**
+ * Dựng cookie "session_name_user" — base64 JSON — khớp
+ * lophoc_api.py::_build_session_name_user(). Server đọc field này để biết
+ * user + buổi học hiện tại (không có nó, nhiều endpoint trả 401/403).
+ */
+function buildSessionNameUser(phone, code = "", learnNumber = "0", lessonName = "", subject = "", classId = "") {
+  const payload = {
+    user: phone,
+    username: phone,
+    displayName: phone,
+    email: phone,
+    role: "student",
+    exp: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    current_lesson: {
+      code,
+      learn_number: String(learnNumber),
+      name: lessonName || phone,
+      subject,
+      class_id: classId,
+    },
+  };
+  return utf8ToB64(JSON.stringify(payload));
+}
+
+function cookieHeader(cookies) {
+  return Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
+/**
+ * Login lophoc bằng password — POST /api/auth/verify-user.
+ * KHÔNG có Set-Cookie — sessionToken (UUID) nằm trong JSON body, ta tự
+ * dựng cookie jar từ đó (khớp lophoc_api.py::_set_post_login_cookies).
+ * Trả về object cookies {name: value} ban đầu (chưa có room-token).
+ */
+async function lophocLogin(env) {
+  const base = lophocBaseUrl(env);
+  const r = await fetch(`${base}/api/auth/verify-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": base,
+      "Referer": `${base}/login`,
+      "User-Agent": LOPHOC_UA,
+    },
+    body: JSON.stringify({ user: env.HM_USERNAME, password: env.HM_PASSWORD }),
+  });
+  if (!r.ok) throw new Error(`lophoc login HTTP ${r.status}`);
+  const data = await r.json();
+  if (!data.success) throw new Error(`lophoc login failed: ${JSON.stringify(data).slice(0, 200)}`);
+
+  const sessionToken = data.sessionToken;
+  const username = env.HM_USERNAME;
+  return {
+    _user_session_token: sessionToken,
+    _user_identifier: username,
+    user_login_input: username,
+    session_name_user: buildSessionNameUser(username),
+  };
+}
+
+/**
+ * Lấy roomToken (JWT) cho 1 buổi học cụ thể — POST /api/auth/room-token.
+ * BẮT BUỘC gọi trước livestreamlink cho mỗi code/learn_number mới, nếu
+ * không sẽ bị 401/403 (đây là bước cả 2 bản port trước đó đều thiếu).
+ * Trả về cookies object đã cập nhật (_user_session_token giờ là JWT).
+ */
+async function lophocRoomToken(env, cookies, code, learnNumber) {
+  const base = lophocBaseUrl(env);
+  const username = env.HM_USERNAME;
+  const r = await fetch(`${base}/api/auth/room-token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": base,
+      "Referer": `${base}/schedule`,
+      "User-Agent": LOPHOC_UA,
+      "Cookie": cookieHeader(cookies),
+    },
+    body: JSON.stringify({ user: username, code, learn_number: learnNumber }),
+  });
+  if (!r.ok) throw new Error(`room-token HTTP ${r.status}`);
+  const data = await r.json();
+  if (!data.success) throw new Error(`room-token failed: ${JSON.stringify(data).slice(0, 200)}`);
+
+  const roomToken = data.roomToken;
+  const lesson = data.lesson || {};
+  return {
+    ...cookies,
+    _user_session_token: roomToken,
+    _class_room_code: code,
+    _learn_number: String(learnNumber),
+    session_name_user: buildSessionNameUser(
+      username, code, String(learnNumber), lesson.lesson_name || "", lesson.subject || ""
+    ),
+  };
+}
+
+/** POST /api/calendar/ — danh sách buổi học (cần sessionToken, chưa cần roomToken) */
+async function lophocGetCalendar(env, cookies) {
+  const base = lophocBaseUrl(env);
+  const r = await fetch(`${base}/api/calendar/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": base,
+      "Referer": `${base}/schedule`,
+      "User-Agent": LOPHOC_UA,
+      "Cookie": cookieHeader(cookies),
+    },
+    body: JSON.stringify({ user: env.HM_USERNAME }),
+  });
+  if (!r.ok) throw new Error(`lophoc calendar HTTP ${r.status}`);
+  const data = await r.json();
+  if (!data.success) return [];
+  return data.calendar || [];
+}
+
+/**
+ * POST /api/livestreamlink — lấy m3u8. Field top-level là "status" (không
+ * phải "success"); field URL là "streamkey" — khớp lophoc_api.py.
+ * Cookies TRUYỀN VÀO phải đã qua lophocRoomToken() cho đúng code này.
+ */
+async function lophocGetM3u8(env, cookies, code, learnNumber) {
+  const base = lophocBaseUrl(env);
+  const roomB64 = utf8ToB64(`${code}-${learnNumber}`);
+  const r = await fetch(`${base}/api/livestreamlink`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": base,
+      "Referer": `${base}/room/${roomB64}`,
+      "User-Agent": LOPHOC_UA,
+      "Cookie": cookieHeader(cookies),
+    },
+    body: JSON.stringify({ code, learn_number: learnNumber }),
+  });
+  if (r.status === 401 || r.status === 403) {
+    const e = new Error(`livestreamlink HTTP ${r.status}`);
+    e.authError = true;
+    throw e;
+  }
+  if (!r.ok) throw new Error(`livestreamlink HTTP ${r.status}`);
+  const data = await r.json();
+  if (!data.status) return null;
+  return data.data?.[0]?.streamkey || null;
+}
+
+/** Check CDN trực tiếp (HEAD, fallback GET nếu 405) — Referer/Origin cố định theo hocmai.vn, khớp crawl_calendar.py */
+async function checkCdnLive(m3u8Url) {
+  try {
+    const r = await fetch(m3u8Url, {
+      method: "HEAD",
+      headers: { "Referer": "https://lophoc.hocmai.vn/", "Origin": "https://lophoc.hocmai.vn", "User-Agent": LOPHOC_UA },
+    });
+    if (r.status === 405) {
+      const r2 = await fetch(m3u8Url, {
+        method: "GET",
+        headers: { "Referer": "https://lophoc.hocmai.vn/", "Origin": "https://lophoc.hocmai.vn", "User-Agent": LOPHOC_UA },
+      });
+      r2.body?.cancel();
+      return r2.status === 200;
+    }
+    return r.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Lấy m3u8 cho 1 event: đảm bảo roomToken đúng code, gọi livestreamlink,
+ * tự retry 1 lần (re-login + room-token lại) nếu 401/403 — khớp
+ * LophocClient.get_m3u8() trong lophoc_api.py.
+ */
+async function ensureM3u8(env, session, code, learnNumber) {
+  if (session.currentCode !== code) {
+    session.cookies = await lophocRoomToken(env, session.cookies, code, learnNumber);
+    session.currentCode = code;
+  }
+  try {
+    return await lophocGetM3u8(env, session.cookies, code, learnNumber);
+  } catch (e) {
+    if (!e.authError || session.retried) throw e;
+    session.retried = true;
+    session.cookies = await lophocLogin(env);
+    session.cookies = await lophocRoomToken(env, session.cookies, code, learnNumber);
+    session.currentCode = code;
+    return await lophocGetM3u8(env, session.cookies, code, learnNumber);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// WATCH MODE MAIN — chỉ login lophoc khi có target event (tiết kiệm CPU/request)
+// ════════════════════════════════════════════════════════════════════════════
+async function watchModeJob(env) {
+  const nowMs = Date.now();
+  const vn = toVnParts(nowMs);
+  console.log(`[watchMode] ${vn.date}T${vn.time} VN`);
+
+  let scheduleDoc;
+  try {
+    scheduleDoc = await firestoreGet(env, "app_data/schedule");
+  } catch (e) {
+    console.error("[watchMode] read schedule error:", e.message);
+    return;
+  }
+  if (!scheduleDoc?.fields?.json?.stringValue) {
+    console.log("[watchMode] no schedule");
+    return;
+  }
+
+  let schedule;
+  try {
+    schedule = JSON.parse(scheduleDoc.fields.json.stringValue);
+  } catch {
+    console.error("[watchMode] schedule parse error");
+    return;
+  }
+  const events = schedule.events || [];
+  const todayStr = vn.date;
+  const nowMinutes = vn.nowMinutes;
+
+  // Lọc target events: hôm nay, trong cửa sổ [-30, +60] phút quanh giờ học
+  const targetEvents = events.filter((ev) => {
+    if (ev.date !== todayStr) return false;
+    const t = ev.time || "00:00";
+    const h = parseInt(t.slice(0, 2), 10);
+    const m = parseInt(t.slice(3, 5), 10);
+    if (isNaN(h) || isNaN(m)) return false;
+    const evMin = h * 60 + m;
+    return -30 <= nowMinutes - evMin && nowMinutes - evMin <= 60;
+  });
+
+  let changed = false;
+
+  if (targetEvents.length > 0) {
+    console.log(`[watchMode] ${targetEvents.length} target event(s)`);
+    const session = { cookies: null, currentCode: null, retried: false };
+    let lophocLessons = [];
+    try {
+      session.cookies = await lophocLogin(env);
+      lophocLessons = await lophocGetCalendar(env, session.cookies);
+    } catch (e) {
+      console.error("[watchMode] lophoc login/calendar error:", e.message);
+      lophocLessons = [];
+    }
+
+    const lophocIdx = new Map();
+    for (const lesson of lophocLessons) {
+      lophocIdx.set(`${lesson.subject}|${lesson.lesson_name}`, lesson);
+    }
+
+    for (const ev of targetEvents) {
+      const lesson = lophocIdx.get(`${ev.subject}|${ev.title}`);
+      if (!lesson) {
+        console.log(`[watchMode] no lophoc match: ${ev.subject} — ${ev.title}`);
+        continue;
+      }
+      const code = lesson.code || "";
+      const learnNumber = lesson.learn_number || 0;
+
+      let m3u8;
+      try {
+        m3u8 = await ensureM3u8(env, session, code, learnNumber);
+      } catch (e) {
+        console.error(`[watchMode] getM3u8 error for ${ev.title}:`, e.message);
+        continue;
+      }
+      if (!m3u8) continue;
+
+      const oldM3u8 = ev.m3u8;
+      const linkChanged = oldM3u8 && m3u8 !== oldM3u8;
+      if (!oldM3u8 || linkChanged) {
+        for (const mainEv of events) {
+          if (mainEv.date === ev.date && mainEv.subject === ev.subject && mainEv.title === ev.title) {
+            mainEv.m3u8 = m3u8;
+            mainEv.status = "live";
+            mainEv.code = code;
+            mainEv.learn_number = learnNumber;
+            if (!mainEv.liveStartEpoch) mainEv.liveStartEpoch = nowMs;
+            changed = true;
+            console.log(`[watchMode] set live: ${ev.subject} — ${ev.title}`);
+            break;
+          }
+        }
+      }
+    }
+  } else {
+    console.log("[watchMode] no target events in window");
+  }
+
+  // Cleanup: clear m3u8 cho event đã quá 60 phút mà CDN không còn trả 200
+  // (fix bug "live chạy mãi" — port bonus, không có trong crawl_calendar.py gốc)
+  for (const ev of events) {
+    if (!ev.m3u8 || ev.date !== todayStr) continue;
+    const h = parseInt((ev.time || "00:00").slice(0, 2), 10);
+    const m = parseInt((ev.time || "00:00").slice(3, 5), 10);
+    if (isNaN(h) || isNaN(m)) continue;
+    const evMin = h * 60 + m;
+    if (nowMinutes - evMin > 60) {
+      const stillLive = await checkCdnLive(ev.m3u8);
+      if (!stillLive) {
+        ev.m3u8 = null;
+        ev.status = "past";
+        ev.liveStartEpoch = null;
+        changed = true;
+        console.log(`[watchMode] clear ended: ${ev.subject} — ${ev.title} (CDN không còn live)`);
+      }
+    }
+  }
+
+  if (changed) {
+    schedule.events = events;
+    schedule.lastUpdated = new Date(nowMs).toISOString();
+    try {
+      await firestorePatch(env, "app_data/schedule", {
+        json: { stringValue: JSON.stringify(schedule) },
+        updatedAt: { stringValue: schedule.lastUpdated },
+      }, true);
+      console.log("[watchMode] schedule updated");
+    } catch (e) {
+      console.error("[watchMode] write schedule error:", e.message);
+    }
+  } else {
+    console.log("[watchMode] no changes");
+  }
 }

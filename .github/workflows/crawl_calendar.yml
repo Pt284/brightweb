@@ -98,9 +98,6 @@ jobs:
           VAPID_PRIVATE_KEY:       ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT:           ${{ secrets.VAPID_SUBJECT }}
           SITE_URL:                ${{ secrets.SITE_URL }}
-    steps2:
-      - name: Checkout
-        uses: actions/checkout@v4
 
       # ── TEMP DEBUG: in HM_BASE_URL để nhớ lại — XÓA SAU ──
       - name: Debug HM_BASE_URL

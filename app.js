@@ -50,11 +50,6 @@ let _calEventsLoadedAt = 0;
 let _calViewDate = new Date();
 let _calViewMode = 'month';
 let _calLiveBannerTimer = null;
-let _liveModalPlyr = null;
-let _liveModalHls = null;
-let _liveElapsedTimer = null;
-// Phase B: HLS instance khi live được nhúng trực tiếp vào ô video bài học (không qua modal)
-let _lessonLiveHls = null;
 const CAL_CACHE_TTL = 3 * 60 * 1000; // 3 phút
 
 // Phase 8: chỉ cho xem lịch trong khoảng 6/2026 → 5/2027
@@ -236,7 +231,8 @@ auth.onAuthStateChanged(async user => {
     if (_calLiveBannerTimer) clearInterval(_calLiveBannerTimer);
     _calLiveBannerTimer = setInterval(updateLiveBanner, 60 * 1000);
 
-    // Auto open live
+    // Auto-open: KHÔNG tự mở tab mới (popup blocker chặn vì không phải user gesture).
+    // Chỉ show toast báo có live, user tự click banner.
     loadCalendarData().then(events => {
       const todayStr = getTodayStr();
       const liveEvent = events.find(e => e.date === todayStr && e.m3u8 && e.status === 'live');
@@ -244,7 +240,8 @@ auth.onAuthStateChanged(async user => {
       const sessionKey = `live_opened_${liveEvent.date}_${liveEvent.time}`;
       if (sessionStorage.getItem(sessionKey)) return;
       sessionStorage.setItem(sessionKey, '1');
-      openLiveModal(liveEvent);
+      // Toast ngắn — không chặn, tự ẩn sau 8 giây
+      showLiveToast(`🔴 ĐANG LIVE: ${liveEvent.subject} — ${liveEvent.title}. Bấm banner trên cùng để xem.`);
     });
   } else {
     if (_calLiveBannerTimer) { clearInterval(_calLiveBannerTimer); _calLiveBannerTimer = null; }
@@ -1638,58 +1635,49 @@ function isTrustedStreamUrl(u) {
   } catch { return false; }
 }
 
-// Phase B: nhúng trực tiếp video live (HLS) vào ô video bài học, giống video thường
-function renderInlineLiveVideo(ev, vw) {
-  const container = document.createElement('div');
-  container.className = 'video-container';
-
-  const videoEl = document.createElement('video');
-  videoEl.id = 'lesson-live-video';
-  videoEl.playsInline = true;
-  container.appendChild(videoEl);
-  vw.appendChild(container);
-
+// Mở tab mới với link live (CDN chặn cross-origin → không embed được)
+// Trả về true nếu mở thành công, false nếu URL không hợp lệ
+function openLiveInNewTab(ev) {
+  if (!ev || !ev.m3u8) return false;
   if (!isTrustedStreamUrl(ev.m3u8)) {
-    console.warn('[App] Chặn stream URL không tin cậy (renderInlineLiveVideo):', ev.m3u8);
-    container.innerHTML = '<div style="padding:2rem;text-align:center;opacity:.7">⚠ URL stream không hợp lệ.</div>';
-    return;
+    console.warn('[App] Chặn stream URL không tin cậy:', ev.m3u8);
+    return false;
   }
+  // noopener để tab mới không có reference ngược (security)
+  // noreferrer để không leak Referer (CDN chặn 403 nếu có Referer/Origin của site)
+  window.open(ev.m3u8, '_blank', 'noopener,noreferrer');
+  return true;
+}
 
-  if (window.Hls && Hls.isSupported()) {
-    _lessonLiveHls = new Hls({ enableWorker: true });
-    _lessonLiveHls.loadSource(ev.m3u8);
-    _lessonLiveHls.attachMedia(videoEl);
-    _lessonLiveHls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => { }));
-    attachHlsEndDetection(_lessonLiveHls, () => {
-      if (_lessonLiveHls) { try { _lessonLiveHls.destroy(); } catch (e) { } _lessonLiveHls = null; }
-      container.innerHTML = '<div style="padding:2rem;text-align:center;opacity:.7">⏹ Buổi học đã kết thúc.</div>';
-    }, (msg) => {
-      // Có thể tạo một overlay div để báo lỗi đang tải lại
-      if (msg && !document.getElementById('inline-live-status')) {
-        const statusDiv = document.createElement('div');
-        statusDiv.id = 'inline-live-status';
-        statusDiv.style = 'position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.5);color:white;padding:5px 10px;border-radius:4px;z-index:10;';
-        statusDiv.textContent = msg;
-        container.style.position = 'relative';
-        container.appendChild(statusDiv);
-      } else if (!msg) {
-        const statusDiv = document.getElementById('inline-live-status');
-        if (statusDiv) statusDiv.remove();
-      }
-    });
-  } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-    videoEl.src = ev.m3u8;
-    videoEl.addEventListener('loadedmetadata', () => videoEl.play().catch(() => { }));
+// Toast báo live (không phụ thuộc push.js, dùng riêng cho auto-open)
+function showLiveToast(msg) {
+  let el = document.getElementById('live-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'live-toast';
+    el.style.cssText = `
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(220,38,38,.95); color: #fff;
+      padding: 12px 20px; border-radius: 10px;
+      font-size: 14px; font-weight: 600;
+      z-index: 9999; max-width: 90vw; text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      transition: opacity .3s; cursor: pointer;
+    `;
+    document.body.appendChild(el);
+    // Click toast cũng mở tab mới
+    el.onclick = () => {
+      const events = _calEvents || [];
+      const todayStr = getTodayStr();
+      const live = events.find(e => e.date === todayStr && e.m3u8 && e.status === 'live');
+      if (live) openLiveInNewTab(live);
+      el.style.opacity = '0';
+    };
   }
-
-  // Dùng chung biến plyrInstance toàn cục — toàn bộ phím tắt, toast, fullscreen
-  // (Phase 9) đã viết sẵn cho plyrInstance sẽ tự hoạt động đúng cho video live luôn.
-  plyrInstance = new Plyr(videoEl, {
-    // Live thật không tua lại được (không phải VOD) — bỏ progress/current-time
-    controls: ['play', 'mute', 'volume', 'fullscreen', 'settings'],
-    settings: ['speed'],
-    storage: { enabled: false },
-  });
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.opacity = '0'; }, 8000);
 }
 
 async function renderLesson(courseId, lessonId) {
@@ -1724,10 +1712,19 @@ async function renderLesson(courseId, lessonId) {
   if (resolvedLive && lessonMain) {
     const banner = document.createElement('div');
     banner.className = 'live-in-lesson-banner';
+    // Thêm nút "Xem live" click-able trong banner
     banner.innerHTML = `
       <span class="live-pulse-dot"></span>
       <span>🔴 ĐANG PHÁT TRỰC TIẾP — <strong>${escapeHtml(resolvedLive.title)}</strong></span>
+      <button class="btn btn-primary btn-sm live-open-btn" style="margin-left:12px">📺 Xem live</button>
     `;
+    // Click nút → mở tab mới. Click banner (trừ nút) cũng mở.
+    banner.querySelector('.live-open-btn').onclick = (e) => {
+      e.stopPropagation();
+      openLiveInNewTab(resolvedLive);
+    };
+    banner.onclick = () => openLiveInNewTab(resolvedLive);
+    banner.style.cursor = 'pointer';
     lessonMain.insertBefore(banner, lessonMain.firstChild);
   }
 
@@ -1738,8 +1735,22 @@ async function renderLesson(courseId, lessonId) {
   vw.appendChild(nv);
 
   if (resolvedLive) {
-    nv.style.display = 'none';
-    renderInlineLiveVideo(resolvedLive, vw);
+    // Live đang chạy nhưng không embed được → hiện thông báo + nút mở tab mới
+    // thay vì renderInlineLiveVideo (bị CDN chặn CORS/403 khi nhúng cross-origin)
+    nv.style.display = 'flex';
+    nv.innerHTML = `
+      <div style="text-align:center; padding: 2rem 1rem;">
+        <div style="font-size: 3rem; margin-bottom: 12px;">🔴</div>
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;">
+          Buổi học đang phát trực tiếp
+        </div>
+        <button class="btn btn-primary" id="nv-open-live">📺 Mở live trong tab mới</button>
+        <div style="font-size: .85rem; opacity: .7; margin-top: 12px;">
+          (Stream chỉ xem được trong tab riêng do CDN yêu cầu same-origin)
+        </div>
+      </div>
+    `;
+    document.getElementById('nv-open-live').onclick = () => openLiveInNewTab(resolvedLive);
   } else if (lesson.youtubeId) {
     nv.style.display = 'none';
 
@@ -2182,8 +2193,6 @@ function destroyPlyr() {
   if (currentLessonId) flushProgressToFirestore(currentLessonId, currentCourseId);
   // Phase 3: clear caption watchdog khi rời trang bài học
   if (_captionWatchdogInterval) { clearInterval(_captionWatchdogInterval); _captionWatchdogInterval = null; }
-  // Phase B: hủy HLS instance của video live nhúng trong bài (nếu có)
-  if (_lessonLiveHls) { try { _lessonLiveHls.destroy(); } catch (e) { } _lessonLiveHls = null; }
   if (plyrInstance) {
     try { plyrInstance.stop(); plyrInstance.destroy(); } catch (e) { }
     plyrInstance = null;
@@ -2800,7 +2809,11 @@ function attachCalendarEventListeners() {
 
 function handleCalendarEventClick(ev) {
   if (ev.m3u8) {
-    openLiveModal(ev);
+    // CDN chặn embed → mở tab mới. User gesture từ click → không bị popup blocker.
+    if (!openLiveInNewTab(ev)) {
+      // Fallback: nếu URL không hợp lệ, vẫn cho xem info qua popup
+      showCalendarEventPopup(ev);
+    }
   } else {
     showCalendarEventPopup(ev);
   }
@@ -2981,6 +2994,12 @@ async function updateLiveBanner() {
 
   if (!activeEvent) {
     banner.style.display = 'none';
+    // Clear sessionKey để lần live sau toast hiện lại (đề phòng restart stream cùng ngày)
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(`live_opened_${todayStr}_`)) {
+        sessionStorage.removeItem(key);
+      }
+    }
     return;
   }
 
@@ -2991,9 +3010,15 @@ async function updateLiveBanner() {
   const text = document.getElementById('live-banner-text');
   const cd = document.getElementById('live-banner-countdown');
 
-  // Phase B: "ấn vào banner để mở bài" — mở thẳng trang bài học (video live hiện inline
-  // trong ô video), không qua modal. Modal vẫn dùng cho auto-open khi vào web / bấm event lịch.
-  banner.onclick = () => navigateToMappedLesson(activeEvent);
+  if (activeEvent.m3u8) {
+    // Đang live → click mở tab mới với stream link (CDN chặn embed cross-origin)
+    banner.onclick = () => openLiveInNewTab(activeEvent);
+    banner.title = 'Bấm để xem live trong tab mới';
+  } else {
+    // Sắp live (chưa có m3u8) → mở trang bài học để xem tài liệu chờ
+    banner.onclick = () => navigateToMappedLesson(activeEvent);
+    banner.title = 'Bấm để mở bài học';
+  }
 
   if (activeEvent.m3u8) {
     text.textContent = `ĐANG LIVE: ${activeEvent.subject} — ${activeEvent.title}`;
@@ -3006,144 +3031,6 @@ async function updateLiveBanner() {
     cd.textContent = diff > 0 ? `Còn ${diff} phút` : 'Đang bắt đầu';
   }
 }
-
-function attachHlsEndDetection(hlsInstance, onEnded, uiStatusUpdater) {
-  let errorCount = 0;
-  let retryTimer = null;
-  let firstErrorTime = 0;
-
-  hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-    if (!data.fatal) return;
-    console.warn('[Live] HLS fatal error:', data.type, data.details);
-
-    const now = Date.now();
-    if (firstErrorTime === 0) firstErrorTime = now;
-
-    // Nếu đã trôi qua hơn 30 giây kể từ lỗi đầu tiên -> kết thúc thật
-    if (now - firstErrorTime > 30000) {
-      if (retryTimer) clearTimeout(retryTimer);
-      onEnded();
-      return;
-    }
-
-    // Nếu vẫn trong 30s, thử lại
-    uiStatusUpdater('Đang mất kết nối, đang thử lại...');
-    if (retryTimer) clearTimeout(retryTimer);
-
-    retryTimer = setTimeout(() => {
-      try {
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hlsInstance.startLoad();
-        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hlsInstance.recoverMediaError();
-        else { hlsInstance.destroy(); onEnded(); }
-      } catch (e) { onEnded(); }
-    }, 2000); // Thử lại mỗi 2 giây
-  });
-
-  // Khi có video parse thành công, reset lại cờ lỗi
-  hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-    firstErrorTime = 0;
-    uiStatusUpdater(''); // xoá thông báo lỗi
-  });
-
-  // Hỗ trợ tự động end live khi stream kết thúc sạch (#EXT-X-ENDLIST)
-  hlsInstance.on(Hls.Events.BUFFER_EOS, () => {
-    console.log('[Live] HLS buffer EOS reached. Stream ended.');
-    if (retryTimer) clearTimeout(retryTimer);
-    onEnded();
-  });
-}
-
-function openLiveModal(ev) {
-  closeLiveModal();
-  if (!ev.m3u8) {
-    navigateToMappedLesson(ev);
-    return;
-  }
-
-  const modal = document.getElementById('live-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-
-  document.getElementById('live-modal-subject').textContent = ev.subject;
-  document.getElementById('live-modal-title-text').textContent = ev.title;
-
-  const elapsedEl = document.getElementById('live-modal-elapsed');
-
-  if (!isTrustedStreamUrl(ev.m3u8)) {
-    console.warn('[App] Chặn stream URL không tin cậy (openLiveModal):', ev.m3u8);
-    elapsedEl.textContent = '⚠ URL stream không hợp lệ.';
-    return;
-  }
-
-  if (ev.liveStartEpoch) {
-    _liveElapsedTimer = setInterval(() => {
-      const diff = Math.floor((Date.now() - ev.liveStartEpoch) / 1000);
-      if (diff < 0) return;
-      const h = String(Math.floor(diff / 3600)).padStart(2, '0');
-      const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
-      const s = String(diff % 60).padStart(2, '0');
-      elapsedEl.textContent = `Đã phát: ${h}:${m}:${s}`;
-    }, 1000);
-  } else {
-    elapsedEl.textContent = '';
-  }
-
-  const videoEl = document.getElementById('live-video');
-
-  if (window.Hls && Hls.isSupported()) {
-    _liveModalHls = new Hls({ enableWorker: true });
-    _liveModalHls.loadSource(ev.m3u8);
-    _liveModalHls.attachMedia(videoEl);
-    _liveModalHls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play());
-    attachHlsEndDetection(_liveModalHls, () => {
-      if (_liveElapsedTimer) { clearInterval(_liveElapsedTimer); _liveElapsedTimer = null; }
-      elapsedEl.textContent = '⏹ Buổi học đã kết thúc';
-      closeLiveModal();
-    }, (msg) => {
-      if (msg) elapsedEl.textContent = msg;
-    });
-  } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-    videoEl.src = ev.m3u8;
-    videoEl.addEventListener('loadedmetadata', () => videoEl.play());
-    videoEl.addEventListener('ended', () => {
-      if (_liveElapsedTimer) { clearInterval(_liveElapsedTimer); _liveElapsedTimer = null; }
-      elapsedEl.textContent = '⏹ Buổi học đã kết thúc';
-      closeLiveModal();
-    });
-  }
-
-  _liveModalPlyr = new Plyr(videoEl, {
-    // Live stream m3u8 không hỗ trợ tua lại (không phải VOD) — bỏ progress/current-time
-    // để tránh hiểu lầm có thể kéo thanh tiến trình
-    controls: ['play', 'mute', 'volume', 'fullscreen', 'settings'],
-    settings: ['speed'],
-    // Phase 4: không cần nhớ giữa các lần mở, tránh rò muted sang player bài học
-    storage: { enabled: false },
-  });
-
-  document.getElementById('live-goto-lesson').onclick = () => {
-    closeLiveModal();
-    navigateToMappedLesson(ev);
-  };
-
-  const closeBtn = document.getElementById('live-modal-close');
-  closeBtn.onclick = closeLiveModal;
-
-  modal.onclick = (e) => {
-    if (e.target === modal) closeLiveModal();
-  };
-}
-
-function closeLiveModal() {
-  const modal = document.getElementById('live-modal');
-  if (modal) modal.style.display = 'none';
-  if (_liveElapsedTimer) clearInterval(_liveElapsedTimer);
-  if (_liveModalPlyr) { _liveModalPlyr.destroy(); _liveModalPlyr = null; }
-  if (_liveModalHls) { _liveModalHls.destroy(); _liveModalHls = null; }
-  const videoEl = document.getElementById('live-video');
-  if (videoEl) videoEl.src = '';
-}
-
 async function setLiveModeOnEvent(eventToFind, m3u8Url) {
   if (!_isAdmin) return;
   if (m3u8Url && typeof isTrustedStreamUrl === 'function' && !isTrustedStreamUrl(m3u8Url)) {
@@ -3252,7 +3139,6 @@ async function initGoLivePanel() {
     statusEl.textContent = 'Đang dừng...';
     try {
       await setLiveModeOnEvent({ date: liveEv.date, time: liveEv.time, title: liveEv.title }, null);
-      closeLiveModal();
       statusEl.textContent = '■ Đã dừng live';
     } catch (e) {
       console.error(e);

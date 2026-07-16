@@ -27,14 +27,14 @@ self.addEventListener("push", (event) => {
   }
 
   const title = data.title || "HM-LEAKBASE 😈";
-  const body  = data.body  || "Có thông báo mới";
-  const tag   = data.tag   || "hm-push-default";
-  const url   = data.url   || (BASE + "/");
+  const body = data.body || "Có thông báo mới";
+  const tag = data.tag || "hm-push-default";
+  const url = data.url || (BASE + "/");
 
   const options = {
     body,
     tag,
-    icon:  BASE + "/icons/icon-192.png",
+    icon: BASE + "/icons/icon-192.png",
     badge: BASE + "/icons/icon-192.png",
     // data truyền vào để notificationclick đọc được URL đích
     data: { url },
@@ -64,6 +64,7 @@ self.addEventListener("notificationclick", (event) => {
     const u = new URL(targetUrl, self.location.origin);
     const allowedOrigins = [
       self.location.origin,
+      "https://brightweb-sync.mcdg5444.workers.dev",
     ];
     if (!allowedOrigins.includes(u.origin)) {
       console.warn("[SW] Chặn navigate tới origin không hợp lệ:", u.origin);

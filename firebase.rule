@@ -82,8 +82,11 @@ service cloud.firestore {
     // → bypass rules hoàn toàn. Rules ở đây chỉ ngăn client ghi trực tiếp tuỳ tiện.
     match /push_subscriptions/{sid} {
       // Client chỉ được tạo/cập nhật subscription của chính mình (uid phải khớp)
+      // VÀ phải nằm trong whitelist/admin — chặn người ngoài tự subscribe qua
+      // Firestore SDK trực tiếp, bỏ qua whitelist check của Worker (/push/subscribe)
       allow create, update: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.uid == request.auth.uid
+        && isWhitelistedOrAdmin();
       // Client chỉ được xoá subscription của chính mình
       allow delete: if request.auth != null
         && resource.data.uid == request.auth.uid;
@@ -107,4 +110,4 @@ service cloud.firestore {
       }
     }
   }
-}
+}

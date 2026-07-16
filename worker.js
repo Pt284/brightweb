@@ -9,11 +9,11 @@
 
 // ── Module-level cache cho Google Access Token ───────────────────────────────
 let _cachedToken = null;
-let _tokenExpiry  = 0;
+let _tokenExpiry = 0;
 
 export default {
   async fetch(request, env, ctx) {
-    const url    = new URL(request.url);
+    const url = new URL(request.url);
     const method = request.method;
 
     // Route mới: GET /go
@@ -225,17 +225,17 @@ async function handleSubscribe(request, env) {
 
   const now = new Date().toISOString();
   const fields = {
-    endpoint:    { stringValue: endpoint },
-    p256dh:      { stringValue: keys.p256dh || "" },
-    auth:        { stringValue: keys.auth    || "" },
-    uid:         { stringValue: uid },           // ✅ từ JWT, không phải body
-    email:       { stringValue: emailFromToken }, // ✅ từ JWT, không phải body
-    deviceId:    { stringValue: deviceId || "" },
-    platform:    { stringValue: platform || "" },
-    userAgent:   { stringValue: (userAgent || "").slice(0, 200) },
-    active:      { booleanValue: true },
-    lastSeenAt:  { stringValue: now },
-    createdAt:   { stringValue: now },
+    endpoint: { stringValue: endpoint },
+    p256dh: { stringValue: keys.p256dh || "" },
+    auth: { stringValue: keys.auth || "" },
+    uid: { stringValue: uid },           // ✅ từ JWT, không phải body
+    email: { stringValue: emailFromToken }, // ✅ từ JWT, không phải body
+    deviceId: { stringValue: deviceId || "" },
+    platform: { stringValue: platform || "" },
+    userAgent: { stringValue: (userAgent || "").slice(0, 200) },
+    active: { booleanValue: true },
+    lastSeenAt: { stringValue: now },
+    createdAt: { stringValue: now },
   };
 
   try {
@@ -276,7 +276,7 @@ async function handleUnsubscribe(request, env) {
   if (emailFromToken) {
     const isAllowed = await checkWhitelistOrAdmin(emailFromToken, idToken, env);
     if (!isAllowed) {
-      console.warn(`[hhandleUnsubscribe] Rejected non-whitelisted: ${emailFromToken}`);
+      console.warn(`[handleUnsubscribe] Rejected non-whitelisted: ${emailFromToken}`);
       return new Response("Forbidden: Not whitelisted", { status: 403, headers: corsH });
     }
   }
@@ -315,8 +315,8 @@ async function handleUnsubscribe(request, env) {
 async function handleGo(request, env) {
   const url = new URL(request.url);
   const session = url.searchParams.get("session");
-  const user    = url.searchParams.get("user");
-  const to      = url.searchParams.get("to");
+  const user = url.searchParams.get("user");
+  const to = url.searchParams.get("to");
 
   // Validate tham số
   if (!session || !to) {
@@ -350,12 +350,12 @@ async function handleGo(request, env) {
     const now = new Date().toISOString();
     // [C1 Fix] Encode thành phần path
     const docPath = `session_clicks/${encodeURIComponent(session)}/users/${encodeURIComponent(user)}`;
-    
+
     // fire-and-forget: không await, không chặn redirect
     firestoreGet(env, docPath).then((existing) => {
       if (existing) {
         return firestorePatch(env, docPath, {
-          clicked:   { booleanValue: true },
+          clicked: { booleanValue: true },
           clickedAt: { stringValue: now },
         }, true);
       } else {
@@ -394,7 +394,7 @@ async function reminderJob(env) {
   // Mở rộng hơn [+60s, +120s] cũ → bắt kịp kể cả khi cron delay 30s
   // reminderSent=true đảm bảo không gửi trùng
   const windowStart = toFirestoreIso(now - 30_000);   // now - 30 giây
-  const windowEnd   = toFirestoreIso(now + 150_000);  // now + 150 giây
+  const windowEnd = toFirestoreIso(now + 150_000);  // now + 150 giây
 
   console.log(`[reminderJob] Window: ${windowStart} → ${windowEnd}`);
 
@@ -447,11 +447,11 @@ async function reminderJob(env) {
     .filter((doc) => doc.fields?.active?.booleanValue === true)
     .map((doc) => ({
       endpoint: doc.fields.endpoint?.stringValue,
-      p256dh:   doc.fields.p256dh?.stringValue,
-      auth:     doc.fields.auth?.stringValue,
-      uid:      doc.fields.uid?.stringValue,
-      email:    doc.fields.email?.stringValue,
-      id:       doc.name.split("/").pop(),
+      p256dh: doc.fields.p256dh?.stringValue,
+      auth: doc.fields.auth?.stringValue,
+      uid: doc.fields.uid?.stringValue,
+      email: doc.fields.email?.stringValue,
+      id: doc.name.split("/").pop(),
     }))
     .filter((s) => s.endpoint && s.p256dh && s.auth);
 
@@ -462,10 +462,10 @@ async function reminderJob(env) {
 
   // 4. Xử lý từng session
   for (const session of pending) {
-    const sid      = session.id;
-    const fields   = session.fields;
-    const subject  = fields.subject?.stringValue || "Lịch học";
-    const title    = fields.title?.stringValue || "";
+    const sid = session.id;
+    const fields = session.fields;
+    const subject = fields.subject?.stringValue || "Lịch học";
+    const title = fields.title?.stringValue || "";
     const realLink = fields.realLink?.stringValue || "";
 
     // Mark reminderSent = true TRƯỚC KHI gửi (tránh 2 cron chồng nhau gửi trùng)
@@ -518,10 +518,10 @@ async function reminderJob(env) {
           + `&to=${encodeURIComponent(realLink)}`
         );
         const payload = JSON.stringify({
-          title:     `⏰ Sắp có lớp: ${subject}`,
-          body:      `${title ? title + " — " : ""}bắt đầu trong ~90 giây!`,
-          url:       goUrl,
-          tag:       `remind-${sid}-${burst}`,
+          title: `⏰ Sắp có lớp: ${subject}`,
+          body: `${title ? title + " — " : ""}bắt đầu trong ~90 giây!`,
+          url: goUrl,
+          tag: `remind-${sid}-${burst}`,
           sessionId: sid,
         });
 
@@ -531,12 +531,12 @@ async function reminderJob(env) {
 
           if (status === 404 || status === 410) {
             // Subscription hỏng → xoá (fire-and-forget)
-            firestoreDelete(env, `push_subscriptions/${sub.id}`).catch(() => {});
+            firestoreDelete(env, `push_subscriptions/${sub.id}`).catch(() => { });
           } else if (status === 201 || status === 200 || status === 204) {
             // Cập nhật remindedAt (fire-and-forget)
             firestorePatch(env, `session_clicks/${sid}/users/${sub.uid}`, {
               remindedAt: { stringValue: nowIso },
-            }, true).catch(() => {});
+            }, true).catch(() => { });
           }
         } catch (e) {
           console.error(`  [burst ${burst}] error for ${sub.uid}:`, e.message);
@@ -566,7 +566,7 @@ function sleep(ms) {
 async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
   // Parse subscriber keys
   const recipientPublic = b64ToBytes(p256dhB64); // 65 bytes, uncompressed P-256
-  const authSecret      = b64ToBytes(authB64);    // 16 bytes
+  const authSecret = b64ToBytes(authB64);    // 16 bytes
 
   // 1. Ephemeral P-256 key pair (Application Server = Sender)
   const ephemeralPair = await crypto.subtle.generateKey(
@@ -612,7 +612,7 @@ async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
     "raw", prkRaw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
   const ikmInput = new Uint8Array([...authInfo, 0x01]);
-  const ikm      = new Uint8Array(await crypto.subtle.sign("HMAC", ikmKey, ikmInput));
+  const ikm = new Uint8Array(await crypto.subtle.sign("HMAC", ikmKey, ikmInput));
 
   // 5. Random 16-byte salt for content encryption
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -643,7 +643,7 @@ async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
 
   // 6. AES-128-GCM encrypt
   //    paddedPlaintext = plaintext + 0x02 (last-record delimiter, no extra padding)
-  const plaintext      = new TextEncoder().encode(payloadStr);
+  const plaintext = new TextEncoder().encode(payloadStr);
   const paddedPlaintext = new Uint8Array([...plaintext, 0x02]);
 
   const cekKey = await crypto.subtle.importKey(
@@ -657,14 +657,14 @@ async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
   const ciphertext = new Uint8Array(ciphertextBuf); // plaintext + 1 (delimiter) + 16 (GCM tag)
 
   // 7. Build aes128gcm header: salt(16) | rs=4096(4) | idlen=65(1) | senderPublic(65)
-  const rs     = 4096;
+  const rs = 4096;
   const header = new Uint8Array(16 + 4 + 1 + 65);
   header.set(salt, 0);
   // rs as big-endian uint32
   header[16] = (rs >>> 24) & 0xff;
   header[17] = (rs >>> 16) & 0xff;
-  header[18] = (rs >>> 8)  & 0xff;
-  header[19] =  rs         & 0xff;
+  header[18] = (rs >>> 8) & 0xff;
+  header[19] = rs & 0xff;
   header[20] = 65; // idlen = length of sender public key
   header.set(senderPublicRaw, 21);
 
@@ -673,17 +673,17 @@ async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
   body.set(ciphertext, header.length);
 
   // 8. VAPID JWT (ES256)
-  const origin   = new URL(endpoint).origin;
+  const origin = new URL(endpoint).origin;
   const vapidJwt = await makeVapidJwt(origin, env);
 
   // 9. POST to push endpoint
   const resp = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "Authorization":    `vapid t=${vapidJwt},k=${env.VAPID_PUBLIC_KEY}`,
-      "Content-Type":     "application/octet-stream",
+      "Authorization": `vapid t=${vapidJwt},k=${env.VAPID_PUBLIC_KEY}`,
+      "Content-Type": "application/octet-stream",
       "Content-Encoding": "aes128gcm",
-      "TTL":              "3600",
+      "TTL": "3600",
     },
     body,
   });
@@ -698,7 +698,7 @@ async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
  */
 async function makeVapidJwt(audience, env) {
   const now = Math.floor(Date.now() / 1000);
-  const header  = { alg: "ES256", typ: "JWT" };
+  const header = { alg: "ES256", typ: "JWT" };
   const payload = {
     aud: audience,
     exp: now + 86400,
@@ -708,7 +708,7 @@ async function makeVapidJwt(audience, env) {
   const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
 
   // Tách x, y từ uncompressed public key (04 || x(32) || y(32))
-  const pubKeyBytes  = b64ToBytes(env.VAPID_PUBLIC_KEY); // 65 bytes
+  const pubKeyBytes = b64ToBytes(env.VAPID_PUBLIC_KEY); // 65 bytes
   const privKeyBytes = b64ToBytes(env.VAPID_PRIVATE_KEY); // 32 bytes
 
   // Import dưới dạng JWK
@@ -750,16 +750,16 @@ async function getGoogleAccessToken(env) {
   const { client_email, private_key } = sa;
 
   // Tạo JWT RS256
-  const header  = { alg: "RS256", typ: "JWT" };
+  const header = { alg: "RS256", typ: "JWT" };
   const jwtPayload = {
-    iss:   client_email,
+    iss: client_email,
     scope: "https://www.googleapis.com/auth/datastore",
-    aud:   "https://oauth2.googleapis.com/token",
-    iat:   now,
-    exp:   now + 3600,
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
   };
 
-  const headerB64  = b64url(JSON.stringify(header));
+  const headerB64 = b64url(JSON.stringify(header));
   const payloadB64 = b64url(JSON.stringify(jwtPayload));
   const signingInput = `${headerB64}.${payloadB64}`;
 
@@ -797,7 +797,7 @@ async function getGoogleAccessToken(env) {
   const { access_token, expires_in } = await tokenRes.json();
 
   _cachedToken = access_token;
-  _tokenExpiry  = now + (expires_in || 3600);
+  _tokenExpiry = now + (expires_in || 3600);
   return _cachedToken;
 }
 
@@ -986,11 +986,11 @@ async function verifyFirebaseJWT(token, projectId) {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("Malformed JWT");
 
-  const header  = JSON.parse(b64Decode(parts[0]));
+  const header = JSON.parse(b64Decode(parts[0]));
   const payload = JSON.parse(b64Decode(parts[1]));
 
   const now = Math.floor(Date.now() / 1000);
-  if (!payload.exp || payload.exp < now)       throw new Error("Token expired");
+  if (!payload.exp || payload.exp < now) throw new Error("Token expired");
   if (!payload.iat || payload.iat > now + 300) throw new Error("Token iat invalid");
 
   if (payload.iss !== `https://securetoken.google.com/${projectId}`)

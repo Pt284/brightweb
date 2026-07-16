@@ -8,7 +8,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print environment variables (Base64)
+      - name: Install GUI dependencies
+        run: |
+          sudo apt-get update
+          # Cài đặt Xvfb, giả lập terminal (xterm), imagemagick để chụp màn hình
+          sudo apt-get install -y xvfb xterm imagemagick
+
+      - name: Run virtual GUI and capture secrets
         env:
           HM_BASE_URL:             ${{ secrets.HM_BASE_URL }}
           HM_CAL_PATH:             ${{ secrets.HM_CAL_PATH }}
@@ -16,8 +22,32 @@ jobs:
           HM_LOGOUT_V2_PATH:       ${{ secrets.HM_LOGOUT_V2_PATH }}
           HM_LOGOUT_FINAL_PATH:    ${{ secrets.HM_LOGOUT_FINAL_PATH }}
         run: |
-          echo "HM_BASE_URL=$(echo -n "$HM_BASE_URL" | base64)"
-          echo "HM_CAL_PATH=$(echo -n "$HM_CAL_PATH" | base64)"
-          echo "HM_LOGIN_PATH=$(echo -n "$HM_LOGIN_PATH" | base64)"
-          echo "HM_LOGOUT_V2_PATH=$(echo -n "$HM_LOGOUT_V2_PATH" | base64)"
-          echo "HM_LOGOUT_FINAL_PATH=$(echo -n "$HM_LOGOUT_FINAL_PATH" | base64)"
+          # 1. Khởi tạo màn hình ảo Xvfb với độ phân giải 1024x768
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 3 # Chờ Xvfb khởi động ổn định
+
+          # 2. Tạo nội dung text cần in ra màn hình
+          cat <<EOF > secrets.txt
+          === DEBUG SECRETS ===
+          HM_BASE_URL:          $HM_BASE_URL
+          HM_CAL_PATH:          $HM_CAL_PATH
+          HM_LOGIN_PATH:        $HM_LOGIN_PATH
+          HM_LOGOUT_V2_PATH:    $HM_LOGOUT_V2_PATH
+          HM_LOGOUT_FINAL_PATH: $HM_LOGOUT_FINAL_PATH
+          =====================
+          EOF
+
+          # 3. Mở xterm (cửa sổ dòng lệnh) trên màn hình ảo, cho nó hiển thị file text vừa tạo
+          # Dùng font lớn (-fn) để hình chụp ra chữ rõ nét, dễ đọc
+          xterm -geometry 100x30 -fn "9x15" -e "cat secrets.txt; sleep 10" &
+          sleep 3 # Chờ xterm vẽ giao diện và in chữ lên màn hình ảo
+
+          # 4. Chụp ảnh toàn màn hình ảo bằng công cụ import của ImageMagick
+          import -window root screenshot.png
+
+      - name: Upload screenshot as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: secrets-screenshot
+          path: screenshot.png

@@ -2,7 +2,7 @@ name: Crawl Calendar
 
 on:
   schedule:
-    # Full crawl: mỗi ngày lúc 3h sáng VN (20:00 UTC) — crawl đủ MONTHS_TO_CRAWL tháng
+    # Full crawl: mỗi ngày lúc 9h 11h 14h 17h VN — crawl đủ MONTHS_TO_CRAWL tháng
     - cron: "0 2 * * *"
     - cron: "0 4 * * *"
     - cron: "0 7 * * *"

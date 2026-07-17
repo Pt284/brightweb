@@ -141,11 +141,27 @@
     body.edit-mode .course-card {
       cursor: grab;
     }
-    
-    .tree-node.dragging { opacity: 0.5; }
-    .tree-node.drag-over-tree { border-top: 2px dashed var(--color-accent); margin-top:-2px; }
-    .tree-node.is-cut > .tree-label { opacity: 0.35; border: 1px dashed var(--color-accent) !important; padding: 4px; border-radius: 6px; }
-    .tree-node.is-hidden > .tree-label { opacity: 0.45; filter: grayscale(80%); }
+
+    .tree-node.dragging {
+      opacity: 0.5;
+    }
+
+    .tree-node.drag-over-tree {
+      border-top: 2px dashed var(--color-accent);
+      margin-top: -2px;
+    }
+
+    .tree-node.is-cut>.tree-label {
+      opacity: 0.35;
+      border: 1px dashed var(--color-accent) !important;
+      padding: 4px;
+      border-radius: 6px;
+    }
+
+    .tree-node.is-hidden>.tree-label {
+      opacity: 0.45;
+      filter: grayscale(80%);
+    }
 
     .course-card.is-hidden-course {
       opacity: .4;
@@ -192,7 +208,8 @@
       <button id="btn-admin" class="btn-icon" title="Admin" style="display:none">⚙️</button>
       <button id="btn-undo" class="btn-icon" title="Hoàn tác (Ctrl+Z)" style="display:none">↩</button>
       <button id="btn-redo" class="btn-icon" title="Làm lại" style="display:none">↪</button>
-      <button id="btn-reset-courses" class="btn-icon" title="Reset tất cả khóa học (Home)" style="display:none; color: var(--color-red);">🔄</button>
+      <button id="btn-reset-courses" class="btn-icon" title="Reset tất cả khóa học (Home)"
+        style="display:none; color: var(--color-red);">🔄</button>
       <button id="btn-edit" class="btn-icon" title="Chỉnh sửa" style="display:none">✏️</button>
       <button class="btn-icon" id="btn-calendar" title="Lịch học">📅</button>
       <button class="btn btn-outline btn-sm" id="btn-signout">Đăng xuất</button>
@@ -212,8 +229,7 @@
       <button class="btn btn-outline btn-sm" id="btn-flatten-all">
         ⚡ Làm phẳng toàn bộ
       </button>
-      <button class="btn btn-outline btn-sm" id="btn-unflatten"
-        style="display:none">
+      <button class="btn btn-outline btn-sm" id="btn-unflatten" style="display:none">
         ↩ Hoàn tác làm phẳng
       </button>
     </div>
@@ -237,7 +253,8 @@
       <input id="go-live-m3u8" class="admin-input" placeholder="Dán link m3u8..." style="width:100%" />
       <div style="display:flex;gap:6px">
         <button id="btn-go-live" class="btn btn-primary btn-sm">▶ Go Live</button>
-        <button id="btn-stop-live" class="btn btn-sm" style="border-color:var(--color-red);color:var(--color-red)">■ Stop</button>
+        <button id="btn-stop-live" class="btn btn-sm" style="border-color:var(--color-red);color:var(--color-red)">■
+          Stop</button>
       </div>
       <div id="go-live-status" style="font-size:.75rem;color:var(--color-text-muted)"></div>
     </div>

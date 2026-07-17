@@ -70,15 +70,22 @@ const SUBJECT_COURSE_ORDER = {
 // Phase 1 fix: prefix tiền tố chapter id gốc theo môn học.
 // id của chương không thay đổi khi reparent → dùng làm "chìa khóa ổn định"
 // để tìm đúng bài TSA live dù chương đã bị chuyển sang khóa manual-...
+// FIX (round 3): bỏ hậu tố `-thay-tung` / `-v` lỗi thời — crawler đã đổi format ID.
+// THÊM: 3 entry "Thực chiến *" — events có subject="Thực chiến Toán/Khoa học/Đọc hiểu"
+// tương ứng với các lesson trong chương "PHÒNG THỰC CHIẾN THÁNG 7-2026".
+// (xác minh trên data2.json + events.js thật: 12+12+4=28 events Thực chiến tồn tại)
 const TSA_CHAPTER_PREFIX = {
-  "Toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
-  "Tư duy toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc-thay-tung",
-  "Sinh học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Vật lí": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Hóa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Khoa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc-v",
-  "Đọc hiểu": "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
-  "Ngữ văn": "05-tong-on-tsa-phan-tu-duy-oc-hieu-v",
+  "Toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc",
+  "Tư duy toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc",
+  "Thực chiến Toán": "03-tong-on-tsa-phan-tu-duy-toan-hoc",
+  "Sinh học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc",
+  "Vật lí": "04-tong-on-tsa-phan-tu-duy-khoa-hoc",
+  "Hóa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc",
+  "Khoa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc",
+  "Thực chiến Khoa học": "04-tong-on-tsa-phan-tu-duy-khoa-hoc",
+  "Đọc hiểu": "05-tong-on-tsa-phan-tu-duy-oc-hieu",
+  "Ngữ văn": "05-tong-on-tsa-phan-tu-duy-oc-hieu",
+  "Thực chiến Đọc hiểu": "05-tong-on-tsa-phan-tu-duy-oc-hieu",
 };
 // Phase 3: caption watchdog interval handle
 let _captionWatchdogInterval = null;
@@ -2682,7 +2689,9 @@ function renderCalDay(dayNum, dateStr, events, todayStr, isOther) {
     const m3u8Attr = ev.m3u8 ? ` data-m3u8="${escapeHtml(ev.m3u8)}"` : '';
     const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
     const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
-    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="color:${color}" title="${escapeHtml(ev.subject)} — ${escapeHtml(ev.title)}" data-date="${dateStr}" data-subject="${escapeHtml(ev.subject)}" data-title="${escapeHtml(ev.title)}"${m3u8Attr}${liveStartAttr}${statusAttr}>
+    // FIX: truyền `time` vào data-* để click handler và resolver khớp được event
+    const timeAttr = ev.time ? ` data-time="${escapeHtml(ev.time)}"` : '';
+    return `<div class="cal-event ${isPast ? 'is-past' : ''}" style="color:${color}" title="${escapeHtml(ev.subject)} — ${escapeHtml(ev.title)}" data-date="${dateStr}" data-subject="${escapeHtml(ev.subject)}" data-title="${escapeHtml(ev.title)}"${timeAttr}${m3u8Attr}${liveStartAttr}${statusAttr}>
       <div class="cal-event-dot" style="background:${color}"></div>
       <div class="cal-event-time">${escapeHtml(ev.time || '')}</div>
       <div class="cal-event-subject">${escapeHtml(ev.subject || '')}</div>
@@ -2729,7 +2738,9 @@ function renderCalendarListView(events) {
       const m3u8Attr = ev.m3u8 ? ` data-m3u8="${escapeHtml(ev.m3u8)}"` : '';
       const liveStartAttr = ev.liveStartEpoch ? ` data-livestart="${ev.liveStartEpoch}"` : '';
       const statusAttr = ev.status ? ` data-status="${ev.status}"` : '';
-      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${escapeHtml(ev.subject)}" data-title="${escapeHtml(ev.title)}"${m3u8Attr}${liveStartAttr}${statusAttr} style="cursor:pointer">
+      // FIX: truyền `time` vào data-* để click handler và resolver khớp được event
+      const timeAttr = ev.time ? ` data-time="${escapeHtml(ev.time)}"` : '';
+      html += `<div class="cal-list-event cal-event" data-date="${dateStr}" data-subject="${escapeHtml(ev.subject)}" data-title="${escapeHtml(ev.title)}"${timeAttr}${m3u8Attr}${liveStartAttr}${statusAttr} style="cursor:pointer">
         <div class="cal-list-dot" style="background:${color}"></div>
         <div class="cal-list-info">
           <div class="cal-list-subject">${escapeHtml(ev.subject || '')}</div>
@@ -2800,6 +2811,8 @@ function attachCalendarEventListeners() {
       date: ev.dataset.date,
       subject: ev.dataset.subject,
       title: ev.dataset.title,
+      // FIX: đọc lại `time` từ data-time (được render bởi renderCalDay / renderCalendarListView)
+      time: ev.dataset.time || null,
       status: ev.dataset.status || null,
       m3u8: ev.dataset.m3u8 || null,
       liveStartEpoch: ev.dataset.livestart ? parseInt(ev.dataset.livestart) : null
@@ -2829,7 +2842,12 @@ function showCalendarEventPopup(calEvent) {
 
   const isEnded = calEvent.status === 'past' || calEvent.date < getTodayStr();
   const resolved = resolveLiveCalendarEvent(calEvent, _calEvents || []);
-  const lessonTitle = resolved ? resolved.lesson.title : null;
+  // FIX (round 3): resolved có thể là { course, lesson } | { course, lesson: null } | null.
+  // - lesson tồn tại → hiện lesson title (title đã match với event title sau normalize)
+  // - lesson null (event Thực chiến 04-12, lesson chưa tạo) → hiện event title gốc
+  // - resolved null (subject không thuộc TSA) → hiện event title gốc
+  // Trước đây dùng `resolved.lesson.title` trực tiếp → crash TypeError khi lesson=null.
+  const lessonTitle = (resolved && resolved.lesson) ? resolved.lesson.title : (calEvent.title || null);
 
   const statusEl = document.getElementById('cal-popup-status');
   if (statusEl) statusEl.textContent = isEnded ? 'Buổi học đã kết thúc' : 'Buổi học sắp tới';
@@ -2883,27 +2901,82 @@ function jaccardSim(a, b) {
 }
 
 // ── Phase 1: Sequence-based lesson resolver ──
-// Trích số tháng từ tên chương ("Tháng 6", "Tháng 10", ...)
+// Trích số tháng từ tên chương ("Tháng 6", "Tháng 10", "PHÒNG THỰC CHIẾN THÁNG 7", ...)
+// FIX (round 3): thêm flag /i để match cả title viết hoa toàn bộ như "PHÒNG THỰC CHIẾN THÁNG 7-2026"
+// FIX (round 6): thêm .normalize('NFC') đầu vào — phòng khi hocmai đổi công cụ export
+// sang NFD (macOS text editor, một số CMS). Nếu NFD lọt vào, regex sẽ âm thầm fail
+// (verify bằng code: NFD 'Tháng 6' → bytes khác, regex/[Tt]h[áa]ng/ không match).
 function extractMonthNum(title) {
-  const m = title.match(/[Tt]h[áa]ng\s*0*(\d{1,2})/);
+  const m = String(title).normalize('NFC').match(/[Tt]h[áa]ng\s*0*(\d{1,2})/i);
   return m ? parseInt(m[1]) : 999;
 }
 
 // Lấy danh sách bài học (kể cả ẩn) từ các chương "Tháng N" thuộc prefix,
 // sắp xếp theo thứ tự tháng — stable dù chương đã bị reparent
+//
+// FIX (round 4): gắn `_chapterMonth` vào mỗi lesson object (non-enumerable để không
+// bị serialize ra JSON khi save). Cần cho resolveLiveCalendarEvent() disambiguate
+// khi nhiều lesson trùng title (verify trên data2.json: 1 cặp trùng trong Toán:
+// "Các bài toán thực tế sử dụng ứng dụng tích phân" ở cả Tháng 10 và Tháng 11).
+//
+// FIX (round 6): thêm .normalize('NFC') cho title trước khi test regex, và guard
+// (c.tree || []) để chống crash nếu 1 course bị thiếu field tree (vd do restore backup
+// hỏng) — verify bằng code: .flatMap(c => c.tree) crash TypeError nếu có course lỗi,
+// làm hỏng toàn bộ resolver cho mọi môn TSA.
 function getLiveLessonSequence(prefix) {
   const chapters = appData.courses
-    .flatMap(c => c.tree)
+    .flatMap(c => (c.tree || []))
     .filter(n =>
       n.id && n.id.startsWith(prefix) &&
-      /[Tt]h[áa]ng\s*0*\d{1,2}/.test(n.title)
+      /[Tt]h[áa]ng\s*0*\d{1,2}/i.test(String(n.title).normalize('NFC'))
     );
   chapters.sort((a, b) => extractMonthNum(a.title) - extractMonthNum(b.title));
-  return chapters.flatMap(getAllLessonsIncHidden);
+  // Flatten và gắn `_chapterMonth` vào mỗi lesson để resolver disambiguate sau này
+  const out = [];
+  for (const ch of chapters) {
+    const chMonth = extractMonthNum(ch.title);
+    for (const l of getAllLessonsIncHidden(ch)) {
+      // Dùng Object.defineProperty để _chapterMonth không enumerable (không serialize)
+      Object.defineProperty(l, '_chapterMonth', { value: chMonth, enumerable: false, configurable: true });
+      out.push(l);
+    }
+  }
+  return out;
 }
 
-// Resolve event lịch → { course, lesson } bằng cách đếm vị trí trong sequence
-// Trả về null nếu subject không thuộc TSA hoặc vượt quá số bài đã soạn
+// FIX (round 3): normalize title để match event title với lesson title.
+// Sự khác biệt thực tế trên dữ liệu thật (events.js vs data2.json):
+//   - Event title thường có dấu ".." ở cuối: "...đặc biệt.."
+//   - Event dùng "/" nhưng lesson dùng "-": "một/nhiều" vs "một-nhiều"
+//   - Event dùng ":" nhưng lesson dùng " - " (space 2 bên): "Electron:" vs "Electron -"
+//   - Event dùng "–" (en-dash U+2013) lesson cũng dùng "–" → giữ nguyên
+// FIX (round 6): thêm .normalize('NFC') đầu vào — nếu event là NFC nhưng lesson là
+// NFD (hoặc ngược lại), === sẽ fail dù 2 chuỗi nhìn giống hệt nhau (verify bằng code).
+// Strategy: đưa mọi dấu phân cách (-, /, :) về dạng " - " (space-dash-space), collapse spaces.
+function normalizeLessonTitle(s) {
+  if (!s) return '';
+  let t = String(s).normalize('NFC').trim();
+  // Strip trailing dots (có thể nhiều dấu chấm)
+  while (t.endsWith('.')) t = t.slice(0, -1).trim();
+  // Thay / và : → " - " (sau đó mọi - đều được normalize bên dưới)
+  t = t.replace(/\//g, ' - ').replace(/:/g, ' - ');
+  // Normalize mọi dấu "-" (hyphen U+002D) → " - " (đảm bảo space 2 bên)
+  // En-dash "–" (U+2013) và em-dash "—" (U+2014) giữ nguyên vì cả 2 bên đều dùng.
+  t = t.replace(/\s*-\s*/g, ' - ');
+  // Collapse multiple spaces
+  t = t.replace(/\s+/g, ' ').trim();
+  return t.toLowerCase();
+}
+
+// Resolve event lịch → { course, lesson } bằng cách MATCH TITLE với lesson trong sequence.
+// FIX (round 3): bỏ positional mapping (đã verify 0% đúng trên events.js thật vì
+// events bắt đầu từ tháng 7 nhưng lesson sequence bắt đầu từ tháng 6 → lệch toàn bộ).
+// FIX (round 4): disambiguate khi nhiều lesson trùng title (sau normalize) — chọn
+// lesson có _chapterMonth gần nhất với tháng của calEvent.date. Verify trên data2.json:
+// Toán có 1 cặp trùng "Các bài toán thực tế sử dụng ứng dụng tích phân" ở Tháng 10 và
+// Tháng 11; events.js có 2 event cùng title (2026-10-13 và 2026-11-06). Trước fix:
+// cả 2 event đều map vào lesson Tháng 10 (sai cho event 11/06). Sau fix: map đúng.
+// Trả về { course, lesson } | { course, lesson: null } | null.
 function resolveLiveCalendarEvent(calEvent, allEvents) {
   const prefix = TSA_CHAPTER_PREFIX[calEvent.subject];
   if (!prefix) return null;
@@ -2911,48 +2984,80 @@ function resolveLiveCalendarEvent(calEvent, allEvents) {
   const sequence = getLiveLessonSequence(prefix);
   if (!sequence.length) return null;
 
-  // Lấy tất cả events cùng nhóm môn (cùng prefix), sắp xếp theo ngày+giờ
-  const pool = (allEvents && allEvents.length ? allEvents : (_calEvents || []));
-  const sameSubject = pool
-    .filter(e => TSA_CHAPTER_PREFIX[e.subject] === prefix)
-    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+  // Match bằng normalized title — có thể có nhiều candidates nếu trùng tên
+  const evNorm = normalizeLessonTitle(calEvent.title);
+  const candidates = sequence.filter(l => normalizeLessonTitle(l.title) === evNorm);
 
-  const idx = sameSubject.findIndex(e =>
-    e.date === calEvent.date &&
-    e.time === calEvent.time &&
-    e.title === calEvent.title
+  let lesson = null;
+  if (candidates.length === 1) {
+    lesson = candidates[0];
+  } else if (candidates.length > 1) {
+    // Disambiguate: ưu tiên lesson có _chapterMonth gần nhất với tháng của event
+    if (calEvent.date) {
+      const evMonth = parseInt(calEvent.date.split('-')[1], 10);
+      if (!isNaN(evMonth)) {
+        lesson = candidates.reduce((best, l) =>
+          Math.abs((l._chapterMonth || 999) - evMonth) < Math.abs((best._chapterMonth || 999) - evMonth) ? l : best
+        );
+      }
+    }
+    // Fallback: nếu event không có date (dữ liệu cũ), lấy candidate đầu tiên
+    if (!lesson) lesson = candidates[0];
+  }
+
+  // Tìm khóa học chứa lesson (hoặc chứa prefix chapter nếu lesson=null)
+  // FIX (round 6): guard (c.tree || []) cho mọi truy cập c.tree
+  if (lesson) {
+    const course = appData.courses.find(c =>
+      (c.tree || []).some(ch => getAllLessonsIncHidden(ch).some(l => l.id === lesson.id))
+    );
+    return course ? { course, lesson } : null;
+  }
+
+  // Lesson không tìm thấy (vd: event Thực chiến số 04-12 nhưng tree chỉ có 01-03).
+  // Trả về course chứa prefix chapter để user ít nhất vào đúng khóa, không bị đá về home.
+  const fallbackCourse = appData.courses.find(c =>
+    (c.tree || []).some(ch => ch.id && ch.id.startsWith(prefix))
   );
-
-  if (idx < 0 || idx >= sequence.length) return null;
-
-  const lesson = sequence[idx];
-  // Tìm khóa học chứa lesson này (có thể là manual-... sau khi reparent)
-  const course = appData.courses.find(c =>
-    c.tree.some(ch => getAllLessonsIncHidden(ch).some(l => l.id === lesson.id))
-  );
-  return course ? { course, lesson } : null;
+  return fallbackCourse ? { course: fallbackCourse, lesson: null } : null;
 }
 
 function navigateToMappedLesson(calEvent, allEvents) {
-  // Ưu tiên: dùng sequence đếm theo vị trí cho bài TSA live
-  // Hoạt động đúng dù chương "Tháng N" đã bị reparent sang khóa manual-...
+  // Ưu tiên: TSA resolver — match bằng title với lesson trong sequence
   if (TSA_CHAPTER_PREFIX[calEvent.subject]) {
     const resolved = resolveLiveCalendarEvent(calEvent, allEvents || _calEvents || []);
     if (resolved) {
-      navigate('lesson', resolved.course.id, resolved.lesson.id);
+      if (resolved.lesson) {
+        navigate('lesson', resolved.course.id, resolved.lesson.id);
+      } else {
+        // FIX (round 3): event có subject TSA nhưng lesson chưa tồn tại trong tree
+        // (vd: Thực chiến số 04-12) → mở trang khóa học thay vì đá về home.
+        navigate('course', resolved.course.id);
+      }
       return;
     }
-    // Không resolve được (vượt quá số bài đã soạn) → về home
-    navigate('home');
-    return;
+    // resolved === null (subject TSA nhưng sequence rỗng — vd HocMai xóa/đổi tên
+    // hết chapter "Tháng N") → fall-through, nhưng ưu tiên tìm course theo prefix ID
+    // (ổn định hơn order) trước khi dùng Jaccard.
   }
 
-  // Fallback Jaccard cho các môn khác không thuộc TSA live
-  const order = SUBJECT_COURSE_ORDER[calEvent.subject];
-  if (order === undefined) { navigate('home'); return; }
-  const course = appData.courses.find(c => c.order === order);
+  // FIX (round 5): Tìm course ưu tiên theo prefix ID (ổn định khi hocmai tái cấu trúc),
+  // fallback sang SUBJECT_COURSE_ORDER cho môn không thuộc TSA.
+  // Bug cũ: SUBJECT_COURSE_ORDER['Toán']=3 trỏ vào khóa [✨FLEX] đã bị cắt hết "Tháng N"
+  // sang khóa manual [🔴LIVE] (order=99) → user bị đá vào khóa sai (verify trên data2.json).
+  // FIX (round 6): guard (c.tree || []) cho mọi truy cập c.tree.
+  const prefix = TSA_CHAPTER_PREFIX[calEvent.subject];
+  let course = prefix
+    ? appData.courses.find(c => (c.tree || []).some(ch => ch.id && ch.id.startsWith(prefix)))
+    : null;
+  if (!course) {
+    const order = SUBJECT_COURSE_ORDER[calEvent.subject];
+    if (order !== undefined) course = appData.courses.find(c => c.order === order);
+  }
   if (!course) { navigate('home'); return; }
-  const lessons = course.tree.flatMap(getAllLessons);
+
+  // Fallback Jaccard cho các môn khác không thuộc TSA live
+  const lessons = (course.tree || []).flatMap(getAllLessons);
   const calTokens = normalizeTitle(calEvent.title);
   let bestLesson = null, bestScore = 0;
   for (const l of lessons) {

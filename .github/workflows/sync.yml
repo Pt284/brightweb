@@ -3,7 +3,7 @@ name: Sync Drive → data.json
 on:
   # Tự động mỗi 6 tiếng
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 */1 * * *"
 
   # Chạy tay từ GitHub UI
   workflow_dispatch:

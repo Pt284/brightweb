@@ -1,7 +1,7 @@
 name: Sync Drive → data.json
 
 on:
-  # Tự động mỗi 6 tiếng
+  # Tự động mỗi 1 tiếng
   schedule:
     - cron: "0 */1 * * *"
 

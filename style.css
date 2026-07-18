@@ -1651,6 +1651,11 @@ body.no-glass .plyr__menu__container {
   animation: flash-today 0.5s ease-in-out 3 !important;
 }
 
+/* Mặc định ẩn nút mở sidebar (chỉ hiện trên mobile/portrait, xem block bên dưới) */
+#btn-sidebar-toggle {
+  display: none;
+}
+
 /* ============================================================
    MOBILE / PORTRAIT ORIENTATION UI
    Phát hiện dọc/ngang bằng orientation: portrait.

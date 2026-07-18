@@ -197,6 +197,7 @@
   <div id="loading">Đang tải...</div>
 
   <div id="header" class="glass" style="display:none">
+    <button id="btn-sidebar-toggle" class="btn-icon" style="display:none" aria-label="Mở menu">&gt;&gt;</button>
     <span class="logo" id="btn-home-logo">🏠 GO TO HOME 😈</span>
     <div class="header-right">
       <span id="user-info"></span>
@@ -217,6 +218,8 @@
   </div>
 
   <div id="admin-panel" class="glass">
+    <button id="btn-admin-close" class="btn-icon" style="position:absolute;top:12px;right:12px;display:none;"
+      aria-label="Đóng">✕</button>
     <h4>⚙️ Admin Panel</h4>
     <p id="admin-last-updated">lastUpdated: —</p>
     <button class="btn btn-primary btn-sm" id="btn-trigger-sync">🔄 Sync ngay</button>
@@ -331,6 +334,9 @@
     </div>
   </div>
 
+  <!-- Mobile sidebar drawer backdrop (chỉ dùng ở orientation:portrait) -->
+  <div id="sidebar-backdrop"></div>
+
   <!-- Phase 2: Edit modal -->
   <div id="edit-overlay" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45)">
   </div>
@@ -384,6 +390,7 @@
   <script src="app.js"></script>
   <script src="color-settings.js"></script>
   <script src="push.js"></script>
+  <script src="responsive.js"></script>
 
 </body>
 

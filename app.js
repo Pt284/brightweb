@@ -49,6 +49,8 @@ let _calEvents = null;
 let _calEventsLoadedAt = 0;
 let _calViewDate = new Date();
 let _calViewMode = 'month';
+window.setCalViewMode = (m) => { _calViewMode = m; };
+window.resetCalViewDate = () => { _calViewDate = new Date(); };
 let _calLiveBannerTimer = null;
 const CAL_CACHE_TTL = 3 * 60 * 1000; // 3 phút
 
@@ -140,6 +142,9 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const p = $('page-' + name);
   if (p) p.classList.add('active');
+  // Mobile: chỉ trang course/lesson mới có nút mở sidebar (>>) trên header
+  document.body.classList.toggle('has-sidebar-page', name === 'course' || name === 'lesson');
+  if (!(name === 'course' || name === 'lesson')) document.body.classList.remove('sidebar-open');
   if (name === 'landing' && !window._pjsLoaded) {
     window._pjsLoaded = true;
     particlesJS('particles-js', PARTICLES_CONFIG);
@@ -2824,9 +2829,13 @@ function handleCalendarEventClick(ev) {
   if (ev.m3u8) {
     // CDN chặn embed → mở tab mới. User gesture từ click → không bị popup blocker.
     if (!openLiveInNewTab(ev)) {
-      // Fallback: nếu URL không hợp lệ, vẫn cho xem info qua popup
-      showCalendarEventPopup(ev);
+      // Fallback: nếu URL không hợp lệ, vẫn cho xem info qua popup (trừ dạng danh sách)
+      if (_calViewMode === 'list') navigateToMappedLesson(ev);
+      else showCalendarEventPopup(ev);
     }
+  } else if (_calViewMode === 'list') {
+    // Dạng danh sách: đi thẳng vào bài học, không cần popup xác nhận (cả desktop lẫn mobile)
+    navigateToMappedLesson(ev);
   } else {
     showCalendarEventPopup(ev);
   }

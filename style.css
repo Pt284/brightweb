@@ -1650,3 +1650,166 @@ body.no-glass .plyr__menu__container {
 .flash-today {
   animation: flash-today 0.5s ease-in-out 3 !important;
 }
+
+/* ============================================================
+   MOBILE / PORTRAIT ORIENTATION UI
+   Phát hiện dọc/ngang bằng orientation: portrait.
+   Khi xoay ngang (kể cả trên điện thoại) → tự quay lại giao diện
+   desktop nguyên bản vì các rule dưới đây không áp dụng.
+   ============================================================ */
+@media (orientation: portrait) {
+
+  /* ── Header ── */
+  #header {
+    justify-content: flex-start;
+    gap: 4px;
+  }
+
+  #btn-sidebar-toggle {
+    display: none;
+    /* JS chỉ hiện khi đang ở trang có sidebar (course/lesson) */
+    order: -1;
+    font-family: monospace;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  body.has-sidebar-page #btn-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #header .logo {
+    order: 2;
+    margin-left: auto;
+    font-size: 0;
+    /* ẩn text "GO TO HOME 😈", chỉ giữ icon 🏠 */
+    flex-shrink: 0;
+  }
+
+  #header .logo::before {
+    content: "🏠";
+    font-size: 1.3rem;
+  }
+
+  #header .header-right {
+    order: 3;
+    gap: 6px;
+  }
+
+  #header .header-right #user-info {
+    display: none;
+    /* tên người dùng chiếm chỗ trên màn hẹp — ẩn, vẫn giữ icon → nút đăng xuất */
+  }
+
+  /* ── Sidebar drawer (course & lesson) ── */
+  body.has-sidebar-page #sidebar-backdrop {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 150;
+  }
+
+  body.has-sidebar-page.sidebar-open #sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #page-course.active,
+  #page-lesson.active {
+    position: relative;
+    display: block;
+  }
+
+  #page-course .sidebar,
+  #page-lesson .sidebar {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    width: 80vw;
+    min-width: 0;
+    max-width: 360px;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 160;
+    box-shadow: var(--shadow-glass);
+  }
+
+  /* Sidebar hẹp (điện thoại, <640px): ép nội dung tree-label xuống dòng thay vì tràn ra ngoài */
+  #page-course .sidebar .tree-label>span,
+  #page-lesson .sidebar .tree-label>span {
+    min-width: 0;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Màn rộng ≥640px dù đang portrait (tablet/laptop cảm ứng dọc):
+     sidebar hiện đúng kích cỡ + số dòng như desktop, không bị cắt xuống dòng */
+  @media (min-width: 640px) {
+
+    #page-course .sidebar,
+    #page-lesson .sidebar {
+      width: var(--sidebar-w);
+      max-width: var(--sidebar-w);
+    }
+
+    #page-course .sidebar .tree-label>span,
+    #page-lesson .sidebar .tree-label>span {
+      min-width: auto;
+      white-space: normal;
+      word-break: normal;
+    }
+  }
+
+  body.sidebar-open #page-course .sidebar,
+  body.sidebar-open #page-lesson .sidebar {
+    transform: translateX(0);
+  }
+
+  .course-main,
+  .lesson-main {
+    padding: 16px;
+    max-width: 100%;
+  }
+
+  /* Video full chiều ngang màn hình, giống YouTube mobile */
+  .lesson-main .video-wrap {
+    margin: -16px -16px 18px;
+    width: calc(100% + 32px);
+    border-radius: 0;
+  }
+
+  /* ── Admin panel (⚙️) fullscreen ── */
+  #admin-panel.open {
+    position: fixed;
+    top: 52px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    border-radius: 0;
+    overflow-y: auto;
+    z-index: 250;
+  }
+
+  #btn-admin-close {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Calendar: list view mặc định trên mobile, cuộn + nhấp nháy hôm nay ── */
+  #page-calendar {
+    padding: 12px;
+  }
+}

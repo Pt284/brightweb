@@ -133,8 +133,18 @@ def create_test_session(minutes_from_now: float = 1.5):
     # Script này đọc TOÀN BỘ subscriber thật và tạo document khiến cron Worker
     # gửi push thật cho cả nhóm. Chặn hoàn toàn trừ khi:
     #   (a) đang chạy với Firestore Emulator  → FIRESTORE_EMULATOR_HOST được set, HOẶC
-    #   (b) người dùng chủ động xác nhận      → ALLOW_PROD_TEST=1 được set
-    if not os.environ.get("FIRESTORE_EMULATOR_HOST") and not os.environ.get("ALLOW_PROD_TEST"):
+    #   (b) người dùng chủ động xác nhận      → ALLOW_PROD_PUSH=yes (hoặc ALLOW_PROD_TEST,
+    #       giữ lại để tương thích ngược) được set
+    # [Phase 0 fix] Trước đây guard này CHỈ nhận ALLOW_PROD_TEST, khác tên với
+    # guard ở đầu main() (ALLOW_PROD_PUSH) — user làm đúng theo hướng dẫn lỗi
+    # của main() thì lọt qua send_test_push_direct() (đã gửi push thật!) rồi
+    # mới bị chặn ở ĐÂY bởi 1 biến môi trường khác họ chưa từng biết tới.
+    _prod_ok = (
+        os.environ.get("FIRESTORE_EMULATOR_HOST")
+        or os.environ.get("ALLOW_PROD_PUSH") == "yes"
+        or os.environ.get("ALLOW_PROD_TEST")
+    )
+    if not _prod_ok:
         print("❌ DỪNG: Script này sẽ gửi push THẬT cho TOÀN BỘ subscriber production!")
         print("   Cron Worker đang chạy mỗi phút và sẽ TỰ ĐỘNG tìm thấy document giả này.")
         print()
@@ -142,7 +152,7 @@ def create_test_session(minutes_from_now: float = 1.5):
         print("     $env:FIRESTORE_EMULATOR_HOST='localhost:8080'")
         print()
         print("   Nếu CHẮC CHẮN muốn chạy trên production (hiểu rõ hậu quả):")
-        print("     $env:ALLOW_PROD_TEST='1'")
+        print("     $env:ALLOW_PROD_PUSH='yes'")
         sys.exit(1)
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -254,6 +264,15 @@ def verify_date_format_fix():
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 def main():
+    # [Phase 0] Landmine guard: script này gửi push THẬT + ghi Firestore THẬT
+    # (send_test_push_direct, create_test_session). Bắt buộc set env rõ ràng
+    # để tránh ai chạy nhầm lúc đang debug và spam cả group.
+    if os.environ.get("ALLOW_PROD_PUSH") != "yes":
+        sys.exit(
+            "❌ test_push blocked in prod — script này gửi push THẬT tới mọi subscriber.\n"
+            "   Nếu chắc chắn muốn chạy: set ALLOW_PROD_PUSH=yes rồi chạy lại."
+        )
+
     missing = [k for k in ["GOOGLE_CREDENTIALS_JSON", "FIRESTORE_PROJECT_ID",
                             "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]
                if not os.environ.get(k)]

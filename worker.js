@@ -173,6 +173,20 @@ async function handleSubscribe(request, env) {
 
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsH });
 
+  // [Phase 6] Rate limit theo IP — tái dùng checkRateLimit()/RATE_LIMIT_KV đã
+  // có sẵn cho handleSyncDispatch. Đặt TRƯỚC verifyFirebaseJWT (tốn 1 fetch
+  // JWKS) để chặn sớm, giảm chi phí nếu bị spam. Guard bằng `if (env.RATE_LIMIT_KV)`
+  // giống hệt handleSyncDispatch (line ~119) — nếu binding chưa/bị mất, không
+  // được để toàn bộ /push/subscribe crash 500 vì thiếu guard này.
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  if (env.RATE_LIMIT_KV) {
+    const rateOk = await checkRateLimit(env.RATE_LIMIT_KV, `subscribe:${clientIp}`, 60, 5);
+    if (!rateOk) {
+      console.warn(`[handleSubscribe] Rate limited: ${clientIp}`);
+      return new Response("Too Many Requests", { status: 429, headers: corsH });
+    }
+  }
+
   // Verify Firebase ID token
   const authHeader = request.headers.get("Authorization") || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
@@ -400,12 +414,250 @@ function toFirestoreIso(ms) {
 // click link (pendingUids), nên hễ ai nhận được mốc muộn tức là vẫn chưa
 // vào lớp dù đã bị nhắc các mốc trước đó.
 const REMINDER_CHECKPOINTS = [
-  { key: "reminded_15m", offsetSec: 900, tolSec: 35, bursts: 1, emoji: "🔔", label: "15 phút nữa" },
-  { key: "reminded_10m", offsetSec: 600, tolSec: 35, bursts: 1, emoji: "🔔", label: "10 phút nữa" },
-  { key: "reminded_5m", offsetSec: 300, tolSec: 35, bursts: 1, emoji: "⏰", label: "5 phút nữa" },
-  { key: "reminded_150s", offsetSec: 150, tolSec: 35, bursts: 2, emoji: "⚠️", label: "2 phút 30 giây nữa" },
-  { key: "reminded_60s", offsetSec: 60, tolSec: 35, bursts: 3, emoji: "🚨", label: "1 phút nữa" },
+  { key: "reminded_15m", offsetSec: 900, tolSec: 35, bursts: 1, emoji: "🔔", label: "15 phút nữa", ttl: 3600 },
+  { key: "reminded_10m", offsetSec: 600, tolSec: 35, bursts: 1, emoji: "🔔", label: "10 phút nữa", ttl: 3600 },
+  { key: "reminded_5m", offsetSec: 300, tolSec: 35, bursts: 1, emoji: "⏰", label: "5 phút nữa", ttl: 1800 },
+  { key: "reminded_150s", offsetSec: 150, tolSec: 35, bursts: 2, emoji: "⚠️", label: "2 phút 30 giây nữa", ttl: 600 },
+  { key: "reminded_60s", offsetSec: 60, tolSec: 35, bursts: 3, emoji: "🚨", label: "1 phút nữa", ttl: 300 },
 ];
+
+// ════════════════════════════════════════════════════════════════════════════
+// [Phase 2/3] Helpers dùng chung giữa watchModeJob (tự tạo "Link mới" —
+// handleNewM3u8) và reminderJob (fallback khi chưa có session_clicks —
+// tryFallbackFromSchedule). Lấp khoảng trống kiến trúc: trước đây CHỈ
+// GitHub Action (tools/send_push.py) mới tạo doc `session_clicks/{sid}`,
+// nên nếu Action lỗi hoặc không kịp chạy đúng lúc thì reminderJob luôn
+// "Found 0 session(s)" — đúng như log Cloudflare ngày 16/7/2026.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Timestamp hiện tại, format khớp Firestore/Python (suffix +00:00, không ms) */
+function nowFsIso() {
+  return toFirestoreIso(Date.now());
+}
+
+/** Base URL của PWA (GitHub Pages) — dùng khi CHƯA có link m3u8 thật để mở */
+function appUrl(env) {
+  return `https://${env.GITHUB_OWNER}.github.io/${env.GITHUB_REPO}`;
+}
+
+/**
+ * sessionId dự phòng — đường chính luôn dùng `ev.sessionId` do
+ * crawl_calendar.py ghi sẵn (session_id() = sha1(date|time|title)[:16]).
+ * Hàm này chỉ chạy khi event thiếu sẵn field đó (data cũ/bất thường) —
+ * PHẢI khớp hash Python 100% nếu được dùng tới.
+ */
+async function computeSid(ev) {
+  const raw = `${ev.date}|${ev.time}|${ev.title}`;
+  const hex = await sha1Hex(raw);
+  return hex.slice(0, 16);
+}
+
+/**
+ * startAt dự phòng — đường chính luôn dùng `ev.startAt` do
+ * crawl_calendar.py ghi sẵn (compute_start_at(): VN local → UTC ISO,
+ * suffix "+00:00" khớp toFirestoreIso()). Chỉ chạy khi thiếu field đó.
+ */
+function computeStartAtFromVN(dateStr, timeStr) {
+  const [Y, M, D] = (dateStr || "").split("-").map(Number);
+  const [h, m] = (timeStr || "").split(":").map(Number);
+  if ([Y, M, D, h, m].some((n) => Number.isNaN(n))) return null;
+  const vnEpochMs = Date.UTC(Y, M - 1, D, h, m, 0) - 7 * 3600 * 1000;
+  return toFirestoreIso(vnEpochMs);
+}
+
+/**
+ * Danh sách subscription đang active — schema PHẲNG (endpoint/p256dh/auth/
+ * uid/email/active), khớp field do handleSubscribe() ghi. KHÔNG có field
+ * lồng `keys.p256dh/auth` — chỉ tồn tại ở bên Python (firestore_rest.py),
+ * không phải ở Worker. Tách từ logic vốn nằm inline trong reminderJob để
+ * dùng lại ở handleNewM3u8()/tryFallbackFromSchedule() — hành vi giữ
+ * nguyên 100% so với bản gốc.
+ */
+async function listActiveSubscriptions(env) {
+  const allSubDocs = await firestoreListCollection(env, "push_subscriptions");
+  return allSubDocs
+    .filter((doc) => doc.fields?.active?.booleanValue === true)
+    .map((doc) => ({
+      endpoint: doc.fields.endpoint?.stringValue,
+      p256dh: doc.fields.p256dh?.stringValue,
+      auth: doc.fields.auth?.stringValue,
+      uid: doc.fields.uid?.stringValue,
+      email: doc.fields.email?.stringValue,
+      id: doc.name.split("/").pop(),
+    }))
+    .filter((s) => s.endpoint && s.p256dh && s.auth);
+}
+
+/**
+ * [Phase 2 — CHỦ CHỐT] Khi watchModeJob phát hiện m3u8 mới/đổi cho 1 event,
+ * TỰ tạo doc `session_clicks/{sid}` (để reminderJob thấy được ngay, không
+ * cần chờ GitHub Action) + TỰ gửi push "Link mới". `tools/send_push.py`
+ * vẫn chạy như cũ sau đó và tự skip vì thấy doc đã tồn tại với cùng
+ * realLink (logic skip đã có sẵn ở send_push.py — không cần đổi Python).
+ */
+async function handleNewM3u8(env, ev, m3u8) {
+  const sid = ev.sessionId || (await computeSid(ev));
+  const startAt = ev.startAt || computeStartAtFromVN(ev.date, ev.time);
+  if (!startAt || !sid) {
+    console.log(`[handleNewM3u8] skip: invalid startAt/sid for ${ev.title}`);
+    return;
+  }
+
+  const existing = await firestoreGet(env, `session_clicks/${sid}`).catch(() => null);
+  const oldLink = existing?.fields?.realLink?.stringValue || null;
+  if (oldLink === m3u8) return; // đã ghi đúng link này rồi → không làm gì thêm
+  // isFirstRealLink cũng đúng cho doc do tryFallbackFromSchedule() tạo trước
+  // (realLink=null lúc đó) — dù doc đã tồn tại, đây vẫn là link thật ĐẦU
+  // TIÊN nên phải dùng tiêu đề "ĐÃ CÓ LINK HỌC", không phải "LINK ĐỔI".
+  const isFirstRealLink = !oldLink;
+
+  const subs = await listActiveSubscriptions(env);
+
+  // Tạo/patch doc TRƯỚC khi gửi push — đảm bảo reminderJob thấy được ngay
+  // cả khi bước gửi push bên dưới lỗi giữa chừng.
+  try {
+    await firestorePatch(env, `session_clicks/${sid}`, {
+      sessionId: { stringValue: sid },
+      subject: { stringValue: ev.subject || "" },
+      title: { stringValue: ev.title || "" },
+      date: { stringValue: ev.date },
+      time: { stringValue: ev.time },
+      startAt: { stringValue: startAt },
+      realLink: { stringValue: m3u8 },
+      reminderSent: { booleanValue: false }, // field cũ, tools/send_push.py vẫn ghi — giữ khớp schema
+      notifiedBy: { stringValue: "worker-watchmode" },
+      createdAt: { stringValue: existing?.fields?.createdAt?.stringValue || nowFsIso() },
+      updatedAt: { stringValue: nowFsIso() },
+    }, true);
+  } catch (e) {
+    console.error(`[handleNewM3u8] ${sid}: patch doc failed:`, e.message);
+    return;
+  }
+
+  if (subs.length === 0) {
+    console.log(`[handleNewM3u8] ${sid}: doc ${existing ? "updated" : "created"}, 0 subscribers to push`);
+    return;
+  }
+
+  // users/{uid} subdocs — reset clicked=false để reminderJob biết ai còn
+  // "pending" cho link mới/đổi. CHỈ patch field `clicked` (updateMask 1
+  // field) — KHÔNG kèm clickedAt/remindedAt/createdAt nữa: nếu đây là link
+  // ĐỔI (không phải session mới), user đã có subdoc từ trước sẽ bị mất lịch
+  // sử audit oan nếu ghi đè cả 4 field mỗi lần đổi link. Với user thực sự
+  // mới, thiếu 3 field kia không sao vì reminderJob/send_push.py không đọc
+  // chúng để quyết định gì (chỉ đọc `clicked`).
+  for (const sub of subs) {
+    await firestorePatch(env, `session_clicks/${sid}/users/${sub.uid}`, {
+      clicked: { booleanValue: false },
+    }, true).catch((e) => console.log(`[handleNewM3u8] ${sid}: init user doc fail uid=${sub.uid}: ${e.message}`));
+  }
+
+  const pushTitle = isFirstRealLink ? "🗣🔥🔥🔥 ĐÃ CÓ LINK HỌC 😈" : "📡 LINK BỊ THAY ĐỔI ĐỘT NGỘT";
+  let success = 0;
+  // Tuần tự (KHÔNG Promise.all): encrypt Web Push (RFC 8291) tốn CPU, Free
+  // plan chỉ có 10ms CPU/invocation — gửi song song dễ spike vượt quota.
+  for (const sub of subs) {
+    const goUrl = `${WORKER_SELF}/go?session=${encodeURIComponent(sid)}&user=${encodeURIComponent(sub.uid)}&to=${encodeURIComponent(m3u8)}`;
+    const payload = JSON.stringify({
+      title: pushTitle,
+      body: `${ev.subject || ""} — ${ev.title}`.trim(),
+      url: goUrl,
+      tag: `link-${sid}`, // dedup: tag cố định → trình duyệt tự thay notification cũ bằng mới
+      sessionId: sid,
+    });
+    try {
+      const status = await sendWebPush(sub.endpoint, sub.p256dh, sub.auth, payload, env, 86400);
+      if (status >= 200 && status < 300) success++;
+      else if (status === 404 || status === 410) {
+        await firestoreDelete(env, `push_subscriptions/${sub.id}`).catch(() => { });
+      }
+    } catch (e) {
+      console.log(`[handleNewM3u8] push fail uid=${sub.uid}: ${e.message}`);
+    }
+  }
+  console.log(`[handleNewM3u8] ${sid}: ${isFirstRealLink ? "new" : "changed"} link, pushed ${success}/${subs.length}`);
+}
+
+/**
+ * [Phase 3] Lưới an toàn cuối cùng: khi reminderJob query `session_clicks`
+ * ra 0 kết quả, đọc thẳng `app_data/schedule` — nếu có event rơi vào
+ * window mà CHƯA có doc session_clicks thì tạo tạm (realLink=null) để vẫn
+ * nhắc được. Không phụ thuộc watchModeJob/GitHub Action đã lấy được m3u8
+ * hay chưa; khi sau đó lấy được, handleNewM3u8() sẽ tự update lại doc này
+ * (không tạo trùng, vì đã tồn tại → nhánh isChanged xử lý).
+ */
+async function tryFallbackFromSchedule(env, windowStart, windowEnd) {
+  const doc = await firestoreGet(env, "app_data/schedule").catch(() => null);
+  if (!doc?.fields?.json?.stringValue) return [];
+  let schedule;
+  try { schedule = JSON.parse(doc.fields.json.stringValue); }
+  catch { return []; }
+
+  // [Low #7] Lọc sớm theo ngày VN trước khi tính startAt/computeSid cho từng
+  // event — lịch có thể chứa hàng trăm event nhiều tháng, đa số chắc chắn
+  // ngoài window [now-90s, now+16min]. Lấy CẢ hôm nay lẫn ngày mai VN để
+  // không bỏ sót event 00:0x VN khi now đang ~23:5x VN hôm trước.
+  const todayStr = toVnParts(Date.now()).date;
+  const tomorrowStr = toVnParts(Date.now() + 24 * 3600 * 1000).date;
+  const nearEvents = (schedule.events || []).filter(
+    (ev) => ev.date === todayStr || ev.date === tomorrowStr
+  );
+
+  // [Low #6] Hoist ra ngoài loop — trước đây gọi lại mỗi lần tạo 1 fallback
+  // doc mới; nếu 2 event cùng rơi vào window 1 tick sẽ đọc push_subscriptions
+  // 2 lần không cần thiết.
+  const subs = await listActiveSubscriptions(env);
+
+  const created = [];
+  for (const ev of nearEvents) {
+    const startAt = ev.startAt || computeStartAtFromVN(ev.date, ev.time);
+    if (!startAt || startAt < windowStart || startAt > windowEnd) continue;
+
+    const sid = ev.sessionId || (await computeSid(ev));
+    const existing = await firestoreGet(env, `session_clicks/${sid}`).catch(() => null);
+    if (existing) continue; // đã có doc (watchModeJob hoặc GitHub Action tạo trước) → bỏ qua
+
+    try {
+      await firestorePatch(env, `session_clicks/${sid}`, {
+        sessionId: { stringValue: sid },
+        subject: { stringValue: ev.subject || "" },
+        title: { stringValue: ev.title || "" },
+        date: { stringValue: ev.date },
+        time: { stringValue: ev.time },
+        startAt: { stringValue: startAt },
+        realLink: { nullValue: null }, // chưa có link thật — reminderJob sẽ mở app thay vì m3u8
+        reminderSent: { booleanValue: false },
+        notifiedBy: { stringValue: "reminder-fallback" },
+        createdAt: { stringValue: nowFsIso() },
+        updatedAt: { stringValue: nowFsIso() },
+      }, true);
+    } catch (e) {
+      console.error(`[reminderJob] fallback create ${sid} failed:`, e.message);
+      continue;
+    }
+
+    for (const sub of subs) {
+      await firestorePatch(env, `session_clicks/${sid}/users/${sub.uid}`, {
+        clicked: { booleanValue: false },
+        clickedAt: { nullValue: null },
+        remindedAt: { nullValue: null },
+        createdAt: { stringValue: nowFsIso() },
+      }, true).catch(() => { });
+    }
+
+    created.push({
+      name: `session_clicks/${sid}`,
+      id: sid,
+      fields: {
+        startAt: { stringValue: startAt },
+        subject: { stringValue: ev.subject || "" },
+        title: { stringValue: ev.title || "" },
+        realLink: { nullValue: null },
+      },
+    });
+  }
+  return created;
+}
 
 async function reminderJob(env) {
   const now = Date.now();
@@ -439,6 +691,22 @@ async function reminderJob(env) {
   }
 
   console.log(`[reminderJob] Found ${sessions.length} session(s) in window`);
+
+  // [Phase 3] Lưới an toàn: nếu chưa có doc session_clicks nào (vd. watchMode
+  // chưa kịp lấy m3u8, hoặc GitHub Action lỗi/không chạy đúng lúc), tạo tạm
+  // từ app_data/schedule để vẫn nhắc được (xem tryFallbackFromSchedule()).
+  // Dùng luôn trong tick này (không đợi tick sau) — mốc 60s/150s có dung sai
+  // chỉ ±35s nên chờ thêm 1 phút có thể lỡ hẳn mốc gần giờ học nhất.
+  if (sessions.length === 0) {
+    const fallback = await tryFallbackFromSchedule(env, windowStart, windowEnd).catch((e) => {
+      console.error("[reminderJob] fallback error:", e.message);
+      return [];
+    });
+    if (fallback.length > 0) {
+      console.log(`[reminderJob] fallback created ${fallback.length} session_clicks doc(s)`);
+      sessions = fallback;
+    }
+  }
   if (sessions.length === 0) return;
 
   // Với mỗi session, tìm checkpoint (nếu có) đang khớp giờ hiện tại và CHƯA gửi
@@ -465,25 +733,13 @@ async function reminderJob(env) {
   }
 
   // Lấy toàn bộ subscription active — dùng chung cho mọi checkpoint due lần này
-  let allSubDocs;
+  let activeSubs;
   try {
-    allSubDocs = await firestoreListCollection(env, "push_subscriptions");
+    activeSubs = await listActiveSubscriptions(env);
   } catch (e) {
     console.error("[reminderJob] list subs error:", e.message);
     return;
   }
-
-  const activeSubs = allSubDocs
-    .filter((doc) => doc.fields?.active?.booleanValue === true)
-    .map((doc) => ({
-      endpoint: doc.fields.endpoint?.stringValue,
-      p256dh: doc.fields.p256dh?.stringValue,
-      auth: doc.fields.auth?.stringValue,
-      uid: doc.fields.uid?.stringValue,
-      email: doc.fields.email?.stringValue,
-      id: doc.name.split("/").pop(),
-    }))
-    .filter((s) => s.endpoint && s.p256dh && s.auth);
 
   if (activeSubs.length === 0) {
     console.log("[reminderJob] No active subscriptions");
@@ -495,7 +751,11 @@ async function reminderJob(env) {
     const fields = session.fields;
     const subject = fields.subject?.stringValue || "Lịch học";
     const title = fields.title?.stringValue || "";
-    const realLink = fields.realLink?.stringValue || "";
+    // [Phase 3] realLink có thể null (doc tạo bởi tryFallbackFromSchedule khi
+    // chưa lấy được m3u8) — /go chỉ allowlist domain hocmai/CDN nên KHÔNG
+    // dùng /go cho trường hợp này, mở thẳng app (giống send_daily_digest()
+    // bên Python vốn cũng không đi qua go_url khi không có link cụ thể).
+    const realLink = fields.realLink?.stringValue || null;
 
     // Đánh dấu checkpoint đã xử lý TRƯỚC KHI gửi (tránh double-fire nếu 2 lần cron chồng nhau)
     try {
@@ -535,12 +795,9 @@ async function reminderJob(env) {
     for (let burst = 1; burst <= checkpoint.bursts; burst++) {
       const nowIso = new Date().toISOString();
       for (const sub of subsToNotify) {
-        const goUrl = (
-          `${WORKER_SELF}/go`
-          + `?session=${sid}`
-          + `&user=${sub.uid}`
-          + `&to=${encodeURIComponent(realLink)}`
-        );
+        const goUrl = realLink
+          ? `${WORKER_SELF}/go?session=${encodeURIComponent(sid)}&user=${encodeURIComponent(sub.uid)}&to=${encodeURIComponent(realLink)}`
+          : `${appUrl(env)}/#calendar`;
         const payload = JSON.stringify({
           title: `${checkpoint.emoji} Sắp học: ${subject}`,
           body: `${title ? title + " — " : ""}bắt đầu trong ${checkpoint.label}!`,
@@ -550,7 +807,7 @@ async function reminderJob(env) {
         });
 
         try {
-          const status = await sendWebPush(sub.endpoint, sub.p256dh, sub.auth, payload, env);
+          const status = await sendWebPush(sub.endpoint, sub.p256dh, sub.auth, payload, env, checkpoint.ttl);
           console.log(`  [${checkpoint.key} burst ${burst}] ${sub.email || sub.uid}: HTTP ${status}`);
 
           if (status === 404 || status === 410) {
@@ -587,7 +844,7 @@ function sleep(ms) {
  * Gửi 1 Web Push tới 1 subscription.
  * @returns {number} HTTP status code (201=success, 404/410=expired, v.v.)
  */
-async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
+async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env, ttl = 3600) {
   // Parse subscriber keys
   const recipientPublic = b64ToBytes(p256dhB64); // 65 bytes, uncompressed P-256
   const authSecret = b64ToBytes(authB64);    // 16 bytes
@@ -707,7 +964,7 @@ async function sendWebPush(endpoint, p256dhB64, authB64, payloadStr, env) {
       "Authorization": `vapid t=${vapidJwt},k=${env.VAPID_PUBLIC_KEY}`,
       "Content-Type": "application/octet-stream",
       "Content-Encoding": "aes128gcm",
-      "TTL": "3600",
+      "TTL": String(ttl),
     },
     body,
   });
@@ -1162,6 +1419,17 @@ function cookieHeader(cookies) {
 }
 
 /**
+ * [Phase 1] Redact secret-looking substrings (token/password/session/cookie/jwt)
+ * trước khi log response body lỗi — tránh leak secret vào Cloudflare log.
+ */
+function redactBody(body) {
+  return String(body).replace(/(token|password|session|cookie|jwt)[^,&}"]*/gi, "$1=***");
+}
+
+/** [Phase 1] Timeout cho mỗi fetch lophoc — Free plan wall-time 30s, chừa time cho các bước sau */
+const LOPHOC_FETCH_TIMEOUT_MS = 8000;
+
+/**
  * Login lophoc bằng password — POST /api/auth/verify-user.
  * KHÔNG có Set-Cookie — sessionToken (UUID) nằm trong JSON body, ta tự
  * dựng cookie jar từ đó (khớp lophoc_api.py::_set_post_login_cookies).
@@ -1178,8 +1446,13 @@ async function lophocLogin(env) {
       "User-Agent": LOPHOC_UA,
     },
     body: JSON.stringify({ user: env.HM_USERNAME, password: env.HM_PASSWORD }),
+    signal: AbortSignal.timeout(LOPHOC_FETCH_TIMEOUT_MS),
   });
-  if (!r.ok) throw new Error(`lophoc login HTTP ${r.status}`);
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.log(`[lophocLogin] ${r.status} body=${redactBody(txt).slice(0, 300)}`);
+    throw new Error(`lophoc login HTTP ${r.status}`);
+  }
   const data = await r.json();
   if (!data.success) throw new Error(`lophoc login failed: ${JSON.stringify(data).slice(0, 200)}`);
 
@@ -1212,8 +1485,19 @@ async function lophocRoomToken(env, cookies, code, learnNumber) {
       "Cookie": cookieHeader(cookies),
     },
     body: JSON.stringify({ user: username, code, learn_number: learnNumber }),
+    signal: AbortSignal.timeout(LOPHOC_FETCH_TIMEOUT_MS),
   });
-  if (!r.ok) throw new Error(`room-token HTTP ${r.status}`);
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.log(`[lophocRoomToken] ${r.status} body=${redactBody(txt).slice(0, 300)}`);
+    // [Phase 1 fix] Trước đây lỗi này KHÔNG gắn cờ authError → ensureM3u8()
+    // không bao giờ retry khi chính room-token (chứ không phải livestreamlink)
+    // trả 401/403 — đây là nguyên nhân của log "room-token HTTP 403" ngày 16/7
+    // không được retry. Gắn cờ giống lophocGetM3u8() để dùng chung 1 cơ chế retry.
+    const e = new Error(`room-token HTTP ${r.status}`);
+    if (r.status === 401 || r.status === 403) e.authError = true;
+    throw e;
+  }
   const data = await r.json();
   if (!data.success) throw new Error(`room-token failed: ${JSON.stringify(data).slice(0, 200)}`);
 
@@ -1243,8 +1527,13 @@ async function lophocGetCalendar(env, cookies) {
       "Cookie": cookieHeader(cookies),
     },
     body: JSON.stringify({ user: env.HM_USERNAME }),
+    signal: AbortSignal.timeout(LOPHOC_FETCH_TIMEOUT_MS),
   });
-  if (!r.ok) throw new Error(`lophoc calendar HTTP ${r.status}`);
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.log(`[lophocGetCalendar] ${r.status} body=${redactBody(txt).slice(0, 300)}`);
+    throw new Error(`lophoc calendar HTTP ${r.status}`);
+  }
   const data = await r.json();
   if (!data.success) return [];
   return data.calendar || [];
@@ -1268,13 +1557,20 @@ async function lophocGetM3u8(env, cookies, code, learnNumber) {
       "Cookie": cookieHeader(cookies),
     },
     body: JSON.stringify({ code, learn_number: learnNumber }),
+    signal: AbortSignal.timeout(LOPHOC_FETCH_TIMEOUT_MS),
   });
   if (r.status === 401 || r.status === 403) {
+    const txt = await r.text().catch(() => "");
+    console.log(`[lophocGetM3u8] ${r.status} body=${redactBody(txt).slice(0, 300)}`);
     const e = new Error(`livestreamlink HTTP ${r.status}`);
     e.authError = true;
     throw e;
   }
-  if (!r.ok) throw new Error(`livestreamlink HTTP ${r.status}`);
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    console.log(`[lophocGetM3u8] ${r.status} body=${redactBody(txt).slice(0, 300)}`);
+    throw new Error(`livestreamlink HTTP ${r.status}`);
+  }
   const data = await r.json();
   if (!data.status) return null;
   return data.data?.[0]?.streamkey || null;
@@ -1307,11 +1603,11 @@ async function checkCdnLive(m3u8Url) {
  * LophocClient.get_m3u8() trong lophoc_api.py.
  */
 async function ensureM3u8(env, session, code, learnNumber) {
-  if (session.currentCode !== code) {
-    session.cookies = await lophocRoomToken(env, session.cookies, code, learnNumber);
-    session.currentCode = code;
-  }
   try {
+    if (session.currentCode !== code) {
+      session.cookies = await lophocRoomToken(env, session.cookies, code, learnNumber);
+      session.currentCode = code;
+    }
     return await lophocGetM3u8(env, session.cookies, code, learnNumber);
   } catch (e) {
     if (!e.authError || session.retried) throw e;
@@ -1414,6 +1710,11 @@ async function watchModeJob(env) {
             if (!mainEv.liveStartEpoch) mainEv.liveStartEpoch = nowMs;
             changed = true;
             console.log(`[watchMode] set live: ${ev.subject} — ${ev.title}`);
+            // [Phase 2] Tự tạo session_clicks/{sid} + gửi "Link mới" — không
+            // còn phụ thuộc GitHub Action send_push.py phải chạy đúng lúc.
+            await handleNewM3u8(env, mainEv, m3u8).catch((e) =>
+              console.error(`[watchMode] handleNewM3u8 fail for ${mainEv.title}:`, e.message)
+            );
             break;
           }
         }

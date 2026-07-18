@@ -401,7 +401,24 @@ class LophocClient:
             # Luôn refresh room-token cho đúng code/learn_number
             current_code = self.session.cookies.get("_class_room_code")
             if current_code != code:
-                self._refresh_room_token(code, learn_number)
+                try:
+                    self._refresh_room_token(code, learn_number)
+                except requests.HTTPError as e:
+                    # [Phase 1 fix] Trước đây lỗi 401/403 NGAY TẠI room-token (chứ không
+                    # phải livestreamlink bên dưới) không được retry — đây khớp với log
+                    # Worker "room-token HTTP 403" ngày 16/7 không tự phục hồi được.
+                    if not self._retried_auth and e.response is not None and e.response.status_code in (401, 403):
+                        logger.warning(f"room-token {e.response.status_code} — re-login và thử lại 1 lần")
+                        self._retried_auth = True
+                        self._do_password_login()
+                        self._refresh_room_token(code, learn_number)
+                        # [Low #4 fix] Reset ngay sau khi retry THÀNH CÔNG — client này
+                        # được _run_watch_mode() dùng lại cho NHIỀU event trong 1 lần
+                        # chạy script; không reset thì event thứ 2 trở đi gặp 401/403
+                        # riêng của nó sẽ không được retry nữa (flag đã True vĩnh viễn).
+                        self._retried_auth = False
+                    else:
+                        raise
         try:
             return get_m3u8_url(self.session, code, learn_number)
         except requests.HTTPError as e:
@@ -410,7 +427,9 @@ class LophocClient:
                 self._retried_auth = True
                 self._do_password_login()
                 self._refresh_room_token(code, learn_number)
-                return get_m3u8_url(self.session, code, learn_number)
+                result = get_m3u8_url(self.session, code, learn_number)
+                self._retried_auth = False  # [Low #4 fix] xem giải thích ở nhánh room-token trên
+                return result
             raise
 
     def _extract_jwt_claim(self, jwt: str, claim: str) -> Optional[str]:

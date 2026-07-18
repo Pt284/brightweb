@@ -2,11 +2,18 @@ name = "brightweb-sync"
 main = "worker.js"
 compatibility_date = "2024-09-01"
 
+# QUAN TRỌNG: Cron trigger đang được cấu hình qua Cloudflare Dashboard,
+# KHÔNG qua `wrangler deploy`. File này CHỈ để tài liệu hoá cho khớp —
+# `wrangler deploy` sẽ GHI ĐÈ cron trên Dashboard bằng đúng danh sách dưới
+# đây. Nếu định deploy qua wrangler, hãy đảm bảo Dashboard đã khớp trước
+# (đã verify khớp qua log Cloudflare ngày 16/7/2026: cron thực tế đang chạy
+# đúng là "* * * * *" và "*/2 0-16 * * *").
+#
 # Cron triggers:
-# - reminderJob mỗi phút (T-90s push reminder) — đã có từ trước
-# - watchModeJob mỗi 3 phút, 07:00-23:55 VN (00:00-16:55 UTC) — lấy m3u8 khi live
+# - reminderJob mỗi phút (T-90s push reminder)
+# - watchModeJob mỗi 2 phút, 00:00-16:58 UTC = 07:00-23:58 VN (lấy m3u8 khi live)
 [triggers]
 crons = [
   "* * * * *",        # reminderJob
-  "*/2 0-16 * * *",   # watchModeJob — 07:00-23:55 VN
+  "*/2 0-16 * * *",   # watchModeJob — 07:00-23:58 VN
 ]

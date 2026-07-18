@@ -49,7 +49,16 @@
 
     // Xoay ngang → dọn state để lần mở lại nhất quán
     window.addEventListener('resize', () => {
-        if (!isPortrait()) setSidebarOpen(false);
+        if (!isPortrait()) { setSidebarOpen(false); return; }
+        // Vừa xoay dọc (hoặc thu nhỏ cửa sổ) trong lúc đang xem lịch dạng lưới
+        // (vào từ desktop rồi xoay/resize, không qua nút 📅) → ép về list ngay,
+        // vì nút chuyển sang lưới đã bị ẩn trên mobile, tránh kẹt ở màn lưới vỡ.
+        const calActive = document.getElementById('page-calendar')?.classList.contains('active');
+        if (calActive && typeof window.getCalViewMode === 'function' && window.getCalViewMode() === 'month'
+            && typeof window.setCalViewMode === 'function' && typeof renderCalendar === 'function') {
+            window.setCalViewMode('list');
+            renderCalendar();
+        }
     });
 
     // ── Resize sidebar bằng chuột kéo (chỉ desktop, không áp dụng ở drawer mobile) ──

@@ -221,47 +221,53 @@
   </div>
 
   <div id="admin-panel" class="glass">
-    <button id="btn-admin-close" class="btn-icon" style="position:absolute;top:12px;right:12px;display:none;" aria-label="Đóng">✕</button>
-    <h4>⚙️ Admin Panel</h4>
-    <p id="admin-last-updated">lastUpdated: —</p>
-    <button class="btn btn-primary btn-sm" id="btn-trigger-sync">🔄 Sync ngay</button>
-    <button class="btn btn-outline btn-sm" id="btn-check-video">🔍 Check Video</button>
-    <button class="btn btn-outline btn-sm" id="btn-download-backup">⬇ Tải backup</button>
-    <button class="btn btn-outline btn-sm" id="btn-upload-backup">⬆ Tải lên backup</button>
-    <input type="file" id="backup-file-input" style="display:none" accept=".json">
-    <div style="margin-top:12px; border-top:1px solid var(--color-border); padding-top:12px;">
-      <div class="section-label">Cấu trúc khóa học</div>
-      <button class="btn btn-outline btn-sm" id="btn-flatten-all">
-        ⚡ Làm phẳng toàn bộ
-      </button>
-      <button class="btn btn-outline btn-sm" id="btn-unflatten" style="display:none">
-        ↩ Hoàn tác làm phẳng
-      </button>
-    </div>
-    <hr>
-    <div class="section-label">Whitelist</div>
-    <div class="admin-row">
-      <input id="whitelist-input" type="email" placeholder="email@gmail.com">
-      <button class="btn btn-primary btn-sm" id="btn-add-whitelist">Thêm</button>
-    </div>
-    <div id="whitelist-list"></div>
-    <hr>
-    <div class="section-label">Truy cập trái phép</div>
-    <div id="security-logs"></div>
-    <button class="btn-reload" id="btn-reload-admin">🔄 Tải lại</button>
-
-    <hr>
-    <div class="section-label">🔴 Go Live (Thủ công)</div>
-    <div class="admin-row" style="flex-direction:column; gap:8px; align-items:flex-start;">
-      <select id="go-live-date" class="admin-input" style="width:100%"></select>
-      <select id="go-live-lesson" class="admin-input" style="width:100%"></select>
-      <input id="go-live-m3u8" class="admin-input" placeholder="Dán link m3u8..." style="width:100%" />
-      <div style="display:flex;gap:6px">
-        <button id="btn-go-live" class="btn btn-primary btn-sm">▶ Go Live</button>
-        <button id="btn-stop-live" class="btn btn-danger btn-sm">■
-          Stop</button>
+    <button id="btn-admin-close" class="btn-icon" style="position:absolute;top:12px;right:12px;display:none;"
+      aria-label="Đóng">✕</button>
+    <!-- FIX: scrollbar không bo góc theo viền admin-panel → tách vùng cuộn ra
+         1 div con riêng; panel ngoài chỉ bo góc + overflow:hidden để cắt phần
+         scrollbar lòi ra, còn div con mới thật sự overflow-y:auto. -->
+    <div class="admin-panel-scroll">
+      <h4>⚙️ Admin Panel</h4>
+      <p id="admin-last-updated">lastUpdated: —</p>
+      <button class="btn btn-primary btn-sm" id="btn-trigger-sync">🔄 Sync ngay</button>
+      <button class="btn btn-outline btn-sm" id="btn-check-video">🔍 Check Video</button>
+      <button class="btn btn-outline btn-sm" id="btn-download-backup">⬇ Tải backup</button>
+      <button class="btn btn-outline btn-sm" id="btn-upload-backup">⬆ Tải lên backup</button>
+      <input type="file" id="backup-file-input" style="display:none" accept=".json">
+      <div style="margin-top:12px; border-top:1px solid var(--color-border); padding-top:12px;">
+        <div class="section-label">Cấu trúc khóa học</div>
+        <button class="btn btn-outline btn-sm" id="btn-flatten-all">
+          ⚡ Làm phẳng toàn bộ
+        </button>
+        <button class="btn btn-outline btn-sm" id="btn-unflatten" style="display:none">
+          ↩ Hoàn tác làm phẳng
+        </button>
       </div>
-      <div id="go-live-status" style="font-size:.75rem;color:var(--color-text-muted)"></div>
+      <hr>
+      <div class="section-label">Whitelist</div>
+      <div class="admin-row">
+        <input id="whitelist-input" type="email" placeholder="email@gmail.com">
+        <button class="btn btn-primary btn-sm" id="btn-add-whitelist">Thêm</button>
+      </div>
+      <div id="whitelist-list"></div>
+      <hr>
+      <div class="section-label">Truy cập trái phép</div>
+      <div id="security-logs"></div>
+      <button class="btn-reload" id="btn-reload-admin">🔄 Tải lại</button>
+
+      <hr>
+      <div class="section-label">🔴 Go Live (Thủ công)</div>
+      <div class="admin-row" style="flex-direction:column; gap:8px; align-items:flex-start;">
+        <select id="go-live-date" class="admin-input" style="width:100%"></select>
+        <select id="go-live-lesson" class="admin-input" style="width:100%"></select>
+        <input id="go-live-m3u8" class="admin-input" placeholder="Dán link m3u8..." style="width:100%" />
+        <div style="display:flex;gap:6px">
+          <button id="btn-go-live" class="btn btn-primary btn-sm">▶ Go Live</button>
+          <button id="btn-stop-live" class="btn btn-danger btn-sm">■
+            Stop</button>
+        </div>
+        <div id="go-live-status" style="font-size:.75rem;color:var(--color-text-muted)"></div>
+      </div>
     </div>
   </div>
 

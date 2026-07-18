@@ -50,6 +50,7 @@ let _calEventsLoadedAt = 0;
 let _calViewDate = new Date();
 let _calViewMode = 'month';
 window.setCalViewMode = (m) => { _calViewMode = m; };
+window.getCalViewMode = () => _calViewMode;
 let _calLiveBannerTimer = null;
 const CAL_CACHE_TTL = 3 * 60 * 1000; // 3 phút
 
@@ -259,19 +260,6 @@ auth.onAuthStateChanged(async user => {
     updateLiveBanner();
     if (_calLiveBannerTimer) clearInterval(_calLiveBannerTimer);
     _calLiveBannerTimer = setInterval(updateLiveBanner, 60 * 1000);
-
-    // Auto-open: KHÔNG tự mở tab mới (popup blocker chặn vì không phải user gesture).
-    // Chỉ show toast báo có live, user tự click banner.
-    loadCalendarData().then(events => {
-      const todayStr = getTodayStr();
-      const liveEvent = events.find(e => e.date === todayStr && e.m3u8 && e.status === 'live');
-      if (!liveEvent) return;
-      const sessionKey = `live_opened_${liveEvent.date}_${liveEvent.time}`;
-      if (sessionStorage.getItem(sessionKey)) return;
-      sessionStorage.setItem(sessionKey, '1');
-      // Toast ngắn — không chặn, tự ẩn sau 8 giây
-      showLiveToast(`🔴 ĐANG LIVE: ${liveEvent.subject} — ${liveEvent.title}. Bấm banner trên cùng để xem.`);
-    });
   } else {
     if (_calLiveBannerTimer) { clearInterval(_calLiveBannerTimer); _calLiveBannerTimer = null; }
     editMode = false;
@@ -1681,36 +1669,6 @@ function openLiveInNewTab(ev) {
 }
 
 // Toast báo live (không phụ thuộc push.js, dùng riêng cho auto-open)
-function showLiveToast(msg) {
-  let el = document.getElementById('live-toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'live-toast';
-    el.style.cssText = `
-      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-      background: rgba(220,38,38,.95); color: #fff;
-      padding: 12px 20px; border-radius: 10px;
-      font-size: 14px; font-weight: 600;
-      z-index: 9999; max-width: 90vw; text-align: center;
-      box-shadow: 0 4px 20px rgba(0,0,0,.4);
-      transition: opacity .3s; cursor: pointer;
-    `;
-    document.body.appendChild(el);
-    // Click toast cũng mở tab mới
-    el.onclick = () => {
-      const events = _calEvents || [];
-      const todayStr = getTodayStr();
-      const live = events.find(e => e.date === todayStr && e.m3u8 && e.status === 'live');
-      if (live) openLiveInNewTab(live);
-      el.style.opacity = '0';
-    };
-  }
-  el.textContent = msg;
-  el.style.opacity = '1';
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.style.opacity = '0'; }, 8000);
-}
-
 async function renderLesson(courseId, lessonId) {
   currentCourseId = courseId; currentLessonId = lessonId; showPage('lesson');
   const course = findCourse(courseId); if (!course) { navigate('home'); return; }
@@ -3300,17 +3258,25 @@ function scrollAndFlashCalendarToday() {
   }
   if (!target) return;
 
-  // Đợi 2 khung hình: khung 1 tính layout, khung 2 vẽ → chắc chắn phần tử đã
-  // hiển thị trước khi cuộn + bật animation (đặc biệt khi vừa chuyển trang).
+  function doFlash() {
+    try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+    // Khởi động lại animation: gỡ class, force reflow, thêm lại.
+    target.classList.remove(flashClass);
+    void target.offsetWidth;
+    target.classList.add(flashClass);
+    // Dọn sau khi animation chạy xong (0.5s × 3 = 1.5s) + dư 200ms.
+    setTimeout(() => target.classList.remove(flashClass), 1700);
+  }
+
+  // FIX: double-rAF vẫn không đủ khi vừa chuyển trang (display:none→block) VÀ vừa
+  // dựng lại toàn bộ #cal-content bằng innerHTML trong cùng lúc — một số trình
+  // duyệt vẫn chưa "chốt" xong layout/paint ở 2 khung hình đó (chỉ cuộn, không
+  // nhấp nháy ở lần bấm đầu tiên). Thêm 1 khoảng nghỉ macrotask (setTimeout) SAU
+  // 2 rAF để chắc chắn trình duyệt đã paint xong trạng thái hiển thị trước khi
+  // bật lại animation.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
-      // Khởi động lại animation: gỡ class, force reflow, thêm lại.
-      target.classList.remove(flashClass);
-      void target.offsetWidth;
-      target.classList.add(flashClass);
-      // Dọn sau khi animation chạy xong (0.5s × 3 = 1.5s) + dư 200ms.
-      setTimeout(() => target.classList.remove(flashClass), 1700);
+      setTimeout(doFlash, 30);
     });
   });
 }

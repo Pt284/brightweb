@@ -292,7 +292,6 @@ button {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 16px;
   min-width: 260px;
   box-shadow: var(--shadow);
   z-index: 200;
@@ -300,11 +299,20 @@ button {
   /* FIX: panel dài hơn viewport bị tràn xuống dưới, không cuộn được vì thiếu
      max-height + overflow-y. Trừ 60px (top) + 20px lề dưới cho thoáng. */
   max-height: calc(100vh - 80px);
-  overflow-y: auto;
+  /* FIX: scrollbar không bo góc theo border-radius, lòi ra rất xấu — chuyển
+     việc cuộn thật sự sang .admin-panel-scroll (div con), còn panel ngoài này
+     chỉ overflow:hidden để CẮT phần scrollbar/nội dung lòi ra khỏi góc bo. */
+  overflow: hidden;
 }
 
 #admin-panel.open {
   display: block;
+}
+
+.admin-panel-scroll {
+  padding: 16px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
 }
 
 #admin-panel h4 {
@@ -533,7 +541,7 @@ button {
 /* ── Sidebar ── */
 .sidebar {
   position: relative;
-  /* neo cho .sidebar-resize-handle */
+  /* neo cho .sidebar-resize-handle + ::before (glass highlight) */
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
   background: var(--color-surface-overlay);
@@ -544,6 +552,18 @@ button {
   padding: 12px 0;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+/* Đã kiểm tra: .sidebar.glass dùng đúng .glass (!important, giống hệt #admin-panel).
+   Vấn đề chỉ là bề mặt sidebar quá lớn/phẳng nên mắt thấy "kém kính" hơn panel nhỏ
+   như admin-panel dù cùng công thức blur — thêm 1 lớp ánh sáng chéo nhẹ để rõ chất
+   kính hơn trên bề mặt lớn. */
+.sidebar.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .10) 0%, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, .04) 100%);
 }
 
 /* Tay kéo resize sidebar (chỉ hoạt động ở giao diện desktop, ẩn khi portrait/mobile) */
@@ -1200,6 +1220,15 @@ body.no-glass .plyr__menu__container {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Ẩn thanh cuộn dọc (cả 2 dạng lưới/danh sách) nhưng vẫn cuộn được bằng
+     chuột/trackpad/vuốt như bình thường. */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+#cal-content::-webkit-scrollbar {
+  display: none;
+  /* Chrome/Safari/Edge */
 }
 
 .cal-week-header {
@@ -1215,6 +1244,11 @@ body.no-glass .plyr__menu__container {
   background: var(--color-cal-bg);
   backdrop-filter: blur(14px) saturate(160%) brightness(1.3);
   -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.3);
+  /* FIX: nền/blur riêng của header không bo góc theo .cal-grid-wrap (bo góc ở
+     ngoài) → tạo vệt hình chữ nhật mờ, vuông góc, đè lên góc trên bo tròn của
+     khung lịch. Bo trùng 2 góc trên cho khớp. */
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
 }
 
 .cal-week-header-cell {
@@ -1490,7 +1524,26 @@ body.no-glass .plyr__menu__container {
   max-width: 360px;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
+}
+
+/* Chữ trong banner luôn chạy marquee ngang (phải→trái, loop) thay vì cắt "..." —
+   áp dụng cả desktop lẫn mobile (mobile override kích thước nhỏ hơn riêng, xem
+   khối @media (orientation: portrait) bên dưới). */
+#live-banner-scroll {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: live-banner-marquee 9s linear infinite;
+}
+
+@keyframes live-banner-marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 #live-banner.live-active {
@@ -1829,31 +1882,13 @@ body.no-glass .plyr__menu__container {
     /* tên người dùng chiếm chỗ trên màn hẹp — ẩn, vẫn giữ icon → nút đăng xuất */
   }
 
-  /* Live banner: trên desktop rộng thoải mái nên hiện đầy đủ chữ (max-width 360px).
-     Trên mobile chật, nếu để nguyên sẽ đẩy hết các icon còn lại ra ngoài màn hình
-     → thu nhỏ lại + cho chữ chạy marquee ngang thay vì hiện tràn. */
+  /* Live banner: marquee đã áp dụng chung ở base rule (cả desktop lẫn mobile).
+     Trên mobile chật, nếu để nguyên max-width 360px sẽ đẩy hết các icon còn lại
+     ra ngoài màn hình → chỉ cần thu nhỏ max-width riêng cho mobile ở đây. */
   #live-banner {
     max-width: 108px;
     flex-shrink: 0;
-    overflow: hidden;
     padding: 4px 8px;
-  }
-
-  #live-banner-scroll {
-    display: inline-block;
-    white-space: nowrap;
-    padding-left: 100%;
-    animation: live-banner-marquee 9s linear infinite;
-  }
-
-  @keyframes live-banner-marquee {
-    0% {
-      transform: translateX(0);
-    }
-
-    100% {
-      transform: translateX(-100%);
-    }
   }
 
   /* ── Sidebar drawer (course & lesson) ── */
@@ -1880,6 +1915,17 @@ body.no-glass .plyr__menu__container {
        thay vì 1 khối chữ nhật phẳng dính sát mép trái màn hình */
     border-top-right-radius: var(--radius-lg);
     border-bottom-right-radius: var(--radius-lg);
+    /* FIX: scrollbar không bo góc theo border-radius, lòi ra xấu — chuyển việc
+       cuộn thật sự xuống #sidebar-tree/#sidebar-lesson-tree (div con có sẵn),
+       còn .sidebar ở đây chỉ overflow:hidden để cắt phần lòi ra. */
+    overflow: hidden;
+  }
+
+  #page-course #sidebar-tree,
+  #page-lesson #sidebar-lesson-tree {
+    max-height: calc(100vh - 52px - 50px);
+    /* trừ header + .sidebar-title */
+    overflow-y: auto;
   }
 
   /* Resize bằng chuột chỉ có trên desktop — ẩn tay kéo khi ở chế độ drawer mobile */
@@ -1946,6 +1992,14 @@ body.no-glass .plyr__menu__container {
     z-index: 250;
   }
 
+  /* Mobile fullscreen không bo góc nên không cần tách vùng cuộn riêng như
+     desktop — để .admin-panel-scroll cuộn theo panel ngoài luôn, tránh 2 lớp
+     cuộn lồng nhau. */
+  .admin-panel-scroll {
+    max-height: none;
+    overflow-y: visible;
+  }
+
   #btn-admin-close {
     display: inline-flex !important;
     align-items: center;
@@ -1955,5 +2009,11 @@ body.no-glass .plyr__menu__container {
   /* ── Calendar: list view mặc định trên mobile, cuộn + nhấp nháy hôm nay ── */
   #page-calendar {
     padding: 12px;
+  }
+
+  /* Lịch dạng lưới (tháng) không phù hợp màn hình nhỏ — mobile ép list-mode
+     mặc định (xem responsive.js), ẩn luôn nút chuyển sang lưới để tránh bug/rối. */
+  #cal-view-month {
+    display: none;
   }
 }

@@ -87,6 +87,24 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentBgColor = '#020810';
     let rafId = null;
 
+    // FIX: trước đây canvas luôn khởi động với màu MẶC ĐỊNH (COLORS gốc + isBlobActive=true),
+    // rồi đợi color-settings.js load xong mới áp lại theme đã lưu (~150ms sau) → gây
+    // hiệu ứng nháy: nền động mặc định hiện ra một chút rồi mới đổi màu/tắt đi.
+    // Giờ đọc thẳng theme đã lưu trong localStorage NGAY TỪ ĐẦU, trước khi vẽ khung hình
+    // đầu tiên, để không còn khoảng hở nào hiện màu/trạng thái sai.
+    const BASE_HUE = 215;
+    const BASE_BLOB_HSL = { h: 209, s: 75, l: 33 };
+    let savedTheme = null;
+    try {
+      const raw = localStorage.getItem('theme_settings');
+      if (raw) savedTheme = JSON.parse(raw);
+    } catch (e) { /* dùng mặc định nếu parse lỗi */ }
+
+    if (savedTheme) {
+      if (savedTheme.blobActive !== undefined) isBlobActive = savedTheme.blobActive;
+      if (savedTheme.blobSpeed !== undefined) speedMultiplier = savedTheme.blobSpeed;
+    }
+
     window.BlobController = {
       setPalette: function (hue) {
         const lightnessStops = [6, 8, 10, 15, 19, 24, 29, 33];
@@ -129,6 +147,30 @@ document.addEventListener('DOMContentLoaded', function () {
         currentBgColor = color;
       }
     };
+
+    // Áp palette + màu nền đã lưu NGAY (nếu có), trước khung hình đầu tiên —
+    // công thức giống hệt applyTheme()/applySettings() bên color-settings.js
+    // để nhất quán, chỉ khác là chạy đồng bộ ngay tại đây thay vì đợi script kia.
+    (function applySavedThemeImmediately() {
+      const hue = savedTheme?.hue !== undefined ? savedTheme.hue : BASE_HUE;
+      const blobHsl = savedTheme?.blobHsl || {
+        h: Math.round(((BASE_BLOB_HSL.h + (hue - BASE_HUE)) % 360 + 360) % 360),
+        s: BASE_BLOB_HSL.s,
+        l: BASE_BLOB_HSL.l
+      };
+      window.BlobController.setPaletteFromHsl(blobHsl.h, blobHsl.s, blobHsl.l);
+
+      if (savedTheme?.blobHsl) {
+        const { h, s, l } = savedTheme.blobHsl;
+        const darkL = Math.round(6 * (l / 33));
+        const darkS = Math.round(81 * (s / 81));
+        currentBgColor = `hsl(${(h + 360) % 360}, ${darkS}%, ${darkL}%)`;
+      } else {
+        // --color-bg gốc: h:213 s:78 l:4, dịch theo cùng deltaHue như applyTheme()
+        const finalHue = Math.round(((213 + (hue - BASE_HUE)) % 360 + 360) % 360);
+        currentBgColor = `hsla(${finalHue}, 78%, 4%, 1)`;
+      }
+    })();
 
     const blobs = Array.from({ length: 11 }, () => makeBlob(false));
     blobs.forEach((b, i) => {

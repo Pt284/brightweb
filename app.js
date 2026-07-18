@@ -50,7 +50,6 @@ let _calEventsLoadedAt = 0;
 let _calViewDate = new Date();
 let _calViewMode = 'month';
 window.setCalViewMode = (m) => { _calViewMode = m; };
-window.resetCalViewDate = () => { _calViewDate = new Date(); };
 let _calLiveBannerTimer = null;
 const CAL_CACHE_TTL = 3 * 60 * 1000; // 3 phút
 
@@ -233,7 +232,25 @@ auth.onAuthStateChanged(async user => {
     if (_isAdmin) {
       $('btn-admin').style.display = '';
       $('btn-edit').style.display = '';
+    } else {
+      // FIX: trước đây chỉ set display khi _isAdmin=true, nên khi đăng xuất admin
+      // rồi đăng nhập tài khoản thường trong CÙNG session, nút vẫn còn hiện
+      // (chỉ mất khi reload trang). Cần ẩn tường minh khi không phải admin.
+      $('btn-admin').style.display = 'none';
+      $('btn-edit').style.display = 'none';
     }
+    // FIX: mọi lần đăng nhập mới luôn bắt đầu ở editMode=false — reset tường minh
+    // các nút phụ thuộc edit mode (trước đây chỉ ẩn/hiện qua toggleEditMode(), nên
+    // nếu admin cũ đang bật edit mode lúc đăng xuất, nút vẫn còn hiện cho user sau).
+    editMode = false;
+    document.body.classList.remove('edit-mode');
+    $('btn-edit').textContent = '✏️';
+    $('btn-edit').title = 'Chỉnh sửa';
+    $('btn-undo').style.display = 'none';
+    $('btn-redo').style.display = 'none';
+    const btnResetCourses0 = $('btn-reset-courses');
+    if (btnResetCourses0) btnResetCourses0.style.display = 'none';
+    $('admin-panel').classList.remove('open');
     await loadData();
     await loadProgress();
     hideLoad();
@@ -1067,13 +1084,13 @@ function buildTree(nodes, courseId, indent, activeId, parentId) {
         btnRow.style.cssText = 'display: flex; gap: 8px; margin: 8px 0 4px ' + (14 + (indent + 1) * 14) + 'px;';
 
         const addBtn = document.createElement('button');
-        addBtn.className = 'btn btn-outline btn-sm';
+        addBtn.className = 'btn btn-primary btn-sm';
         addBtn.textContent = '＋ Thêm bài';
         addBtn.style.cssText = 'flex: 1 1 0%; margin: 0;';
         addBtn.onclick = () => openChapterModal(courseId, null, nodeId, { type: 'lesson' });
 
         const resetBtn = document.createElement('button');
-        resetBtn.className = 'btn btn-outline btn-sm';
+        resetBtn.className = 'btn btn-primary btn-sm';
         resetBtn.textContent = '↺ Reset thứ tự';
         resetBtn.style.cssText = 'flex: 1 1 0%; margin: 0;';
         resetBtn.onclick = async () => {
@@ -1095,13 +1112,13 @@ function buildTree(nodes, courseId, indent, activeId, parentId) {
     btnRow.style.cssText = 'display: flex; gap: 8px; margin: 8px 0;';
 
     const addBtn = document.createElement('button');
-    addBtn.className = 'btn btn-outline btn-sm';
+    addBtn.className = 'btn btn-primary btn-sm';
     addBtn.textContent = '＋ Thêm chương';
     addBtn.style.cssText = 'flex: 1 1 0%; margin: 0;';
     addBtn.onclick = () => openChapterModal(courseId, null, courseId, { type: 'chapter' });
 
     const resetBtn = document.createElement('button');
-    resetBtn.className = 'btn btn-outline btn-sm';
+    resetBtn.className = 'btn btn-primary btn-sm';
     resetBtn.textContent = '↺ Reset thứ tự';
     resetBtn.style.cssText = 'flex: 1 1 0%; margin: 0;';
     resetBtn.onclick = async () => {
@@ -1109,7 +1126,7 @@ function buildTree(nodes, courseId, indent, activeId, parentId) {
     };
 
     const resetCourseBtn = document.createElement('button');
-    resetCourseBtn.className = 'btn btn-outline btn-sm';
+    resetCourseBtn.className = 'btn btn-primary btn-sm';
     resetCourseBtn.textContent = '🔄 Reset khóa học';
     resetCourseBtn.style.cssText = 'flex: 1 1 0%; margin: 0; color: var(--color-red); border-color: var(--color-red);';
     resetCourseBtn.onclick = () => resetCurrentCourse(courseId);
@@ -1494,9 +1511,11 @@ function openCourseModal(courseId) {
 
   const modal = $('edit-modal');
   modal.innerHTML = '';
+  modal.className = 'glass';
   modal.style.cssText = `display:flex;flex-direction:column;gap:16px;
         position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
         z-index:1001;padding:24px;min-width:320px;max-width:440px;
+        border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);
         max-height:80vh;overflow-y:auto;`;
 
   modal.appendChild(el('h4', {
@@ -3260,6 +3279,42 @@ async function initGoLivePanel() {
     }
   };
 }
+// Cuộn tới + nhấp nháy ô/dòng "hôm nay" — dùng chung cho cả lưới tháng lẫn danh sách,
+// và cho cả nút "Hôm nay" lẫn nút mở lịch 📅 trên header.
+function scrollAndFlashCalendarToday() {
+  const todayDate = getTodayStr();
+  const todayCell = document.querySelector('.cal-day.today');
+  let todayHeader = null;
+  if (!todayCell) {
+    document.querySelectorAll('.cal-list-date-header').forEach(h => {
+      if (h.dataset.date === todayDate) todayHeader = h;
+    });
+  }
+  const target = todayCell || todayHeader;
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // FIX: lần đầu tiên phần tử vừa được chèn vào DOM, trình duyệt đôi khi gộp
+  // khung hình chèn DOM với khung hình bật animation nên animation không chạy
+  // (chỉ cuộn, không nhấp nháy). Đợi 2 khung hình (double rAF) để chắc chắn
+  // trạng thái ban đầu đã được vẽ trước khi bật lại animation.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      target.classList.remove('flash-today');
+      void target.offsetWidth;
+      target.classList.add('flash-today');
+      setTimeout(() => target.classList.remove('flash-today'), 1600);
+    });
+  });
+}
+
+// Mở lịch từ nút 📅 trên header: luôn quay về tháng hiện tại + cuộn/nhấp nháy hôm nay,
+// bất kể đang ở dạng lưới hay danh sách (mobile ép sang list qua responsive.js trước khi hàm này chạy).
+async function openCalendarFromHeader() {
+  _calViewDate = new Date();
+  await renderCalendar();
+  scrollAndFlashCalendarToday();
+}
+
 function _initCalendarButtons() {
   const on = (id, fn) => {
     const el = document.getElementById(id);
@@ -3268,28 +3323,7 @@ function _initCalendarButtons() {
   on('cal-today-btn', async () => {
     _calViewDate = new Date();
     await renderCalendar();
-    const todayCell = document.querySelector('.cal-day.today');
-    if (todayCell) {
-      todayCell.classList.remove('flash-today');
-      void todayCell.offsetWidth;
-      todayCell.classList.add('flash-today');
-      setTimeout(() => todayCell.classList.remove('flash-today'), 1600);
-    }
-    if (_calViewMode === 'list') {
-      const todayDate = getTodayStr();
-      const headers = document.querySelectorAll('.cal-list-date-header');
-      for (const h of headers) {
-        if (h.dataset.date === todayDate) {
-          h.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Phase 7: nhấp nháy viền giống month-view
-          h.classList.remove('flash-today');
-          void h.offsetWidth;
-          h.classList.add('flash-today');
-          setTimeout(() => h.classList.remove('flash-today'), 1600);
-          break;
-        }
-      }
-    }
+    scrollAndFlashCalendarToday();
   });
   on('cal-prev-btn', () => {
     // Phase 8: chặn vượt biên dưới (trước 6/2026)
@@ -3319,7 +3353,7 @@ _initCalendarButtons();
 
   // Header
   on('btn-home-logo', 'click', () => navigate('home'));
-  on('btn-calendar', 'click', renderCalendar);
+  on('btn-calendar', 'click', openCalendarFromHeader);
   on('btn-signout', 'click', signOut);
   on('btn-admin', 'click', toggleAdmin);
   on('btn-undo', 'click', doUndo);

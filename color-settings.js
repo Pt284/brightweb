@@ -102,6 +102,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // FIX: trang lịch dùng backdrop-filter nhiều (.cal-grid-wrap) — một số trình duyệt
+  // không tự repaint ngay khi đổi CSS custom property nếu phần tử đó chỉ đứng yên,
+  // khiến màu lịch "kẹt" màu cũ tới khi reload. Ép render lại lịch (debounce nhẹ)
+  // mỗi khi đổi theme trong lúc đang mở trang lịch để đảm bảo cập nhật ngay.
+  let _calThemeRefreshTimer = null;
+  function _refreshCalendarIfActive() {
+    const calPage = document.getElementById('page-calendar');
+    if (!calPage || !calPage.classList.contains('active')) return;
+    if (typeof window.renderCalendar !== 'function') return;
+    clearTimeout(_calThemeRefreshTimer);
+    _calThemeRefreshTimer = setTimeout(() => { window.renderCalendar(); }, 120);
+  }
+
   function applyTheme(newHue) {
     const deltaHue = newHue - BASE_HUE;
     let canvasBgHsl = null;
@@ -139,6 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Sync swatches trong Advanced tab nếu đang mở
     syncAdvancedSwatches(newHue);
+
+    _refreshCalendarIfActive();
   }
 
   function syncAdvancedSwatches(newHue) {
@@ -252,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const popup = document.createElement('div');
     popup.id = 'color-settings-popup';
+    popup.classList.add('glass'); // dùng chung hiệu ứng glass (blur+saturate) với sidebar/header/admin-panel
 
     // --- Header ---
     const header = document.createElement('div');
@@ -440,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.documentElement.style.setProperty(token, hex);
         swatch.style.background = hex;
         saveSettings();
+        _refreshCalendarIfActive();
       });
 
       swatch.appendChild(picker);
@@ -474,8 +491,16 @@ document.addEventListener('DOMContentLoaded', () => {
     previewContent.innerHTML = `
       <div class="sidebar glass" style="width:100%;height:auto;min-height:100px;">
         <div class="sidebar-title">Giao diện mẫu</div>
-        <div class="tree-label active-lesson" style="margin-top:10px;"><span class="icon">▶</span> Bài đang xem</div>
-        <div class="tree-label"><span class="icon check">✓</span> Bài đã xem</div>
+        <div class="tree-label active-lesson" style="margin-top:10px;">
+          <span class="icon">▶</span>
+          <span style="flex:1;">Bài đang xem</span>
+          <span class="bar-badge"><span class="bar-track"><span class="bar-fill" style="width:40%;"></span></span>40%</span>
+        </div>
+        <div class="tree-label">
+          <span class="icon">📄</span>
+          <span style="flex:1;">Bài đã xem</span>
+          <span class="bar-badge"><span class="bar-track"><span class="bar-fill done" style="width:100%;"></span></span>100%</span>
+        </div>
       </div>
       <div class="course-card glass">
         <h3>Ví dụ Khóa Học</h3>

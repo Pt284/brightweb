@@ -10,7 +10,7 @@
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.plyr.io;
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' https://fonts.gstatic.com https://i.ytimg.com https://cdn.plyr.io data:;
-  connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://brightweb-sync.mcdg5444.workers.dev https://www.youtube.com https://noembed.com https://evg-stream.hocmai.net https://*.hocmai.net;
+  connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://brightweb-sync.mcdg5444.workers.dev https://www.youtube.com https://noembed.com https://evg-stream.hocmai.net https://*.hocmai.net https://cdn.plyr.io;
   frame-src https://www.youtube.com https://brightwebaccbase.firebaseapp.com;
   worker-src 'self' blob:;
   object-src 'none';
@@ -204,8 +204,10 @@
       <span id="user-info"></span>
       <div id="live-banner" style="display:none" tabindex="0" role="button" aria-live="polite">
         <span id="live-banner-dot"></span>
-        <span id="live-banner-text"></span>
-        <span id="live-banner-countdown"></span>
+        <span id="live-banner-scroll">
+          <span id="live-banner-text"></span>
+          <span id="live-banner-countdown"></span>
+        </span>
       </div>
       <button id="btn-admin" class="btn-icon" title="Admin" style="display:none">⚙️</button>
       <button id="btn-undo" class="btn-icon" title="Hoàn tác (Ctrl+Z)" style="display:none">↩</button>
@@ -219,8 +221,7 @@
   </div>
 
   <div id="admin-panel" class="glass">
-    <button id="btn-admin-close" class="btn-icon" style="position:absolute;top:12px;right:12px;display:none;"
-      aria-label="Đóng">✕</button>
+    <button id="btn-admin-close" class="btn-icon" style="position:absolute;top:12px;right:12px;display:none;" aria-label="Đóng">✕</button>
     <h4>⚙️ Admin Panel</h4>
     <p id="admin-last-updated">lastUpdated: —</p>
     <button class="btn btn-primary btn-sm" id="btn-trigger-sync">🔄 Sync ngay</button>
@@ -334,9 +335,6 @@
       <div id="lesson-edit-panel" style="display:none; flex-direction:column; gap:12px; margin-top:8px;"></div>
     </div>
   </div>
-
-  <!-- Mobile sidebar drawer backdrop (chỉ dùng ở orientation:portrait) -->
-  <div id="sidebar-backdrop"></div>
 
   <!-- Phase 2: Edit modal -->
   <div id="edit-overlay" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45)">

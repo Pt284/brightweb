@@ -9,24 +9,15 @@
         return window.matchMedia('(orientation: portrait)').matches;
     }
 
-    // ── Đồng bộ chiều rộng sidebar hiện tại → CSS var --sidebar-current-w
-    // để backdrop mobile "khoét" đúng phần diện tích sidebar (xem style.css),
-    // giúp hiệu ứng glass của sidebar blur đúng nền thật thay vì lớp đen mờ.
-    function syncSidebarCutout() {
-        const activeSidebar = document.querySelector('#page-course.active .sidebar, #page-lesson.active .sidebar');
-        const w = activeSidebar ? activeSidebar.getBoundingClientRect().width : 0;
-        document.documentElement.style.setProperty('--sidebar-current-w', w + 'px');
-    }
-
     // ── Sidebar drawer (course & lesson) ──
     function setSidebarOpen(open) {
         document.body.classList.toggle('sidebar-open', open);
         const btn = document.getElementById('btn-sidebar-toggle');
         if (btn) btn.textContent = open ? '<<' : '>>';
-        if (open) syncSidebarCutout();
     }
 
-    document.getElementById('btn-sidebar-toggle')?.addEventListener('click', () => {
+    document.getElementById('btn-sidebar-toggle')?.addEventListener('click', (e) => {
+        e.stopPropagation();
         setSidebarOpen(!document.body.classList.contains('sidebar-open'));
     });
 
@@ -34,7 +25,12 @@
         if (typeof navigate === 'function') navigate('home');
     });
 
-    document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
+    // Không còn lớp phủ đen riêng (#sidebar-backdrop) nữa — nó chính là nguyên nhân
+    // che mất hiệu ứng glass thật của sidebar. Đóng khi bấm ra ngoài sidebar (mọi nơi
+    // trừ chính sidebar và nút toggle) bằng 1 listener ở document, giống các dropdown khác.
+    document.addEventListener('click', (e) => {
+        if (!document.body.classList.contains('sidebar-open')) return;
+        if (e.target.closest('.sidebar') || e.target.closest('#btn-sidebar-toggle')) return;
         setSidebarOpen(false);
     });
 
@@ -51,19 +47,10 @@
     document.getElementById('sidebar-tree')?.addEventListener('click', handleTreeClick);
     document.getElementById('sidebar-lesson-tree')?.addEventListener('click', handleTreeClick);
 
-    // Xoay ngang / thoát trang có sidebar → dọn state để lần mở lại nhất quán
+    // Xoay ngang → dọn state để lần mở lại nhất quán
     window.addEventListener('resize', () => {
         if (!isPortrait()) setSidebarOpen(false);
-        if (document.body.classList.contains('sidebar-open')) syncSidebarCutout();
     });
-
-    // Theo dõi mọi thay đổi kích thước sidebar thật (kéo resize, đổi breakpoint…)
-    if (window.ResizeObserver) {
-        const ro = new ResizeObserver(() => {
-            if (document.body.classList.contains('sidebar-open')) syncSidebarCutout();
-        });
-        document.querySelectorAll('.sidebar').forEach(el => ro.observe(el));
-    }
 
     // ── Resize sidebar bằng chuột kéo (chỉ desktop, không áp dụng ở drawer mobile) ──
     const SIDEBAR_MIN_W = 180;
@@ -102,7 +89,7 @@
                     'color:#4fc3f7;font-weight:bold;font-size:12px;'
                 );
                 console.log(
-                    '→ Vừa mắt rồi thì mở style.css, tìm "--sidebar-w: 280px;" trong :root và đổi thành "--sidebar-w: ' +
+                    '→ Vừa mắt rồi thì mở style.css, tìm "--sidebar-w: 400px;" trong :root và đổi thành "--sidebar-w: ' +
                     finalWidth + ';" để đặt làm mặc định.'
                 );
             }
@@ -119,27 +106,13 @@
         document.getElementById('admin-panel')?.classList.remove('open');
     });
 
-    // ── Calendar: mobile mặc định mở dạng danh sách, tự cuộn + nhấp nháy hôm nay ──
-    document.addEventListener('click', function (e) {
+    // ── Calendar: mobile mặc định mở dạng danh sách khi bấm 📅 ──
+    // Chỉ cần ép list-mode TRƯỚC KHI app.js render (dùng capture phase để chạy trước
+    // handler bubble của app.js gắn trên chính nút). Việc render/cuộn/nhấp nháy hôm nay
+    // giờ app.js tự lo (openCalendarFromHeader) cho cả 2 dạng lịch, không cần lặp lại ở đây.
+    document.addEventListener('click', (e) => {
         if (!e.target.closest('#btn-calendar')) return;
         if (!isPortrait()) return;
-        if (typeof renderCalendar !== 'function') return;
-        // Chặn handler mặc định (render dạng tháng) của app.js, tự render dạng danh sách.
-        e.stopImmediatePropagation();
-        e.preventDefault();
         if (typeof window.setCalViewMode === 'function') window.setCalViewMode('list');
-        if (typeof window.resetCalViewDate === 'function') window.resetCalViewDate();
-        Promise.resolve(renderCalendar()).then(() => {
-            const todayDate = typeof getTodayStr === 'function' ? getTodayStr() : null;
-            if (!todayDate) return;
-            const header = document.querySelector(`.cal-list-date-header[data-date="${todayDate}"]`);
-            if (header) {
-                header.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                header.classList.remove('flash-today');
-                void header.offsetWidth;
-                header.classList.add('flash-today');
-                setTimeout(() => header.classList.remove('flash-today'), 1600);
-            }
-        });
     }, true);
 })();

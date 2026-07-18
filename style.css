@@ -61,7 +61,7 @@
   --radius: 10px;
   --radius-sm: 6px;
   --radius-lg: 16px;
-  --sidebar-w: 280px;
+  --sidebar-w: 400px;
   --shadow: 0 4px 24px hsla(0, 0%, 0%, 0.5);
   --shadow-sm: 0 2px 16px hsla(203, 100%, 46%, 0.2);
   --shadow-glass: 0 8px 32px hsla(0, 0%, 0%, 0.35);
@@ -285,6 +285,10 @@ button {
   box-shadow: var(--shadow);
   z-index: 200;
   display: none;
+  /* FIX: panel dài hơn viewport bị tràn xuống dưới, không cuộn được vì thiếu
+     max-height + overflow-y. Trừ 60px (top) + 20px lề dưới cho thoáng. */
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
 }
 
 #admin-panel.open {
@@ -1745,28 +1749,34 @@ body.no-glass .plyr__menu__container {
     /* tên người dùng chiếm chỗ trên màn hẹp — ẩn, vẫn giữ icon → nút đăng xuất */
   }
 
+  /* Live banner: trên desktop rộng thoải mái nên hiện đầy đủ chữ (max-width 360px).
+     Trên mobile chật, nếu để nguyên sẽ đẩy hết các icon còn lại ra ngoài màn hình
+     → thu nhỏ lại + cho chữ chạy marquee ngang thay vì hiện tràn. */
+  #live-banner {
+    max-width: 108px;
+    flex-shrink: 0;
+    overflow: hidden;
+    padding: 4px 8px;
+  }
+
+  #live-banner-scroll {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%;
+    animation: live-banner-marquee 9s linear infinite;
+  }
+
+  @keyframes live-banner-marquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+
   /* ── Sidebar drawer (course & lesson) ── */
-  body.has-sidebar-page #sidebar-backdrop {
-    position: fixed;
-    top: 52px;
-    /* Chừa đúng phần diện tích sidebar chiếm (đồng bộ bằng JS qua --sidebar-current-w)
-       để backdrop KHÔNG đè lên dưới sidebar — nếu không, hiệu ứng glass (backdrop-filter)
-       của sidebar sẽ blur nhầm lớp đen mờ này thay vì blur nền thật phía sau. */
-    left: var(--sidebar-current-w, 0px);
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.55);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
-    z-index: 150;
-  }
-
-  body.has-sidebar-page.sidebar-open #sidebar-backdrop {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
   #page-course.active,
   #page-lesson.active {
     position: relative;
@@ -1786,6 +1796,10 @@ body.no-glass .plyr__menu__container {
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 160;
     box-shadow: var(--shadow-glass);
+    /* Bo tròn cạnh ngoài để trông như 1 panel kính nổi lên, giống popup cài đặt,
+       thay vì 1 khối chữ nhật phẳng dính sát mép trái màn hình */
+    border-top-right-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
   }
 
   /* Resize bằng chuột chỉ có trên desktop — ẩn tay kéo khi ở chế độ drawer mobile */

@@ -516,6 +516,8 @@ button {
 
 /* ── Sidebar ── */
 .sidebar {
+  position: relative;
+  /* neo cho .sidebar-resize-handle */
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
   background: var(--color-surface-overlay);
@@ -524,6 +526,35 @@ button {
   padding: 12px 0;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+/* Tay kéo resize sidebar (chỉ hoạt động ở giao diện desktop, ẩn khi portrait/mobile) */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.active {
+  background: var(--color-accent-alpha);
+}
+
+/* Trong lúc kéo: khoá cursor + chặn bôi đen chữ trên toàn trang */
+body.sidebar-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .sidebar-title {
@@ -1656,6 +1687,11 @@ body.no-glass .plyr__menu__container {
   display: none;
 }
 
+/* Mặc định ẩn nút home dạng icon cho mobile — desktop dùng .logo text như cũ */
+#btn-home-mobile {
+  display: none;
+}
+
 /* ============================================================
    MOBILE / PORTRAIT ORIENTATION UI
    Phát hiện dọc/ngang bằng orientation: portrait.
@@ -1686,16 +1722,17 @@ body.no-glass .plyr__menu__container {
   }
 
   #header .logo {
-    order: 2;
-    margin-left: auto;
-    font-size: 0;
-    /* ẩn text "GO TO HOME 😈", chỉ giữ icon 🏠 */
-    flex-shrink: 0;
+    display: none;
+    /* Trên mobile dùng #btn-home-mobile (button .btn-icon thật) thay cho logo text */
   }
 
-  #header .logo::before {
-    content: "🏠";
-    font-size: 1.3rem;
+  #btn-home-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    order: 2;
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   #header .header-right {
@@ -1712,7 +1749,10 @@ body.no-glass .plyr__menu__container {
   body.has-sidebar-page #sidebar-backdrop {
     position: fixed;
     top: 52px;
-    left: 0;
+    /* Chừa đúng phần diện tích sidebar chiếm (đồng bộ bằng JS qua --sidebar-current-w)
+       để backdrop KHÔNG đè lên dưới sidebar — nếu không, hiệu ứng glass (backdrop-filter)
+       của sidebar sẽ blur nhầm lớp đen mờ này thay vì blur nền thật phía sau. */
+    left: var(--sidebar-current-w, 0px);
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.55);
@@ -1746,6 +1786,11 @@ body.no-glass .plyr__menu__container {
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 160;
     box-shadow: var(--shadow-glass);
+  }
+
+  /* Resize bằng chuột chỉ có trên desktop — ẩn tay kéo khi ở chế độ drawer mobile */
+  .sidebar-resize-handle {
+    display: none;
   }
 
   /* Sidebar hẹp (điện thoại, <640px): ép nội dung tree-label xuống dòng thay vì tràn ra ngoài */

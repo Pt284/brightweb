@@ -1126,9 +1126,9 @@ function buildTree(nodes, courseId, indent, activeId, parentId) {
     };
 
     const resetCourseBtn = document.createElement('button');
-    resetCourseBtn.className = 'btn btn-primary btn-sm';
+    resetCourseBtn.className = 'btn btn-danger btn-sm';
     resetCourseBtn.textContent = '🔄 Reset khóa học';
-    resetCourseBtn.style.cssText = 'flex: 1 1 0%; margin: 0; color: var(--color-red); border-color: var(--color-red);';
+    resetCourseBtn.style.cssText = 'flex: 1 1 0%; margin: 0;';
     resetCourseBtn.onclick = () => resetCurrentCourse(courseId);
 
     btnRow.appendChild(addBtn);
@@ -3281,28 +3281,36 @@ async function initGoLivePanel() {
 }
 // Cuộn tới + nhấp nháy ô/dòng "hôm nay" — dùng chung cho cả lưới tháng lẫn danh sách,
 // và cho cả nút "Hôm nay" lẫn nút mở lịch 📅 trên header.
+// FIX: khi sang từ trang khác (display:none → block), phải đợi 2 khung hình để
+// layout/paint xong rồi mới bật animation, nếu không trình duyệt gộp khung chèn
+// DOM với khung animation → animation không chạy (chỉ cuộn, không nhấp nháy).
+// FIX: dạng danh sách nhấp nháy cả VIỀN .cal-list-group (bo tròn) thay vì chỉ
+// date-header.
 function scrollAndFlashCalendarToday() {
   const todayDate = getTodayStr();
-  const todayCell = document.querySelector('.cal-day.today');
-  let todayHeader = null;
-  if (!todayCell) {
-    document.querySelectorAll('.cal-list-date-header').forEach(h => {
-      if (h.dataset.date === todayDate) todayHeader = h;
-    });
+  // Lưới tháng: ô hôm nay. Danh sách: cả .cal-list-group chứa date-header hôm nay.
+  let target = document.querySelector('.cal-day.today');
+  let flashClass = 'flash-today';
+  if (!target) {
+    const todayHeader = document.querySelector('.cal-list-date-header[data-date="' + todayDate + '"]');
+    if (todayHeader) {
+      target = todayHeader.closest('.cal-list-group');
+      flashClass = 'flash-today-group';
+    }
   }
-  const target = todayCell || todayHeader;
   if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  // FIX: lần đầu tiên phần tử vừa được chèn vào DOM, trình duyệt đôi khi gộp
-  // khung hình chèn DOM với khung hình bật animation nên animation không chạy
-  // (chỉ cuộn, không nhấp nháy). Đợi 2 khung hình (double rAF) để chắc chắn
-  // trạng thái ban đầu đã được vẽ trước khi bật lại animation.
+
+  // Đợi 2 khung hình: khung 1 tính layout, khung 2 vẽ → chắc chắn phần tử đã
+  // hiển thị trước khi cuộn + bật animation (đặc biệt khi vừa chuyển trang).
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      target.classList.remove('flash-today');
+      try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+      // Khởi động lại animation: gỡ class, force reflow, thêm lại.
+      target.classList.remove(flashClass);
       void target.offsetWidth;
-      target.classList.add('flash-today');
-      setTimeout(() => target.classList.remove('flash-today'), 1600);
+      target.classList.add(flashClass);
+      // Dọn sau khi animation chạy xong (0.5s × 3 = 1.5s) + dư 200ms.
+      setTimeout(() => target.classList.remove(flashClass), 1700);
     });
   });
 }

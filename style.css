@@ -196,6 +196,18 @@ button {
   --btn-bg: var(--color-accent-alpha);
 }
 
+/* Danger — dùng cho các nút phá hủy (Reset khóa học, Stop live...).
+   Không override bằng inline style đỏ trên nút primary nữa. */
+.btn-danger {
+  --btn-bg: transparent;
+  --btn-border: var(--color-red);
+  --btn-text: var(--color-red);
+}
+
+.btn-danger:hover {
+  --btn-bg: var(--color-red-alpha);
+}
+
 .btn-sm {
   padding: 5px 12px;
   font-size: .82rem;
@@ -527,6 +539,8 @@ button {
   background: var(--color-surface-overlay);
   border-right: 1px solid var(--color-border);
   overflow-y: auto;
+  /* Ẩn thanh cuộn ngang dưới sidebar — chỉ cho cuộn dọc */
+  overflow-x: hidden;
   padding: 12px 0;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -704,13 +718,8 @@ body.sidebar-resizing * {
 }
 
 
-/* Tắt backdrop-filter trên trang lesson để bớt lag */
-#page-lesson .sidebar {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: var(--color-surface-modal) !important;
-}
-
+/* Sidebar dùng chung hiệu ứng glass (blur+saturate) như admin-panel/header —
+   không ép nền đục nữa để glass thật sự hiển thị đúng chuẩn. */
 #page-lesson .lesson-main {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -981,22 +990,36 @@ body.sidebar-resizing * {
   font-weight: 600;
   color: var(--color-text-dim);
   margin-left: auto;
+  /* Cố định chiều rộng badge để các bar (track) thẳng hàng dọc bất kể
+     % hoàn thành dài ngắn khác nhau (9% / 40% / 100%). */
+  justify-content: flex-end;
 }
 
 .bar-track {
+  display: block;
   width: 36px;
   height: 4px;
   background: var(--progress-track);
   border-radius: 2px;
   overflow: hidden;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 .bar-fill {
+  display: block;
   height: 100%;
   border-radius: 2px;
   background: var(--progress-fill);
   transition: width 0.3s ease;
+}
+
+/* Phần text % nằm trong .bar-badge (là <span> — không phải .bar-track/.bar-fill
+   vốn là <div>). Cố định min-width + căn phải để track luôn nằm đúng chỗ. */
+.bar-badge>span:not(.bar-track):not(.bar-fill) {
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .bar-fill.done {
@@ -1054,9 +1077,22 @@ body.no-glass .plyr__menu__container {
    TRANG LICH HOC (#page-calendar)
    ============================================================ */
 #page-calendar {
+  /* Làm cho khung lịch trở thành flex column có chiều cao cố định = vùng nhìn
+     trừ header 52px. Toolbar + week-header luôn cố định on top, chỉ nội dung
+     lịch bên dưới (#cal-content) mới cuộn — giống bảng tính có hàng tiêu đề
+     cố định (freeze panes). */
   min-height: calc(100vh - 52px);
+  height: calc(100vh - 52px);
   padding: 24px;
   background: transparent;
+  overflow: hidden;
+}
+
+/* Khi active, ép sang flex column để toolbar (flex:none) và #cal-content
+   (flex:1 + overflow:auto) chia nhau không gian. */
+#page-calendar.active {
+  display: flex;
+  flex-direction: column;
 }
 
 .cal-toolbar {
@@ -1066,6 +1102,8 @@ body.no-glass .plyr__menu__container {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 20px;
+  /* Cố định on top — không cuộn theo nội dung lịch, cả desktop lẫn mobile. */
+  flex: none;
 }
 
 .cal-toolbar-left {
@@ -1145,7 +1183,9 @@ body.no-glass .plyr__menu__container {
 
 .cal-grid-wrap {
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  /* KHÔNG dùng overflow:hidden ở đây — nó biến grid-wrap thành scroll container
+     riêng, làm position:sticky của .cal-week-header dính vào grid-wrap thay vì
+     #cal-content. Bo góc vẫn giữ nhờ border-radius, các ô lịch đã có border riêng. */
   border: 1px solid var(--color-border-glass);
   background: var(--color-cal-bg);
   backdrop-filter: blur(14px) saturate(160%) brightness(1.3);
@@ -1153,10 +1193,28 @@ body.no-glass .plyr__menu__container {
   box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
 }
 
+/* Vùng cuộn duy nhất của trang lịch: chỉ nội dung trong #cal-content cuộn,
+   toolbar và week-header luôn nhìn thấy on top. */
+#cal-content {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .cal-week-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   border-bottom: 1px solid var(--color-border-glass);
+  /* Luôn hiển thị on top — freeze như hàng tiêu đề bảng tính. top:0 dính vào
+     đỉnh #cal-content (scroll container). nền glass mờ để nội dung cuộn phía
+     dưới không lộ qua. */
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-cal-bg);
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.3);
 }
 
 .cal-week-header-cell {
@@ -1684,6 +1742,28 @@ body.no-glass .plyr__menu__container {
 
 .flash-today {
   animation: flash-today 0.5s ease-in-out 3 !important;
+}
+
+/* Nhấp nháy cả VIỀN của .cal-list-group (bo tròn) khi mở lịch — không chỉ
+   date-header nữa. Dùng cho dạng danh sách. */
+@keyframes flash-today-group {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-accent), 0 8px 32px rgba(0, 0, 0, .3);
+    border-color: var(--color-border-glass);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px var(--color-accent), 0 8px 32px rgba(0, 0, 0, .3);
+    border-color: var(--color-accent);
+  }
+}
+
+/* Góc bo tròn khớp với .cal-list-group (var(--radius)) để viền nhấp nháy cũng
+   bo tròn, không bị vuông góc. */
+.flash-today-group {
+  animation: flash-today-group 0.5s ease-in-out 3 !important;
 }
 
 /* Mặc định ẩn nút mở sidebar (chỉ hiện trên mobile/portrait, xem block bên dưới) */

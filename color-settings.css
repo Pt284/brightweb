@@ -40,14 +40,18 @@
   transform: translateY(0);
 }
 
-/* Header */
+/* Header — dùng hiệu ứng glass giống admin-panel (thêm class "glass" trong JS).
+   Giữ border-bottom để tách rõ khỏi phần body. */
 .cs-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface2);
+  border-bottom: 1px solid var(--color-border-glass) !important;
+  background: var(--color-surface-glass) !important;
+  backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(160%) brightness(1.05);
+  box-shadow: inset 0 1px 0 var(--color-border-glass);
 }
 
 .cs-header h3 {
@@ -85,12 +89,24 @@
 
 .cs-preview {
   flex: 1;
-  background: var(--color-bg);
+  /* Nền trong suốt để nền động (canvas mirror) phía sau preview content hiển thị
+     khi bật nền động. Khi tắt nền động, nền là màu của popup glass phía sau. */
+  background: transparent;
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Canvas mirror nền động — nằm tuyệt đối lấp đầy .cs-preview, phía sau content. */
+.cs-preview-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* Preview Content */
@@ -101,6 +117,9 @@
   flex-direction: column;
   gap: 16px;
   pointer-events: none;
+  /* Đảm bảo preview content nằm trên canvas nền động */
+  position: relative;
+  z-index: 1;
 }
 
 /* Controls styling */

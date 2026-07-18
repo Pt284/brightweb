@@ -269,9 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
     popup.id = 'color-settings-popup';
     popup.classList.add('glass'); // dùng chung hiệu ứng glass (blur+saturate) với sidebar/header/admin-panel
 
-    // --- Header ---
+    // --- Header --- dùng glass giống admin-panel (theo yêu cầu)
     const header = document.createElement('div');
-    header.className = 'cs-header';
+    header.className = 'cs-header glass';
     const h3 = document.createElement('h3');
     h3.textContent = 'Cài đặt Giao diện';
     const closeBtn = document.createElement('button');
@@ -486,20 +486,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Preview Panel ---
     const preview = document.createElement('div');
     preview.className = 'cs-preview';
+
+    // Canvas mirror nền động — nằm phía sau preview content. Chỉ vẽ khi bật
+    // nền động (blobActive), иначе ẩn đi để tránh tốn CPU.
+    const previewBg = document.createElement('canvas');
+    previewBg.className = 'cs-preview-bg';
+    preview.appendChild(previewBg);
+
     const previewContent = document.createElement('div');
     previewContent.className = 'cs-preview-content';
+    // FIX: dùng đúng cấu trúc DOM như buildTree() trong app.js — <div class="bar-track">
+    // bên trong <div class="bar-fill">, và % nằm trong <span> riêng. Trước đây dùng <span>
+    // cho track/fill nên width/height bị bỏ qua (inline) → bar rỗng.
+    // Thêm 1 dòng chương (arc-label + SVG circle) để demo đủ 2 kiểu hiển thị tiến độ.
     previewContent.innerHTML = `
       <div class="sidebar glass" style="width:100%;height:auto;min-height:100px;">
         <div class="sidebar-title">Giao diện mẫu</div>
-        <div class="tree-label active-lesson" style="margin-top:10px;">
+        <div class="tree-label" style="margin-top:10px;">
+          <span class="icon toggle-icon">▶</span>
+          <span style="flex:1;">Chương mẫu</span>
+          <div class="arc-wrap" aria-label="9%">
+            <svg width="24" height="24" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-track)" stroke-width="4"></circle>
+              <circle cx="18" cy="18" r="14" fill="none" stroke="var(--progress-low)" stroke-width="4"
+                stroke-dasharray="7.92 87.96" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 18 18)"></circle>
+            </svg>
+            <span class="arc-label" style="font-size:8px; color:var(--progress-low); font-weight:bold;">9%</span>
+          </div>
+        </div>
+        <div class="tree-label active-lesson">
           <span class="icon">▶</span>
           <span style="flex:1;">Bài đang xem</span>
-          <span class="bar-badge"><span class="bar-track"><span class="bar-fill" style="width:40%;"></span></span>40%</span>
+          <span class="bar-badge"><div class="bar-track"><div class="bar-fill" style="width:40%;"></div></div><span>40%</span></span>
         </div>
         <div class="tree-label">
           <span class="icon">📄</span>
           <span style="flex:1;">Bài đã xem</span>
-          <span class="bar-badge"><span class="bar-track"><span class="bar-fill done" style="width:100%;"></span></span>100%</span>
+          <span class="bar-badge"><div class="bar-track"><div class="bar-fill done" style="width:100%;"></div></div><span>100%</span></span>
         </div>
       </div>
       <div class="course-card glass">
@@ -510,6 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div style="display:flex;gap:10px;">
         <button class="btn btn-primary">Primary</button>
         <button class="btn btn-outline">Outline</button>
+        <button class="btn btn-danger">Danger</button>
       </div>
     `;
     preview.appendChild(previewContent);
@@ -520,6 +544,51 @@ document.addEventListener('DOMContentLoaded', () => {
     popup.appendChild(header);
     popup.appendChild(body);
     backdrop.appendChild(popup);
+
+    // ── Mirror nền động vào .cs-preview khi popup mở và blob đang bật ──
+    let _previewBgRaf = 0;
+    let _previewBgResizeHandler = null;
+    function startPreviewBgMirror() {
+      const globalCanvas = document.getElementById('bg-canvas');
+      if (!globalCanvas) return;
+      // Chỉ mirror khi nền động đang bật
+      if (!currentSettings.blobActive) return;
+      const ctx = previewBg.getContext('2d');
+      function resize() {
+        const r = previewBg.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        previewBg.width = Math.max(1, Math.round(r.width * dpr));
+        previewBg.height = Math.max(1, Math.round(r.height * dpr));
+      }
+      resize();
+      function frame() {
+        try {
+          ctx.clearRect(0, 0, previewBg.width, previewBg.height);
+          ctx.drawImage(globalCanvas, 0, 0, previewBg.width, previewBg.height);
+        } catch (e) { /* canvas chưa sẵn sàng */ }
+        _previewBgRaf = requestAnimationFrame(frame);
+      }
+      cancelAnimationFrame(_previewBgRaf);
+      _previewBgRaf = requestAnimationFrame(frame);
+      _previewBgResizeHandler = resize;
+      window.addEventListener('resize', _previewBgResizeHandler);
+    }
+    function stopPreviewBgMirror() {
+      cancelAnimationFrame(_previewBgRaf);
+      _previewBgRaf = 0;
+      if (_previewBgResizeHandler) {
+        window.removeEventListener('resize', _previewBgResizeHandler);
+        _previewBgResizeHandler = null;
+      }
+      const ctx = previewBg.getContext('2d');
+      if (ctx && previewBg.width) ctx.clearRect(0, 0, previewBg.width, previewBg.height);
+    }
+    // Lắng nghe open/close của backdrop (bất kể đường nào gọi) để bật/tắt mirror
+    const _previewBgObserver = new MutationObserver(() => {
+      if (backdrop.classList.contains('open')) startPreviewBgMirror();
+      else stopPreviewBgMirror();
+    });
+    _previewBgObserver.observe(backdrop, { attributes: true, attributeFilter: ['class'] });
 
     // Đóng khi click ra ngoài popup
     backdrop.addEventListener('click', e => {

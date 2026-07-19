@@ -2612,13 +2612,12 @@ function renderCalendarMonthView(events) {
       : 'Không có buổi học nào trong tháng này';
   }
 
-  const WEEKDAYS = ['THỨ 2', 'THỨ 3', 'THỨ 4', 'THỨ 5', 'THỨ 6', 'THỨ 7', 'CN'];
   const WEEKDAYS_FULL = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
 
+  // FIX: .cal-week-header giờ là 1 phần tử TĨNH nằm ngoài #cal-content (xem
+  // index.html + renderCalendar()), không còn render/lặp lại ở đây và không
+  // còn dùng position:sticky nữa — tránh lỗi mờ/lòi góc vuông khi cuộn.
   let html = `<div class="cal-grid-wrap">
-    <div class="cal-week-header">
-      ${WEEKDAYS.map(d => `<div class="cal-week-header-cell">${d}</div>`).join('')}
-    </div>
     <div class="cal-body">`;
 
   // Cells truoc thang (thang truoc)
@@ -2770,6 +2769,11 @@ async function renderCalendar() {
   } else {
     contentEl.innerHTML = renderCalendarListView(events);
   }
+
+  // .cal-week-header giờ tĩnh, nằm ngoài #cal-content (không sticky nữa) —
+  // chỉ hiện khi ở dạng lưới (tháng), dạng danh sách không cần hàng thứ.
+  const weekHeaderEl = document.getElementById('cal-week-header');
+  if (weekHeaderEl) weekHeaderEl.style.display = _calViewMode === 'month' ? 'grid' : 'none';
 
   attachCalendarEventListeners();
 
@@ -3248,35 +3252,36 @@ function scrollAndFlashCalendarToday() {
   const todayDate = getTodayStr();
   // Lưới tháng: ô hôm nay. Danh sách: cả .cal-list-group chứa date-header hôm nay.
   let target = document.querySelector('.cal-day.today');
-  let flashClass = 'flash-today';
+  let flashAnim = 'flash-today 0.5s ease-in-out 3';
   if (!target) {
     const todayHeader = document.querySelector('.cal-list-date-header[data-date="' + todayDate + '"]');
     if (todayHeader) {
       target = todayHeader.closest('.cal-list-group');
-      flashClass = 'flash-today-group';
+      flashAnim = 'flash-today-group 0.5s ease-in-out 3';
     }
   }
   if (!target) return;
 
   function doFlash() {
     try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
-    // Khởi động lại animation: gỡ class, force reflow, thêm lại.
-    target.classList.remove(flashClass);
-    void target.offsetWidth;
-    target.classList.add(flashClass);
-    // Dọn sau khi animation chạy xong (0.5s × 3 = 1.5s) + dư 200ms.
-    setTimeout(() => target.classList.remove(flashClass), 1700);
+    // FIX: attachCalendarEventListeners() clone+replace toàn bộ #cal-content để
+    // tránh trùng listener → phần tử "hôm nay" luôn là node MỚI TINH vừa chèn
+    // vào DOM (kể cả khi vào từ trang khác lẫn khi đang ở sẵn trang lịch).
+    // classList remove/reflow/add đôi khi không đủ mạnh để khởi động lại
+    // animation trên 1 node vừa mới chèn — set thẳng style.animation (đè hẳn,
+    // ép trình duyệt phải tính lại từ đầu) là cách chắc chắn hơn hẳn.
+    target.style.animation = 'none';
+    void target.offsetWidth; // force reflow
+    target.style.animation = flashAnim;
   }
 
-  // FIX: double-rAF vẫn không đủ khi vừa chuyển trang (display:none→block) VÀ vừa
-  // dựng lại toàn bộ #cal-content bằng innerHTML trong cùng lúc — một số trình
-  // duyệt vẫn chưa "chốt" xong layout/paint ở 2 khung hình đó (chỉ cuộn, không
-  // nhấp nháy ở lần bấm đầu tiên). Thêm 1 khoảng nghỉ macrotask (setTimeout) SAU
-  // 2 rAF để chắc chắn trình duyệt đã paint xong trạng thái hiển thị trước khi
-  // bật lại animation.
+  // Đợi 2 khung hình + thêm 1 khoảng nghỉ macrotask khá rộng rãi (150ms) —
+  // #cal-content vừa bị clone+replace hoàn toàn (coi như DOM mới), cộng thêm
+  // khả năng trang vừa chuyển từ display:none→block cùng lúc, nên cần nhiều
+  // thời gian hơn 1 update thường để trình duyệt "chốt" xong layout/paint.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      setTimeout(doFlash, 30);
+      setTimeout(doFlash, 150);
     });
   });
 }

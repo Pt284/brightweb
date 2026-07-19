@@ -89,14 +89,20 @@
 
 .cs-preview {
   flex: 1;
-  /* Nền trong suốt để nền động (canvas mirror) phía sau preview content hiển thị
-     khi bật nền động. Khi tắt nền động, nền là màu của popup glass phía sau. */
-  background: transparent;
+  /* FIX: mặc định phải là nền ĐẶC var(--color-bg) — đúng như giao diện thật khi
+     tắt nền động. Chỉ trong suốt (để lộ canvas mirror phía sau) khi đang thật
+     sự mirror nền động (class .bg-live, gán bởi color-settings.js), tránh lộ
+     màu kính của popup phía sau khi tắt nền động. */
+  background: var(--color-bg);
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.cs-preview.bg-live {
+  background: transparent;
 }
 
 /* Canvas mirror nền động — nằm tuyệt đối lấp đầy .cs-preview, phía sau content. */

@@ -45,6 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     tokenOverrides: {}
   };
 
+  // Được injectUI() gán 1 lần khi popup đã dựng xong — cho phép applySettings()
+  // (bật/tắt blobActive) đồng bộ nền preview (.cs-preview) dù nó là biến cục bộ
+  // bên trong injectUI(). Trước khi đó (chưa mở popup lần nào) là no-op.
+  let _syncPreviewBg = null;
+
   // --- Helper: hex → hsl ---
   function hexToHsl(hex) {
     let r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -184,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window.BlobController) window.BlobController.toggle(settings.blobActive);
       const cb = document.getElementById('cs-blob-toggle');
       if (cb) cb.checked = settings.blobActive;
+      if (typeof _syncPreviewBg === 'function') _syncPreviewBg();
     }
     if (settings.blobSpeed !== undefined) {
       currentSettings.blobSpeed = settings.blobSpeed;
@@ -551,8 +557,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function startPreviewBgMirror() {
       const globalCanvas = document.getElementById('bg-canvas');
       if (!globalCanvas) return;
-      // Chỉ mirror khi nền động đang bật
-      if (!currentSettings.blobActive) return;
       const ctx = previewBg.getContext('2d');
       function resize() {
         const r = previewBg.getBoundingClientRect();
@@ -583,12 +587,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const ctx = previewBg.getContext('2d');
       if (ctx && previewBg.width) ctx.clearRect(0, 0, previewBg.width, previewBg.height);
     }
-    // Lắng nghe open/close của backdrop (bất kể đường nào gọi) để bật/tắt mirror
-    const _previewBgObserver = new MutationObserver(() => {
-      if (backdrop.classList.contains('open')) startPreviewBgMirror();
+    // FIX: .cs-preview chỉ nên trong suốt (để lộ nền động phía sau) ĐÚNG LÚC đang
+    // thật sự mirror nền động. Khi tắt nền động, phải là nền đặc `--color-bg`
+    // (preview.classList không có 'bg-live') để phản ánh đúng giao diện thật lúc
+    // đó — không được để trong suốt lộ ra màu kính của popup phía sau.
+    function syncPreviewBg() {
+      const shouldMirror = backdrop.classList.contains('open') && currentSettings.blobActive;
+      preview.classList.toggle('bg-live', shouldMirror);
+      if (shouldMirror) startPreviewBgMirror();
       else stopPreviewBgMirror();
-    });
+    }
+    // Lắng nghe open/close của backdrop (bất kể đường nào gọi) để bật/tắt mirror
+    const _previewBgObserver = new MutationObserver(syncPreviewBg);
     _previewBgObserver.observe(backdrop, { attributes: true, attributeFilter: ['class'] });
+    // Cho phép applySettings() (khi bật/tắt blobActive lúc popup đang mở) gọi lại
+    _syncPreviewBg = syncPreviewBg;
 
     // Đóng khi click ra ngoài popup
     backdrop.addEventListener('click', e => {

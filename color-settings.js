@@ -79,22 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return '#' + [f(0), f(8), f(4)].map(x => x.toString(16).padStart(2, '0')).join('');
   }
 
-  // --- Blob palette sinh từ 1 màu (HSL) ---
-  // User chọn màu sáng nhất (màu cuối) → sinh 8 màu tối dần
-  function generateBlobPaletteFromHsl(h, s, l) {
-    const lightnessStops = [6, 8, 10, 15, 19, 24, 29, 33];
-    const satMul = [1, 1, 1, 1, 1, 0.98, 0.96, 0.93];
-    const hueShift = [0, 0, 0, -1, -2, -4, -7, -10];
-    // Normalize: l là lightness của màu sáng nhất (index 7 = 33%)
-    // Scale các stops theo tỉ lệ l/33
-    const lScale = l / 33;
-    const sScale = s / 81;  // base s của palette gốc = 81
-    return lightnessStops.map((ls, i) => ({
-      h: Math.round(((h + hueShift[i]) % 360 + 360) % 360),
-      s: Math.round(81 * sScale * satMul[i]),
-      l: Math.round(ls * lScale)
-    }));
-  }
+  // --- Blob palette: việc sinh palette từ 1 màu HSL giờ nằm trong
+  // bg.js (window.BlobController.setPaletteFromHsl) — applyBlobPalette() bên
+  // dưới gọi thẳng vào đó, không cần tính lại ở đây nữa.
 
   function applyBlobPalette(blobHsl) {
     if (!window.BlobController) return;

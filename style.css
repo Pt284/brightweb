@@ -22,7 +22,6 @@
   --color-border: hsl(222, 45%, 30%);
   --color-border-glass: hsla(215, 0%, 100%, 0.12);
   --color-border-glass-hover: hsla(215, 0%, 100%, 0.2);
-  --color-divider: var(--color-border);
 
   /* System Accents */
   --color-accent: hsl(203, 100%, 46%);
@@ -32,13 +31,9 @@
 
   /* Semantic Colors */
   --color-green: hsl(145, 100%, 39%);
-  --color-green-alpha: hsla(145, 100%, 39%, 0.12);
   --color-red: hsl(0, 90%, 71%);
   --color-red-alpha: hsla(0, 90%, 71%, 0.2);
   --color-yellow: hsl(45, 97%, 60%);
-  --color-yellow-alpha: hsla(45, 97%, 60%, 0.2);
-  --color-info: hsl(214, 97%, 78%);
-  --color-info-alpha: hsla(214, 97%, 78%, 0.2);
 
   /* Text */
   --color-text: hsl(214, 32%, 91%);
@@ -250,6 +245,11 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* FIX: SVG 18x18 render ra hộp nhỏ hơn nút emoji khác (~36x28 vs ~42x33)
+     → viền hover trông nhỏ hơn hẳn các nút khác. Ép kích thước tối thiểu
+     khớp với nút icon emoji thông thường trong header. */
+  min-width: 42px;
+  min-height: 33px;
 }
 
 /* ============================================================
@@ -596,7 +596,13 @@ button {
 .sidebar-resize-handle {
   position: absolute;
   top: 0;
-  right: -3px;
+  /* FIX: trước đây "right:-3px" khiến tay kéo THÒ RA NGOÀI mép phải sidebar,
+     nhưng .sidebar có overflow-x:hidden (để ẩn thanh cuộn ngang) nên phần thò
+     ra bị CẮT MẤT — kể cả điểm giữa (nơi click rơi vào) cũng nằm ngay trên
+     ranh giới bị cắt, khiến tay kéo gần như không bấm được. Đưa hẳn vào bên
+     trong mép phải (right:0) để không còn bị overflow:hidden của chính
+     sidebar cắt mất nữa. */
+  right: 0;
   width: 6px;
   height: 100%;
   cursor: col-resize;
@@ -619,6 +625,24 @@ body.sidebar-resizing {
 body.sidebar-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
+}
+
+/* Ô nhỏ hiện số px bám theo chuột khi kéo resize sidebar — giống resize cửa
+   sổ terminal. */
+.sidebar-resize-tooltip {
+  position: fixed;
+  display: none;
+  background: var(--color-surface2);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 999;
+  box-shadow: var(--shadow);
 }
 
 .sidebar-title {
@@ -741,29 +765,6 @@ body.sidebar-resizing * {
   /* Đè hoàn toàn màu mặc định của trình duyệt */
 }
 
-/* Wrapper plyr-player.js tạo */
-#plyr-wrapper {
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-#plyr-wrapper .plyr {
-  border-radius: 0;
-  /* wrapper đã có radius */
-}
-
-/* Speed popup không bị che bởi overflow:hidden của video-wrap */
-#speed-popup {
-  position: fixed !important;
-  z-index: 9999 !important;
-}
-
-/* Speed indicator */
-#speed-indicator {
-  font-family: system-ui, sans-serif;
-}
-
-
 /* Sidebar dùng chung hiệu ứng glass (blur+saturate) như admin-panel/header —
    không ép nền đục nữa để glass thật sự hiển thị đúng chuẩn. */
 #page-lesson .lesson-main {
@@ -868,67 +869,6 @@ body.sidebar-resizing * {
    LIQUID GLASS OVERRIDES
    ============================================================ */
 
-/* Glass containers dùng trong BrightWeb */
-.glass-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 10px;
-  box-sizing: border-box;
-}
-
-.glass-container-circle {
-  aspect-ratio: 1/1;
-  flex-shrink: 0;
-  flex-grow: 0;
-}
-
-.glass-container-pill {
-  flex-shrink: 0;
-  flex-grow: 0;
-}
-
-.glass-button {
-  position: relative;
-  box-shadow: 0 8px 32px rgba(0, 145, 234, .25), 0 2px 8px rgba(0, 0, 0, .4);
-  cursor: pointer;
-  pointer-events: auto;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  transition: transform .15s, box-shadow .15s;
-}
-
-.glass-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0, 145, 234, .35), 0 4px 12px rgba(0, 0, 0, .5);
-}
-
-.glass-button-circle {
-  aspect-ratio: 1/1;
-  flex-shrink: 0;
-  flex-grow: 0;
-}
-
-.glass-button-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  pointer-events: none;
-  font-weight: 600;
-  color: var(--color-text-inverse);
-  font-family: system-ui, -apple-system, sans-serif;
-  white-space: nowrap;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, .4);
-  letter-spacing: .02em;
-}
-
 /* Wrapper cho glass login button trên landing */
 #landing-glass-btn {
   margin-top: 8px;
@@ -971,35 +911,6 @@ body.sidebar-resizing * {
 
 .btn-glass-login:active {
   transform: translateY(0);
-}
-
-/* Course cards dùng glass — override màu chữ */
-.glass-card-content {
-  position: relative;
-  z-index: 1;
-  padding: 18px;
-  width: 100%;
-  pointer-events: none;
-}
-
-.glass-card-content h3 {
-  font-size: 1rem;
-  margin-bottom: 10px;
-  color: var(--color-text-inverse);
-}
-
-/* Admin panel glass override */
-#admin-panel.glass-admin {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
-  min-width: auto;
-}
-
-#admin-panel.glass-admin .admin-inner {
-  padding: 16px;
-  color: var(--color-text);
 }
 
 /* ============================================================
@@ -1555,6 +1466,12 @@ body.no-glass .plyr__menu__container {
   max-width: 360px;
   overflow: hidden;
   white-space: nowrap;
+  /* Desktop: canh giữa header thật sự (không lệ thuộc độ rộng 2 bên) — tách
+     khỏi dòng chảy flex bằng position:absolute, không đẩy các phần tử khác. */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 /* Chữ trong banner luôn chạy marquee ngang (phải→trái, loop) thay vì cắt "..." —
@@ -1811,16 +1728,23 @@ body.no-glass .plyr__menu__container {
   gap: 6px;
 }
 
+/* FIX THẬT SỰ (không phải do timing): .cal-day.today đã có sẵn box-shadow +
+   background accent gần như GIỐNG HỆT màu đỉnh của animation cũ (cùng hue 203,
+   chỉ khác alpha 0.12→0.35) → mắt gần như không thấy khác biệt dù animation
+   vẫn chạy đúng (đã verify bằng browser thật: animation "running" nhưng quá
+   nhạt). Đổi hẳn sang hiệu ứng scale + brightness pulse — luôn tương phản rõ
+   rệt bất kể màu nền gốc là gì, không thể bị "chìm" vào màu có sẵn nữa. */
 @keyframes flash-today {
 
   0%,
   100% {
-    background: var(--color-accent-alpha);
+    transform: scale(1);
+    filter: brightness(1) saturate(1);
   }
 
   50% {
-    background: hsla(203, 100%, 46%, 0.35);
-    box-shadow: inset 0 0 0 2px var(--color-accent);
+    transform: scale(1.07);
+    filter: brightness(1.7) saturate(1.4);
   }
 }
 
@@ -1829,18 +1753,21 @@ body.no-glass .plyr__menu__container {
 }
 
 /* Nhấp nháy cả VIỀN của .cal-list-group (bo tròn) khi mở lịch — không chỉ
-   date-header nữa. Dùng cho dạng danh sách. */
+   date-header nữa. Dùng cho dạng danh sách. Thêm brightness pulse cho tương
+   phản rõ hơn (cùng lý do như flash-today ở trên). */
 @keyframes flash-today-group {
 
   0%,
   100% {
     box-shadow: 0 0 0 0 var(--color-accent), 0 8px 32px rgba(0, 0, 0, .3);
     border-color: var(--color-border-glass);
+    filter: brightness(1);
   }
 
   50% {
-    box-shadow: 0 0 0 3px var(--color-accent), 0 8px 32px rgba(0, 0, 0, .3);
+    box-shadow: 0 0 0 4px var(--color-accent), 0 8px 32px rgba(0, 0, 0, .3);
     border-color: var(--color-accent);
+    filter: brightness(1.35);
   }
 }
 
@@ -1914,9 +1841,13 @@ body.no-glass .plyr__menu__container {
   }
 
   /* Live banner: marquee đã áp dụng chung ở base rule (cả desktop lẫn mobile).
-     Trên mobile chật, nếu để nguyên max-width 360px sẽ đẩy hết các icon còn lại
-     ra ngoài màn hình → chỉ cần thu nhỏ max-width riêng cho mobile ở đây. */
+     Desktop canh giữa bằng position:absolute (base rule) — mobile không đủ chỗ
+     để canh giữa kiểu đó (dễ đè lên các icon), nên quay lại dòng chảy flex
+     bình thường và ghim hẳn sang TRÁI NHẤT (order nhỏ hơn cả nút >> mở sidebar). */
   #live-banner {
+    position: static;
+    transform: none;
+    order: -2;
     max-width: 108px;
     flex-shrink: 0;
     padding: 4px 8px;

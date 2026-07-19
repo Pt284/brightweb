@@ -64,6 +64,33 @@
     // ── Resize sidebar bằng chuột kéo (chỉ desktop, không áp dụng ở drawer mobile) ──
     const SIDEBAR_MIN_W = 180;
     const SIDEBAR_MAX_W = 520;
+    const SIDEBAR_DEFAULT_W = 400;
+    const SIDEBAR_STORAGE_KEY = 'sidebar_width';
+
+    // Áp lại chiều rộng đã lưu (nếu có) ngay khi script chạy — giống cách
+    // theme_settings áp màu đã lưu, để không phải kéo lại mỗi lần load trang.
+    (function restoreSavedSidebarWidth() {
+        const saved = parseInt(localStorage.getItem(SIDEBAR_STORAGE_KEY), 10);
+        if (!isNaN(saved) && saved >= SIDEBAR_MIN_W && saved <= SIDEBAR_MAX_W) {
+            document.documentElement.style.setProperty('--sidebar-w', saved + 'px');
+        }
+    })();
+
+    let _sidebarResizeTooltip = null;
+    function showSidebarResizeTooltip(x, y, px) {
+        if (!_sidebarResizeTooltip) {
+            _sidebarResizeTooltip = document.createElement('div');
+            _sidebarResizeTooltip.className = 'sidebar-resize-tooltip';
+            document.body.appendChild(_sidebarResizeTooltip);
+        }
+        _sidebarResizeTooltip.textContent = px + 'px';
+        _sidebarResizeTooltip.style.left = (x + 14) + 'px';
+        _sidebarResizeTooltip.style.top = (y - 12) + 'px';
+        _sidebarResizeTooltip.style.display = 'block';
+    }
+    function hideSidebarResizeTooltip() {
+        if (_sidebarResizeTooltip) _sidebarResizeTooltip.style.display = 'none';
+    }
 
     function attachSidebarResize(sidebarEl) {
         const handle = document.createElement('div');
@@ -79,10 +106,12 @@
             handle.setPointerCapture(e.pointerId);
             handle.classList.add('active');
             document.body.classList.add('sidebar-resizing');
+            showSidebarResizeTooltip(e.clientX, e.clientY, Math.round(startWidth));
 
             function onMove(ev) {
                 const newWidth = Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, Math.round(startWidth + (ev.clientX - startX))));
                 document.documentElement.style.setProperty('--sidebar-w', newWidth + 'px');
+                showSidebarResizeTooltip(ev.clientX, ev.clientY, newWidth);
             }
 
             function onUp() {
@@ -91,20 +120,23 @@
                 handle.removeEventListener('pointerup', onUp);
                 handle.classList.remove('active');
                 document.body.classList.remove('sidebar-resizing');
+                hideSidebarResizeTooltip();
 
-                const finalWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
-                console.log(
-                    '%c[Sidebar resize] Chiều rộng hiện tại: ' + finalWidth,
-                    'color:#4fc3f7;font-weight:bold;font-size:12px;'
-                );
-                console.log(
-                    '→ Vừa mắt rồi thì mở style.css, tìm "--sidebar-w: 400px;" trong :root và đổi thành "--sidebar-w: ' +
-                    finalWidth + ';" để đặt làm mặc định.'
-                );
+                // Lưu lại giống cách cài đặt màu lưu vào localStorage — lần sau
+                // mở trang tự dùng lại chiều rộng vừa kéo, không cần chỉnh tay.
+                const finalWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'), 10);
+                if (!isNaN(finalWidth)) localStorage.setItem(SIDEBAR_STORAGE_KEY, String(finalWidth));
             }
 
             handle.addEventListener('pointermove', onMove);
             handle.addEventListener('pointerup', onUp);
+        });
+
+        // Double-click tay kéo → về lại mặc định 400px (giống "Reset mặc định" của cài đặt màu)
+        handle.addEventListener('dblclick', () => {
+            if (isPortrait()) return;
+            document.documentElement.style.setProperty('--sidebar-w', SIDEBAR_DEFAULT_W + 'px');
+            localStorage.setItem(SIDEBAR_STORAGE_KEY, String(SIDEBAR_DEFAULT_W));
         });
     }
 

@@ -137,7 +137,7 @@
   border-radius: 99px;
   padding: 4px;
   width: max-content;
-  margin: 16px auto;
+  margin: 0;
 }
 
 .cs-tabs::before {

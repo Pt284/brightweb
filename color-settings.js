@@ -302,23 +302,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Header --- dùng glass giống admin-panel (theo yêu cầu)
     const header = document.createElement('div');
     header.className = 'cs-header glass';
+    
     const h3 = document.createElement('h3');
     h3.textContent = 'Cài đặt Giao diện';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'cs-close-btn';
-    closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', () => backdrop.classList.remove('open'));
-    header.appendChild(h3);
-    header.appendChild(closeBtn);
-
-    // --- Body ---
-    const body = document.createElement('div');
-    body.className = 'cs-body';
-
-    // Controls panel
-    const controls = document.createElement('div');
-    controls.className = 'cs-controls';
-
+    
     // Tabs
     const tabs = document.createElement('div');
     tabs.className = 'cs-tabs';
@@ -332,6 +319,23 @@ document.addEventListener('DOMContentLoaded', () => {
     tabAdvBtn.textContent = 'Nâng cao';
     tabs.appendChild(tabSimpleBtn);
     tabs.appendChild(tabAdvBtn);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'cs-close-btn';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', () => backdrop.classList.remove('open'));
+    
+    header.appendChild(h3);
+    header.appendChild(tabs);
+    header.appendChild(closeBtn);
+
+    // --- Body ---
+    const body = document.createElement('div');
+    body.className = 'cs-body';
+
+    // Controls panel
+    const controls = document.createElement('div');
+    controls.className = 'cs-controls';
 
     [tabSimpleBtn, tabAdvBtn].forEach(btn => {
       btn.addEventListener('click', () => {
@@ -631,7 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
     body.appendChild(controls);
     body.appendChild(preview);
 
-    popup.appendChild(tabs);
     popup.appendChild(header);
     popup.appendChild(body);
     backdrop.appendChild(popup);

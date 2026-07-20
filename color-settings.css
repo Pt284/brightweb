@@ -130,7 +130,6 @@
 
 /* Controls styling */
 .cs-tabs {
-  display: flex;
   position: relative;
   background: var(--color-surface2);
   border: 2px solid var(--color-accent);
@@ -160,11 +159,9 @@
 .cs-tab-btn {
   position: relative;
   z-index: 1;
-  flex: 1;
   padding: 3px 25px;
   background: transparent;
   border: none;
-  border-radius: 99px;
   color: var(--color-text);
   cursor: pointer;
   font-weight: 500;

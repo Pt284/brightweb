@@ -42,8 +42,24 @@ document.addEventListener('DOMContentLoaded', () => {
     blobSpeed: 1,
     glassActive: true,
     blobHsl: null,      // null = tự tính từ hue, or { h, s, l }
-    tokenOverrides: {}
+    tokenOverrides: {},
+    dongTinhActive: false,
+    dongTinhSpeed: 1
   };
+  
+  let _dongTinhRafId = null;
+  function updateDongTinhLoop() {
+    if (!currentSettings.dongTinhActive) {
+      if (_dongTinhRafId) cancelAnimationFrame(_dongTinhRafId);
+      _dongTinhRafId = null;
+      return;
+    }
+    currentSettings.hue = (currentSettings.hue + currentSettings.dongTinhSpeed * 0.2) % 360;
+    applyTheme(currentSettings.hue);
+    const slider = document.getElementById('cs-hue-slider');
+    if (slider) slider.value = currentSettings.hue;
+    _dongTinhRafId = requestAnimationFrame(updateDongTinhLoop);
+  }
 
   // Được injectUI() gán 1 lần khi popup đã dựng xong — cho phép applySettings()
   // (bật/tắt blobActive) đồng bộ nền preview (.cs-preview) dù nó là biến cục bộ
@@ -171,6 +187,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const slider = document.getElementById('cs-hue-slider');
       if (slider) slider.value = settings.hue;
     }
+    if (settings.dongTinhActive !== undefined) {
+      currentSettings.dongTinhActive = settings.dongTinhActive;
+      const cb = document.getElementById('cs-dongtinh-toggle');
+      if (cb) cb.checked = settings.dongTinhActive;
+      if (currentSettings.dongTinhActive && !_dongTinhRafId) {
+        updateDongTinhLoop();
+      }
+    }
+    if (settings.dongTinhSpeed !== undefined) {
+      currentSettings.dongTinhSpeed = settings.dongTinhSpeed;
+      const spd = document.getElementById('cs-dongtinh-speed');
+      if (spd) spd.value = settings.dongTinhSpeed;
+      const spdInp = document.getElementById('cs-dongtinh-speed-input');
+      if (spdInp) spdInp.value = settings.dongTinhSpeed;
+    }
     if (settings.blobActive !== undefined) {
       currentSettings.blobActive = settings.blobActive;
       if (window.BlobController) window.BlobController.toggle(settings.blobActive);
@@ -187,6 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const pct = ((settings.blobSpeed - 0.1) / (3 - 0.1) * 100).toFixed(1) + '%';
         spd.style.setProperty('--pct', pct);
       }
+      const spdInp = document.getElementById('cs-speed-input');
+      if (spdInp) spdInp.value = settings.blobSpeed;
     }
     if (settings.glassActive !== undefined) {
       currentSettings.glassActive = settings.glassActive;
@@ -224,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function resetToDefaults() {
     tokenOverrides = {};
-    currentSettings = { hue: 215, blobActive: true, blobSpeed: 1, glassActive: true, blobHsl: null, tokenOverrides: {} };
+    currentSettings = { hue: 215, blobActive: true, blobSpeed: 1, glassActive: true, blobHsl: null, tokenOverrides: {}, dongTinhActive: false, dongTinhSpeed: 1 };
     localStorage.removeItem('theme_settings');
     applySettings(currentSettings);
     applyTheme(215);
@@ -329,6 +362,45 @@ document.addEventListener('DOMContentLoaded', () => {
     hueSlider.addEventListener('input', e => { applySettings({ hue: parseInt(e.target.value) }); saveSettings(); });
     tabSimple.appendChild(makeGroup('Màu chủ đạo (Hue)', hueSlider));
 
+    // Toi dong tinh toggle
+    const dtToggle = document.createElement('input');
+    dtToggle.type = 'checkbox'; dtToggle.id = 'cs-dongtinh-toggle'; dtToggle.checked = false;
+    dtToggle.addEventListener('change', e => { applySettings({ dongTinhActive: e.target.checked }); saveSettings(); });
+    const dtLabel = document.createElement('label');
+    dtLabel.className = 'cs-toggle';
+    dtLabel.appendChild(dtToggle);
+    dtLabel.append(' toi dong tinh');
+    const dtGroup = document.createElement('div'); dtGroup.className = 'cs-form-group';
+    dtGroup.appendChild(dtLabel); tabSimple.appendChild(dtGroup);
+
+    // Tốc độ dong tinh
+    const dtSpeedRow = document.createElement('div');
+    dtSpeedRow.style.cssText = 'display:flex; gap:10px; align-items:center; width:100%;';
+    const dtSpeedSlider = document.createElement('input');
+    dtSpeedSlider.type = 'range'; dtSpeedSlider.id = 'cs-dongtinh-speed';
+    dtSpeedSlider.className = 'cs-range'; dtSpeedSlider.min = 0.1; dtSpeedSlider.max = 5; dtSpeedSlider.step = 0.1; dtSpeedSlider.value = 1;
+    dtSpeedSlider.style.flex = '1';
+    
+    const dtSpeedInput = document.createElement('input');
+    dtSpeedInput.type = 'number'; dtSpeedInput.id = 'cs-dongtinh-speed-input';
+    dtSpeedInput.value = 1;
+    dtSpeedInput.style.cssText = 'width:60px; padding:5px 8px; background:var(--color-surface2); border:1px solid var(--color-border); border-radius:var(--radius-sm); font-size:.82rem; color:var(--color-text);';
+    
+    const dtSpeedUpdate = (val) => {
+      let num = parseFloat(val);
+      if (isNaN(num)) num = 1;
+      dtSpeedSlider.value = num;
+      dtSpeedInput.value = num;
+      applySettings({ dongTinhSpeed: num });
+      saveSettings();
+    };
+    dtSpeedSlider.addEventListener('input', e => dtSpeedUpdate(e.target.value));
+    dtSpeedInput.addEventListener('input', e => dtSpeedUpdate(e.target.value));
+    
+    dtSpeedRow.appendChild(dtSpeedSlider);
+    dtSpeedRow.appendChild(dtSpeedInput);
+    tabSimple.appendChild(makeGroup('Tốc độ dong tinh', dtSpeedRow));
+
     // Blob color picker
     const blobColorGroup = document.createElement('div');
     blobColorGroup.className = 'cs-form-group';
@@ -378,18 +450,34 @@ document.addEventListener('DOMContentLoaded', () => {
     blobGroup.appendChild(blobLabel); tabSimple.appendChild(blobGroup);
 
     // Speed slider
+    const speedRow = document.createElement('div');
+    speedRow.style.cssText = 'display:flex; gap:10px; align-items:center; width:100%;';
     const speedSlider = document.createElement('input');
     speedSlider.type = 'range'; speedSlider.id = 'cs-speed-slider';
     speedSlider.className = 'cs-range'; speedSlider.min = 0.1; speedSlider.max = 3; speedSlider.step = 0.1; speedSlider.value = 1;
-    speedSlider.addEventListener('input', e => {
-      const val = parseFloat(e.target.value);
-      // Cập nhật fill gradient: min=0.1, max=3
-      const pct = ((val - 0.1) / (3 - 0.1) * 100).toFixed(1) + '%';
-      e.target.style.setProperty('--pct', pct);
-      applySettings({ blobSpeed: val });
+    speedSlider.style.flex = '1';
+    
+    const speedInput = document.createElement('input');
+    speedInput.type = 'number'; speedInput.id = 'cs-speed-input';
+    speedInput.value = 1;
+    speedInput.style.cssText = 'width:60px; padding:5px 8px; background:var(--color-surface2); border:1px solid var(--color-border); border-radius:var(--radius-sm); font-size:.82rem; color:var(--color-text);';
+    
+    const updateSpeed = (val) => {
+      let num = parseFloat(val);
+      if (isNaN(num)) num = 1;
+      speedSlider.value = num;
+      speedInput.value = num;
+      const pct = ((num - 0.1) / (3 - 0.1) * 100);
+      speedSlider.style.setProperty('--pct', Math.max(0, Math.min(100, pct)).toFixed(1) + '%');
+      applySettings({ blobSpeed: num });
       saveSettings();
-    });
-    tabSimple.appendChild(makeGroup('Tốc độ nền', speedSlider));
+    };
+    speedSlider.addEventListener('input', e => updateSpeed(e.target.value));
+    speedInput.addEventListener('input', e => updateSpeed(e.target.value));
+    
+    speedRow.appendChild(speedSlider);
+    speedRow.appendChild(speedInput);
+    tabSimple.appendChild(makeGroup('Tốc độ nền', speedRow));
 
     // Glass toggle
     const glassToggle = document.createElement('input');

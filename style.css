@@ -148,17 +148,16 @@ button {
 
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-bg-alt);
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
-}
 
 /* ============================================================
    BUTTONS
@@ -503,6 +502,10 @@ button {
 .course-main,
 .lesson-main {
   background: transparent;
+}
+
+#page-home {
+  padding: 0 16px;
 }
 
 #page-home h2 {

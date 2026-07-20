@@ -325,8 +325,12 @@ document.addEventListener('DOMContentLoaded', () => {
     closeBtn.textContent = '×';
     closeBtn.addEventListener('click', () => backdrop.classList.remove('open'));
     
-    header.appendChild(h3);
-    header.appendChild(tabs);
+    const headerLeft = document.createElement('div');
+    headerLeft.style.cssText = 'display:flex; align-items:center; gap:16px;';
+    headerLeft.appendChild(h3);
+    headerLeft.appendChild(tabs);
+
+    header.appendChild(headerLeft);
     header.appendChild(closeBtn);
 
     // --- Body ---

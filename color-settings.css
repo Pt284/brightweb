@@ -135,7 +135,7 @@
   background: var(--color-surface2);
   border: 2px solid var(--color-accent);
   border-radius: 99px;
-  padding: 4px;
+  padding: 3px;
   width: max-content;
   margin: 0;
 }
@@ -143,10 +143,10 @@
 .cs-tabs::before {
   content: "";
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
-  height: calc(100% - 8px);
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
   background: var(--color-accent);
   border-radius: 99px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -161,7 +161,7 @@
   position: relative;
   z-index: 1;
   flex: 1;
-  padding: 8px 24px;
+  padding: 4px 16px;
   background: transparent;
   border: none;
   border-radius: 99px;
@@ -169,7 +169,8 @@
   cursor: pointer;
   font-weight: 500;
   transition: color 0.3s;
-  min-width: 120px;
+  min-width: 80px;
+  font-size: 0.8rem;
 }
 
 .cs-tab-btn.active {

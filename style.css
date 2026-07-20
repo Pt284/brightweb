@@ -113,6 +113,10 @@
 
 html {
   background: var(--color-bg);
+  /* Bỏ thanh cuộn ngang toàn trang (desktop lẫn mobile) — mọi phần tử cố ý
+     tràn viewport (vd video full-bleed âm margin trên mobile) đều được tính
+     toán để không vượt quá viewport thật, nên ẩn overflow-x an toàn. */
+  overflow-x: hidden;
 }
 
 /* fallback màu tối khi canvas chưa load */
@@ -121,6 +125,7 @@ body {
   background: transparent;
   color: var(--color-text);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 #bg-canvas {
@@ -1804,7 +1809,7 @@ body.no-glass .plyr__menu__container {
   #btn-sidebar-toggle {
     display: none;
     /* JS chỉ hiện khi đang ở trang có sidebar (course/lesson) */
-    order: -1;
+    order: -2;
     font-family: monospace;
     font-weight: 700;
     flex-shrink: 0;
@@ -1843,11 +1848,11 @@ body.no-glass .plyr__menu__container {
   /* Live banner: marquee đã áp dụng chung ở base rule (cả desktop lẫn mobile).
      Desktop canh giữa bằng position:absolute (base rule) — mobile không đủ chỗ
      để canh giữa kiểu đó (dễ đè lên các icon), nên quay lại dòng chảy flex
-     bình thường và ghim hẳn sang TRÁI NHẤT (order nhỏ hơn cả nút >> mở sidebar). */
+     bình thường. Thứ tự: >> (mở sidebar) trước, rồi mới tới banner. */
   #live-banner {
     position: static;
     transform: none;
-    order: -2;
+    order: -1;
     max-width: 108px;
     flex-shrink: 0;
     padding: 4px 8px;

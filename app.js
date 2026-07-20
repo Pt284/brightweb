@@ -203,7 +203,20 @@ function handleHash() {
   const h = window.location.hash;
   if (!h || h === '#home') { navigate('home'); return; }
   const p = h.replace('#', '').split('/');
-  if (p[0] === 'calendar') { renderCalendar(); return; }
+  if (p[0] === 'calendar') {
+    // FIX (root cause thật của bug lịch không tự cuộn/nhấp nháy ở lần bấm đầu):
+    // renderCalendar() tự set window.location.hash='#calendar' mỗi lần chạy →
+    // kích hoạt hashchange KHÔNG ĐỒNG BỘ → handleHash() này gọi lại
+    // renderCalendar() LẦN 2 độc lập, chồng lấn với lần gọi gốc từ nút 📅.
+    // Lần render thứ 2 thay thế toàn bộ #cal-content (kể cả ô/nhóm "hôm nay"
+    // vừa được nhắm để cuộn+nhấp nháy) đúng lúc animation sắp chạy → nhắm vào
+    // node đã bị gỡ khỏi DOM, không thấy gì. Nếu đã ở sẵn trang lịch, hashchange
+    // này chỉ là tiếng vọng từ chính renderCalendar(), không phải điều hướng
+    // mới thật sự → bỏ qua, không render lại.
+    if (document.getElementById('page-calendar')?.classList.contains('active')) return;
+    renderCalendar();
+    return;
+  }
   if (p[0] === 'course' && p[1]) { renderCourse(p[1]); return; }
   if (p[0] === 'lesson' && p[1] && p[2]) { renderLesson(p[1], p[2]); return; }
   navigate('home');
@@ -3263,7 +3276,11 @@ function scrollAndFlashCalendarToday() {
   if (!target) return;
 
   function doFlash() {
-    try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* ignore */ }
+    // FIX: mỗi lần render, #cal-content được thay mới hoàn toàn nên scroll luôn
+    // reset về đầu — nếu cuộn "smooth" từ đó xuống vị trí hôm nay sẽ tạo cảm
+    // giác giật (nhảy lên đầu rồi mới trượt xuống). Cuộn tức thì (auto) để vào
+    // thẳng đúng vị trí, phần nhấp nháy đã đủ thu hút chú ý rồi.
+    try { target.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch (e) { /* ignore */ }
     // FIX: attachCalendarEventListeners() clone+replace toàn bộ #cal-content để
     // tránh trùng listener → phần tử "hôm nay" luôn là node MỚI TINH vừa chèn
     // vào DOM (kể cả khi vào từ trang khác lẫn khi đang ở sẵn trang lịch).

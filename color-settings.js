@@ -198,7 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settings.dongTinhSpeed !== undefined) {
       currentSettings.dongTinhSpeed = settings.dongTinhSpeed;
       const spd = document.getElementById('cs-dongtinh-speed');
-      if (spd) spd.value = settings.dongTinhSpeed;
+      if (spd) {
+        spd.value = settings.dongTinhSpeed;
+        const pct = ((settings.dongTinhSpeed - 0.1) / (5 - 0.1) * 100);
+        spd.style.setProperty('--pct', Math.max(0, Math.min(100, pct)).toFixed(1) + '%');
+      }
       const spdInp = document.getElementById('cs-dongtinh-speed-input');
       if (spdInp) spdInp.value = settings.dongTinhSpeed;
     }
@@ -331,14 +335,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     [tabSimpleBtn, tabAdvBtn].forEach(btn => {
       btn.addEventListener('click', () => {
-        controls.querySelectorAll('.cs-tab-btn').forEach(b => b.classList.remove('active'));
+        popup.querySelectorAll('.cs-tab-btn').forEach(b => b.classList.remove('active'));
         controls.querySelectorAll('.cs-tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab === 'tab-advanced') {
+          tabs.classList.add('advanced-active');
+        } else {
+          tabs.classList.remove('advanced-active');
+        }
       });
     });
-
-    controls.appendChild(tabs);
 
     // --- Tab Simple ---
     const tabSimple = document.createElement('div');
@@ -391,6 +398,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isNaN(num)) num = 1;
       dtSpeedSlider.value = num;
       dtSpeedInput.value = num;
+      const pct = ((num - 0.1) / (5 - 0.1) * 100);
+      dtSpeedSlider.style.setProperty('--pct', Math.max(0, Math.min(100, pct)).toFixed(1) + '%');
       applySettings({ dongTinhSpeed: num });
       saveSettings();
     };
@@ -622,6 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
     body.appendChild(controls);
     body.appendChild(preview);
 
+    popup.appendChild(tabs);
     popup.appendChild(header);
     popup.appendChild(body);
     backdrop.appendChild(popup);

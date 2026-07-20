@@ -131,23 +131,48 @@
 /* Controls styling */
 .cs-tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 24px;
+  position: relative;
+  background: var(--color-surface2);
+  border: 2px solid var(--color-accent);
+  border-radius: 99px;
+  padding: 4px;
+  width: max-content;
+  margin: 16px auto;
+}
+
+.cs-tabs::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: var(--color-accent);
+  border-radius: 99px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+.cs-tabs.advanced-active::before {
+  transform: translateX(100%);
 }
 
 .cs-tab-btn {
-  padding: 8px 16px;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: 8px 24px;
   background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
+  border: none;
+  border-radius: 99px;
+  color: var(--color-text);
   cursor: pointer;
   font-weight: 500;
+  transition: color 0.3s;
+  min-width: 120px;
 }
 
 .cs-tab-btn.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
   color: var(--color-text-inverse);
 }
 
@@ -214,7 +239,7 @@
 }
 
 /* Speed slider — match progress bar colors */
-#cs-speed-slider {
+#cs-speed-slider, #cs-dongtinh-speed {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -229,7 +254,7 @@
       var(--progress-track) 100%);
 }
 
-#cs-speed-slider::-webkit-slider-thumb {
+#cs-speed-slider::-webkit-slider-thumb, #cs-dongtinh-speed::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
@@ -242,24 +267,24 @@
   transition: transform 0.15s, border-color 0.15s;
 }
 
-#cs-speed-slider::-webkit-slider-thumb:hover {
+#cs-speed-slider::-webkit-slider-thumb:hover, #cs-dongtinh-speed::-webkit-slider-thumb:hover {
   transform: scale(1.2);
   border-color: var(--color-accent);
 }
 
-#cs-speed-slider::-moz-range-track {
+#cs-speed-slider::-moz-range-track, #cs-dongtinh-speed::-moz-range-track {
   height: 6px;
   border-radius: 3px;
   background: var(--progress-track);
 }
 
-#cs-speed-slider::-moz-range-progress {
+#cs-speed-slider::-moz-range-progress, #cs-dongtinh-speed::-moz-range-progress {
   height: 6px;
   border-radius: 3px;
   background: var(--progress-fill);
 }
 
-#cs-speed-slider::-moz-range-thumb {
+#cs-speed-slider::-moz-range-thumb, #cs-dongtinh-speed::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;

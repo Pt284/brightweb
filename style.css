@@ -126,7 +126,6 @@ body {
   color: var(--color-text);
   min-height: 100vh;
   overflow-x: hidden;
-  zoom: 0.9;
 }
 
 #bg-canvas {
@@ -155,8 +154,10 @@ button {
 }
 
 * {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 
@@ -507,6 +508,7 @@ button {
 
 #page-home {
   padding: 24px 16px 0;
+  zoom: 0.9;
 }
 
 #page-home h2 {
@@ -1293,8 +1295,8 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event-time {
-  font-size: 0.75rem;
-  font-weight: 800;
+  font-size: 0.8rem;
+  font-weight: 700;
   opacity: 1;
   color: inherit;
   white-space: nowrap;
@@ -1302,8 +1304,8 @@ body.no-glass .plyr__menu__container {
 }
 
 .cal-event-subject {
-  font-size: 0.85rem;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 550;
   color: inherit;
   white-space: normal;
   word-wrap: break-word;

@@ -459,12 +459,26 @@ def main():
 
     print("▶ Đọc cấu trúc Drive...")
     courses = read_drive(service)
+    
+    if not courses:
+        print("❌ LỖI NGHIÊM TRỌNG: Không đọc được khóa học nào từ Drive!")
+        print("   → Huỷ thao tác ghi đè Firestore để bảo vệ dữ liệu cũ trên web.")
+        exit(1)
 
     print("▶ Đọc YouTube...")
     playlist_map = read_youtube()
 
     print("▶ Ghép video + xuất data.json...")
     output = build_output(courses, playlist_map)
+
+    # Fail-safe kiểm tra lần cuối trước khi push
+    num_courses = len(output.get("courses", []))
+    if num_courses == 0:
+        print("❌ LỖI NGHIÊM TRỌNG: Dữ liệu output rỗng!")
+        print("   → Huỷ thao tác ghi đè Firestore.")
+        exit(1)
+        
+    print(f"   (Kiểm tra an toàn: OK. Có {num_courses} khóa học hợp lệ)")
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)

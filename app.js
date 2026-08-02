@@ -313,8 +313,13 @@ async function loadData() {
     if ($('admin-last-updated'))
       $('admin-last-updated').textContent = 'Cập nhật: ' + (appData.lastUpdated || '—');
     await loadOverrides();
-    _rawAutoData = JSON.parse(JSON.stringify(appData.courses));
-    appData.courses = getMergedCourses(_rawAutoData, _overrides);
+    _rawAutoData = JSON.parse(JSON.stringify(appData.courses || []));
+    try {
+      appData.courses = getMergedCourses(_rawAutoData, _overrides);
+    } catch (mergeErr) {
+      console.error("Lỗi khi merge courses, dùng data gốc:", mergeErr);
+      // Nếu merge lỗi, cứ dùng data gốc từ Drive thay vì rớt về MockData
+    }
 
     const btnFlattenAll = document.getElementById('btn-flatten-all');
     const btnUnflatten = document.getElementById('btn-unflatten');

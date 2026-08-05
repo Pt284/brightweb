@@ -7,7 +7,7 @@
 ## 📋 Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [📝 Changelog](#-changelog)
+- [Changelog](#-changelog)
 - [Tính năng chính](#tính-năng-chính)
 - [Tính năng nổi bật](#tính-năng-nổi-bật)
 - [Kiến trúc hệ thống](#kiến-trúc-hệ-thống)
@@ -15,7 +15,7 @@
 - [Cài đặt & Cấu hình](#cài-đặt--cấu-hình)
 - [Cách hoạt động](#cách-hoạt-động)
 - [Cấu trúc thư mục](#cấu-trúc-thư-mục)
-- [🔒 Bảo mật](#-bảo-mật)
+- [Bảo mật](#-bảo-mật)
 
 ---
 
@@ -25,7 +25,7 @@ BrightWeb là web app học tập **static frontend + serverless backend** (GitH
 
 1. **Tự động crawl** cấu trúc thư mục Google Drive → sinh cây khóa học/chương/bài
 2. **Tự động ánh xạ** video YouTube vào đúng bài học dựa theo **prefix số** trong tên (`020301 ~ Tên bài`)
-3. **Tự động crawl lịch học trực tiếp** (livestream HocMai) → lấy link m3u8 khi có buổi học live → hiển thị trên lịch + banner + gửi Web Push nhắc nhở trước giờ học
+3. **Tự động crawl lịch học trực tiếp** (livestream) → lấy link m3u8 khi có buổi học live → hiển thị trên lịch + banner + gửi Web Push nhắc nhở trước giờ học
 4. **Hiển thị** thành giao diện học tập đầy đủ: sidebar cây bài học, video player, tài liệu, theo dõi tiến độ, lịch học, live banner
 5. Cho phép admin **chỉnh sửa thủ công** bất kỳ thứ gì mà **không đụng đến dữ liệu gốc** — toàn bộ override được lưu riêng và merge tại runtime
 6. **PWA** — cài đặt được trên điện thoại (Add to Home Screen), nhận Web Push trên cả iOS và Android
@@ -39,8 +39,8 @@ Pipeline sync Drive+YouTube chạy tự động **mỗi 1 tiếng** qua GitHub A
 ### v3.0 — Live Calendar + Web Push + PWA
 
 **🆕 Tính năng mới lớn:**
-- **📅 Lịch học trực tiếp** — crawl lịch HocMai qua API, hiển thị dạng lưới tháng + danh sách, click event → mở bài học tương ứng
-- **🔴 Live Stream** — tự lấy m3u8 livestream từ lophoc.secret.vn khi có buổi học live, hiện banner countdown + nút "Xem live"
+- **📅 Lịch học trực tiếp** — crawl lịch qua API, hiển thị dạng lưới tháng + danh sách, click event → mở bài học tương ứng
+- **🔴 Live Stream** — tự lấy m3u8 livestream từ (secret) khi có buổi học live, hiện banner countdown + nút "Xem live"
 - **🔔 Web Push Notifications** — nhắc nhở trước giờ học (5 mốc: 15m, 10m, 5m, 150s, 60s), thông báo "Đã có link học mới", digest lịch học hôm nay (4 lần/ngày)
 - **📱 PWA** — manifest.json + service worker + icons, cài đặt được trên điện thoại (iOS cần Add to Home Screen để nhận push)
 - **📱 Giao diện di động** — sidebar drawer, admin panel fullscreen, calendar list view mặc định, nút home/sidebar toggle cho mobile
@@ -59,7 +59,7 @@ Pipeline sync Drive+YouTube chạy tự động **mỗi 1 tiếng** qua GitHub A
 - Fix: admin panel scrollbar lòi ra ngoài border-radius
 
 **🔒 Bảo mật vá:**
-- Cookie HocMai trả phí lưu ở `server_only/` — client KHÔNG đọc được (firebase.rule chặn)
+- Cookie trả phí lưu ở `server_only/` — client KHÔNG đọc được (firebase.rule chặn)
 - Web Push `/push/subscribe` yêu cầu JWT + whitelist check (trước đó không check)
 - Stream URL allowlist (`isTrustedStreamUrl`) — chặn m3u8 độc hại nếu Firestore bị compromise
 - `app_data.read` chặt hơn: chỉ user trong whitelist/admin (trước đó bất kỳ ai login)
@@ -88,7 +88,7 @@ Pipeline sync Drive+YouTube chạy tự động **mỗi 1 tiếng** qua GitHub A
 
 ### 📅 Lịch học trực tiếp (crawl_calendar.py + lophoc_api.py)
 
-Pipeline mới hoàn toàn — crawl lịch học livestream từ HocMai:
+Pipeline mới hoàn toàn — crawl lịch học livestream:
 
 - **Crawl lịch** qua API JSON `HM_BASE_URL/study/calendar/event` (đăng nhập Moodle-style với `logintoken` CSRF)
 - **Cookie cache** trong Firestore `server_only/hm_cookies` → skip re-login khi cookie còn hiệu lực
@@ -119,7 +119,7 @@ Hệ thống thông báo đẩy hoàn chỉnh — nhắc trước giờ học + 
 - **Live banner** ở header — auto-update mỗi 60s, countdown "Còn X phút", click → mở tab mới với stream link
 - **Live-in-lesson-banner** — khi mở bài học đang live, hiện banner "🔴 ĐANG PHÁT TRỰC TIẾP" + nút "Xem live"
 - **HLS.js** — play m3u8 livestream (Chrome/Firefox không support HLS native, Safari có)
-- **Stream URL allowlist** — chỉ cho phép `*.hocmai.net`, `*.viettelcdn.vn`, `youtube.com`, `youtu.be` (chặn URL độc hại)
+- **Stream URL allowlist** — chỉ cho phép `youtube.com`, `youtu.be` (chặn URL độc hại)
 - **`noopener,noreferrer`** khi mở tab mới — chặn tabnabbing + không leak Referer (CDN chặn 403 nếu có Referer)
 - **Admin Go Live** — admin set m3u8 thủ công qua panel (chọn date, chọn lesson, dán m3u8, bấm ▶)
 
@@ -221,7 +221,7 @@ Xuất **lệnh PowerShell** để xóa hàng loạt file local đã upload an t
 ### 🎨 Theme System (color-settings.js + bg.js)
 
 - **Hue slider** thay đổi toàn bộ color scheme (HSL-based, 17+ design token)
-- **Tối động tinh** — auto-cycle hue qua RAF loop (mới)
+- **Toi dong tinh** — auto-cycle hue qua RAF loop (mới)
 - **Blob color picker**: chọn màu nền động riêng biệt
 - **Canvas mirror nền động** trong preview — thấy trước giao diện thật khi đổi theme (mới)
 - Per-token override: chỉnh từng màu CSS variable riêng lẻ trong tab "Nâng cao"
@@ -307,7 +307,7 @@ Video YouTube đặt tên `010301 ~ Tên video` → tự động ghép vào đú
 
 Khi user click event lịch → tìm bài học tương ứng để mở:
 
-1. **TSA chapter prefix resolver** — match event title với lesson trong chương "Tháng N" (sắp xếp theo tháng)
+1. **Chapter prefix resolver** — match event title với lesson trong chương "Tháng N" (sắp xếp theo tháng)
 2. **Disambiguate** khi trùng title — chọn lesson có `_chapterMonth` gần nhất với tháng của event
 3. **Fallback Jaccard similarity** — nếu không match exact, dùng Jaccard similarity trên token (strip dấu VN + stopwords), threshold ≥0.35
 4. **Normalize NFC + separators** — `/` `:` → ` - `, strip trailing dots, để match giữa event title và lesson title dù format khác nhau
@@ -346,7 +346,7 @@ Khi user click event lịch → tìm bài học tương ứng để mở:
 │    cookie cache: server_only/hm_cookies                     │
 │    merge_events() → push_schedule()                         │
 │  tools/send_push.py                                         │
-│    "📅 Lịch học hôm nay" digest + "🆕 Link học mới"          │
+│    "📅 Lịch học hôm nay" digest + "🆕 Link học mới"        |
 │  [Fail-safe: không ghi đè nếu event giảm >50%]              │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -360,7 +360,7 @@ Khi user click event lịch → tìm bài học tương ứng để mở:
 │      fallback tryFallbackFromSchedule() nếu 0 session       │
 │      5 mốc nhắc (15m/10m/5m/150s/60s) × burst               │
 │    watchModeJob (mỗi 2 phút, 07:00-23:58 VN):               │
-│      lophocLogin → lophocRoomToken → lophocGetM3u8           │
+│      lophocLogin → lophocRoomToken → lophocGetM3u8          │
 │      handleNewM3u8 → push "Link mới" + tạo session_clicks   │
 │      auto-cleanup m3u8 khi CDN non-200 + event >60ph        │
 │  Routes:                                                    │
@@ -381,7 +381,7 @@ Khi user click event lịch → tìm bài học tương ứng để mở:
 │    ├── Firestore: app_data/overrides (_overrides)           │
 │    └── getMergedCourses(rawAutoData, overrides)             │
 │  loadCalendarData()                                         │
-│    └── Firestore: app_data/schedule (3 phút cache)           │
+│    └── Firestore: app_data/schedule (3 phút cache)          │
 │                                                             │
 │  updateLiveBanner() mỗi 60s                                 │
 │    → #live-banner (countdown + click → openLiveInNewTab)    │
@@ -412,7 +412,7 @@ Khi user click event lịch → tìm bài học tương ứng để mở:
 | PWA | manifest.json + Service Worker (thuần JS, không Workbox) |
 | Web Push | Thuần Web Crypto API (RFC 8291 + RFC 8188 aes128gcm) + VAPID ES256 |
 | Auto-Sync (Drive+YouTube) | Python 3.11, GitHub Actions (mỗi 1h) |
-| Calendar Crawl (HocMai) | Python 3.11 (HTTP thuần), GitHub Actions (4 lần/ngày + watch 16 phút) |
+| Calendar Crawl | Python 3.11 (HTTP thuần), GitHub Actions (4 lần/ngày + watch 16 phút) |
 | Watch Mode + Reminder | Cloudflare Worker cron (mỗi 2 phút + mỗi phút) |
 | Drive API | google-api-python-client |
 | Web Push Sender (Python) | pywebpush 2.0.0 |
@@ -436,17 +436,17 @@ Khi user click event lịch → tìm bài học tương ứng để mở:
 | `DRIVE_ROOT_FOLDER_ID` | ID folder gốc trên Google Drive |
 | `FIRESTORE_PROJECT_ID` | Firebase project ID |
 
-#### Cho crawl_calendar.py (Lịch học HocMai)
+#### Cho crawl_calendar.py
 
 | Secret | Mô tả |
 |---|---|
-| `HM_USERNAME` | Tài khoản HocMai (email/SĐT) |
-| `HM_PASSWORD` | Mật khẩu HocMai |
-| `HM_BASE_URL` | Base URL HocMai (vd `https://secret.vn`) |
-| `HM_CAL_PATH` | Path trang calendar (vd `/calendar`) |
-| `HM_LOGIN_PATH` | Path login (vd `/loginv2/index.php`) |
-| `HM_LOGOUT_V2_PATH` | Path logout bước 1 (vd `/loginv2/logout.php`) |
-| `HM_LOGOUT_FINAL_PATH` | Path logout bước 2 (vd `/login/logout.php`) |
+| `HM_USERNAME` | Tài khoản (email/SĐT) |
+| `HM_PASSWORD` | Mật khẩu |
+| `HM_BASE_URL` | Base URL (vd `https://secret.vn`) |
+| `HM_CAL_PATH` | Path trang calendar (vd `/v0/calendar`) |
+| `HM_LOGIN_PATH` | Path login (vd `/login.php`) |
+| `HM_LOGOUT_V2_PATH` | Path logout bước 1 (vd `/v2_login.php`) |
+| `HM_LOGOUT_FINAL_PATH` | Path logout bước 2 (vd `/logout.php`) |
 
 #### Cho Web Push
 
@@ -528,7 +528,7 @@ Cấu hình qua Cloudflare Dashboard (hoặc `wrangler.toml`):
 5. **Fail-safe check**: nếu `courses` rỗng HOẶC `output.courses` rỗng → exit(1), KHÔNG push Firestore
 6. Push JSON lên Firestore — **không commit vào repo**
 
-### Crawl lịch học (HocMai)
+### Crawl lịch học
 
 1. GitHub Actions chạy `crawl_calendar.py` 4 lần/ngày (full crawl) hoặc mỗi 16 phút (watch mode backup)
 2. **Full mode**: đăng nhập Moodle → fetch calendar API → merge với data cũ (giữ m3u8) → push `app_data/schedule`
@@ -579,7 +579,7 @@ brightweb/
 ├── admin-check.js          # Logic check & report
 ├── admin-check.css         # Styles cho tool
 ├── sync_drive.py           # Script sync Drive + YouTube → Firestore
-├── crawl_calendar.py       # Script crawl lịch HocMai → Firestore           [MỚI]
+├── crawl_calendar.py       # Script crawl lịch  → Firestore                 [MỚI]
 ├── lophoc_api.py           # HTTP client lophoc.secret.vn (lấy m3u8)        [MỚI]
 ├── firestore_rest.py       # Helper Firestore REST API (cache token, list)  [MỚI]
 ├── worker.js               # Cloudflare Worker (sync trigger + push + cron) [MỚI - rewrite 10x]
@@ -638,20 +638,9 @@ BrightWeb áp dụng nhiều lớp bảo vệ — client-side guards có thể b
 - **`uid`/`email` từ JWT** — không tin request body (chống mạo danh)
 - **`/push/unsubscribe` ownership check** — đọc doc, so `uid` với `payload.sub`
 - **`/push/subscribe` SSRF allowlist** — endpoint phải `https:` + host thuộc 4 push services (googleapis, mozilla, windows, apple)
-- **`/go` regex + domain allowlist** — `^[\w-]{1,128}$` cho session/user; `.hocmai.net|.hocmai.vn|.hcdn.vn|.viettelcdn.vn` cho `to`
+- **`/go` regex + domain allowlist** — `^[\w-]{1,128}$` cho session/user
 - **Secret redaction in logs** — `redactBody()` regex replace token/password/session/cookie/jwt trước khi log
 
-### Stream URL Allowlist (app.js)
-
-```javascript
-function isTrustedStreamUrl(u) {
-  const allowedHosts = [
-    /\.hocmai\.net$/, /\.viettelcdn\.vn$/,
-    /^www\.youtube\.com$/, /^youtube\.com$/, /^youtu\.be$/,
-  ];
-  return allowedHosts.some(re => re.test(new URL(u).hostname));
-}
-```
 
 → Chặn URL độc hại nếu Firestore `app_data/schedule` bị compromise (service account leak, admin bị hack). Áp dụng cho cả `openLiveInNewTab` + `setLiveModeOnEvent` (admin Go Live).
 
@@ -663,7 +652,6 @@ script-src 'self' cdn.jsdelivr.net gstatic.com apis.google.com youtube.com cdn.p
 style-src 'self' 'unsafe-inline' fonts.googleapis.com cdn.plyr.io;
 connect-src 'self' *.firebaseio.com *.googleapis.com identitytoolkit.googleapis.com
             brightweb-sync.mcdg5444.workers.dev youtube.com noembed.com
-            evg-stream.hocmai.net *.hocmai.net cdn.plyr.io;   ← MỚI (HLS streaming)
 frame-src youtube.com brightwebaccbase.firebaseapp.com;
 worker-src 'self' blob:;                                     ← MỚI (Service Worker)
 object-src 'none';
@@ -678,7 +666,7 @@ object-src 'none';
 - **Undo stack serialize toàn bộ `_overrides`**: đơn giản nhưng hiệu quả — JSON.stringify/parse đủ nhanh cho object kích thước này
 - **`lastPosition` tách `watchedTime`**: `watchedTime` là max (dùng tính % hoàn thành), `lastPosition` là vị trí gần nhất (dùng resume) — không còn kẹt resume từ cuối khi đã xem hết
 - **Caption watchdog 1.5s**: YouTube đôi khi tự bật captions dù `cc_load_policy: 0` (do user setting browser) — interval force `unloadModule('captions')` mỗi 1.5s + bind vào 4 events (volumechange, pause, playing, seeked)
-- **`server_only/` cho cookie HocMai trả phí**: Cookie MoodleSession bị lộ = kẻ tấn công login thẳng vào tài khoản HocMai trả phí → firebase.rule `allow read, write: if false`, chỉ service account truy cập qua REST
+- **`server_only/` cho cookie học trả phí**: Cookie MoodleSession bị lộ = kẻ tấn công login thẳng vào tài khoản học trả phí → firebase.rule `allow read, write: if false`, chỉ service account truy cập qua REST
 - **Web Push encryption thuần Web Crypto**: RFC 8291 + RFC 8188 aes128gcm + VAPID ES256 — không cần `nodejs_compat`, chạy được trên Cloudflare Free plan (10ms CPU/invocation)
 - **`redactBody()` trong Worker**: log error body chứa token/password/session/cookie/jwt → regex replace `$1=***` trước khi log, tránh leak secret vào Cloudflare logs
 
